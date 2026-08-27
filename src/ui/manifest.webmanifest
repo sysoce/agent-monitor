@@ -1,0 +1,19 @@
+{
+  "name": "Agent Monitor",
+  "short_name": "Agent",
+  "description": "Autonomous AI Agent Mobile Monitor",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#181818",
+  "theme_color": "#181818",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "agent-monitor",
+  "version": "1.0.0",
+  "description": "Mobile-first PWA and real-time live monitoring dashboard for autonomous AI coding agents",
+  "main": "dist/server/server.js",
+  "types": "dist/server/server.d.ts",
+  "bin": {
+    "agent-monitor": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "start": "node dist/cli.js start",
+    "setup": "node dist/cli.js setup",
+    "export": "node dist/cli.js export",
+    "tunnel": "node dist/cli.js tunnel",
+    "test": "tsx --test test/*.test.ts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "agent",
+    "monitor",
+    "pwa",
+    "dashboard",
+    "autonomous-agents",
+    "realtime",
+    "sse",
+    "gist-sync",
+    "single-file"
+  ],
+  "author": "sysoce",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.17.19",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
