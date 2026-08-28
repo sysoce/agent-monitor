@@ -43,12 +43,13 @@ export function applyGistSyncPayload(state: AppState, payload: SyncGistPayload):
     if (!state.activeSessionId) {
       if (state.activeTab !== 'chat') {
         state.activeSessionId = payload.activeSession?.sessionId || state.sessions[0]?.id;
-      } else if (payload.activeSession?.sessionId && isMessageFinished(payload.activeSession.session?.messages?.slice(-1)[0])) {
-        state.activeSessionId = payload.activeSession.sessionId;
       }
+    } else if (!state.sessions.some((s) => s.id === state.activeSessionId)) {
+      state.activeSessionId = payload.activeSession?.sessionId || state.sessions[0]?.id;
     }
+    state.isLoadingSessions = false;
   } else if (payload.sessions && payload.sessions.length === 0 && !state.activeSessionId) {
-    Object.assign(state, { sessions: [], activeSessionId: undefined, activeSession: undefined, activeTab: 'sidebar' });
+    Object.assign(state, { sessions: [], activeSessionId: undefined, activeSession: undefined, activeTab: 'sidebar', isLoadingSessions: false });
   }
 
   const sid = state.activeSessionId;
@@ -68,6 +69,7 @@ export function applyGistSyncPayload(state: AppState, payload: SyncGistPayload):
   if (matched && sid) {
     state.activeSession = mergeSessionDetail(state.activeSession, matched, payload.inbox);
     state.plans = matched.plans || [];
+    state.isLoadingSession = false;
     if (isAbortedRecently && state.activeSession) {
       state.activeSession.isGenerating = false;
     }

@@ -7088,7 +7088,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.0" : "2.3.198";
+  var CLIENT_VERSION = true ? "1.0.1" : "2.3.198";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7204,12 +7204,13 @@ input:checked + .slider:before {
       if (!state2.activeSessionId) {
         if (state2.activeTab !== "chat") {
           state2.activeSessionId = payload.activeSession?.sessionId || state2.sessions[0]?.id;
-        } else if (payload.activeSession?.sessionId && isMessageFinished(payload.activeSession.session?.messages?.slice(-1)[0])) {
-          state2.activeSessionId = payload.activeSession.sessionId;
         }
+      } else if (!state2.sessions.some((s) => s.id === state2.activeSessionId)) {
+        state2.activeSessionId = payload.activeSession?.sessionId || state2.sessions[0]?.id;
       }
+      state2.isLoadingSessions = false;
     } else if (payload.sessions && payload.sessions.length === 0 && !state2.activeSessionId) {
-      Object.assign(state2, { sessions: [], activeSessionId: void 0, activeSession: void 0, activeTab: "sidebar" });
+      Object.assign(state2, { sessions: [], activeSessionId: void 0, activeSession: void 0, activeTab: "sidebar", isLoadingSessions: false });
     }
     const sid = state2.activeSessionId;
     const matched = sid ? payload.sessionDetails?.[sid] || (payload.activeSession?.sessionId === sid ? payload.activeSession.session : void 0) : void 0;
@@ -7226,6 +7227,7 @@ input:checked + .slider:before {
     if (matched && sid) {
       state2.activeSession = mergeSessionDetail(state2.activeSession, matched, payload.inbox);
       state2.plans = matched.plans || [];
+      state2.isLoadingSession = false;
       if (isAbortedRecently && state2.activeSession) {
         state2.activeSession.isGenerating = false;
       }
@@ -7845,8 +7847,8 @@ input:checked + .slider:before {
       this.state.isAuthenticated = urlConfig.imported || !auth.required || auth.authorized;
       this.render();
       if (this.state.isAuthenticated) {
-        await this.reloadData(true);
         this.applyPersistedSyncMode();
+        await this.reloadData(true);
         void checkForUpdates(this.state, this.render);
       }
     }
@@ -8805,42 +8807,6 @@ input:checked + .slider:before {
         <div class="connection-notice-content">
           <span class="connection-notice-title">Host Disconnected</span>
           <span class="connection-notice-text">${escapeHtml2(detail)}</span>
-        </div>
-      </div>
-    `;
-    }
-    if (state2.syncMode === "git-backup" && state2.isAwaitingResponse) {
-      const host = state2.hostPresence;
-      const msgTime = state2.awaitingMessageTimestamp || 0;
-      const now = Date.now();
-      if (host && host.lastActiveAt && now - host.lastActiveAt > 18e4) {
-        return `
-        <div class="connection-notice connection-notice--warning" role="status">
-          <span class="connection-notice-icon">\u{1F4A4}</span>
-          <div class="connection-notice-content">
-            <span class="connection-notice-title">Host Computer Asleep</span>
-            <span class="connection-notice-text">Host agent appears inactive or on a different network. Wake up computer to proceed.</span>
-          </div>
-        </div>
-      `;
-      }
-      if (host && host.lastSyncedAt && host.lastSyncedAt > msgTime) {
-        return `
-        <div class="connection-notice connection-notice--received" role="status">
-          <span class="connection-notice-icon">\u26A1</span>
-          <div class="connection-notice-content">
-            <span class="connection-notice-title">Received by Host</span>
-            <span class="connection-notice-text">Host is processing your request in background.</span>
-          </div>
-        </div>
-      `;
-      }
-      return `
-      <div class="connection-notice connection-notice--queued" role="status">
-        <span class="connection-notice-icon">\u23F3</span>
-        <div class="connection-notice-content">
-          <span class="connection-notice-title">Prompt Queued in Git Sync</span>
-          <span class="connection-notice-text">Waiting for host agent to process. Ensure your host computer is awake.</span>
         </div>
       </div>
     `;

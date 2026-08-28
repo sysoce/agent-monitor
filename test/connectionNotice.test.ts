@@ -41,16 +41,14 @@ test('renderConnectionNotice renders offline / sleep notice when syncStatus is d
   assert.match(html, /computer may be asleep/i);
 });
 
-test('renderConnectionNotice renders queuing notice when in git-backup mode and awaiting response', () => {
+test('renderConnectionNotice returns empty string when in git-backup mode and awaiting response', () => {
   const state = createMockState({
     syncMode: 'git-backup',
     syncStatus: 'connected',
     isAwaitingResponse: true,
   });
   const html = renderConnectionNotice(state);
-  assert.match(html, /connection-notice--queued/);
-  assert.match(html, /Git Sync/i);
-  assert.match(html, /awake/i);
+  assert.equal(html, '');
 });
 
 test('renderConnectionNotice safely escapes dangerous HTML in error messages', () => {

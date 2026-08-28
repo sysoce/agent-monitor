@@ -51,45 +51,5 @@ export function renderConnectionNotice(state: AppState): string {
     `;
   }
 
-  if (state.syncMode === 'git-backup' && state.isAwaitingResponse) {
-    const host = state.hostPresence;
-    const msgTime = state.awaitingMessageTimestamp || 0;
-    const now = Date.now();
-
-    if (host && host.lastActiveAt && (now - host.lastActiveAt > 180_000)) {
-      return `
-        <div class="connection-notice connection-notice--warning" role="status">
-          <span class="connection-notice-icon">💤</span>
-          <div class="connection-notice-content">
-            <span class="connection-notice-title">Host Computer Asleep</span>
-            <span class="connection-notice-text">Host agent appears inactive or on a different network. Wake up computer to proceed.</span>
-          </div>
-        </div>
-      `;
-    }
-
-    if (host && host.lastSyncedAt && host.lastSyncedAt > msgTime) {
-      return `
-        <div class="connection-notice connection-notice--received" role="status">
-          <span class="connection-notice-icon">⚡</span>
-          <div class="connection-notice-content">
-            <span class="connection-notice-title">Received by Host</span>
-            <span class="connection-notice-text">Host is processing your request in background.</span>
-          </div>
-        </div>
-      `;
-    }
-
-    return `
-      <div class="connection-notice connection-notice--queued" role="status">
-        <span class="connection-notice-icon">⏳</span>
-        <div class="connection-notice-content">
-          <span class="connection-notice-title">Prompt Queued in Git Sync</span>
-          <span class="connection-notice-text">Waiting for host agent to process. Ensure your host computer is awake.</span>
-        </div>
-      </div>
-    `;
-  }
-
   return '';
 }

@@ -4,6 +4,7 @@ import type { GistClient } from './gistClient';
 import type { SyncOutboxState } from './types';
 import { listSessions, getSessionDetail, stopSession } from '../server/sessionStore';
 import { sanitizeSessionForSync } from './syncSanitizer';
+import { computeSessionsFingerprint } from './syncFingerprint';
 
 export class LocalSyncWorker {
   private pollTimer?: NodeJS.Timeout;
@@ -14,6 +15,7 @@ export class LocalSyncWorker {
   private lastSessionsFingerprint = '';
   private lastOutboxSyncTime = 0;
   private pendingActiveSessionId?: string;
+  private cachedAppVersion?: string;
 
   constructor(
     private readonly workspaceRoot: string,
@@ -21,19 +23,10 @@ export class LocalSyncWorker {
   ) {}
 
   private async computeFingerprint(sessions: Array<{ id: string; updatedAt: number; messageCount: number }>): Promise<string> {
-    const topId = sessions[0]?.id;
-    let draftMtime = 0, hasActive = false;
-    if (topId) {
-      try {
-        const sDir = path.join(this.workspaceRoot, '.agent', 'sessions', topId);
-        draftMtime = (await fs.stat(path.join(sDir, 'live_draft.json')).catch(() => ({ mtimeMs: 0 }))).mtimeMs;
-        hasActive = Boolean((await fs.stat(path.join(sDir, '.active')).catch(() => null))?.isFile());
-      } catch {}
-    }
-    return sessions.slice(0, 20).map((s) => `${s.id}:${s.updatedAt}:${s.messageCount}`).join('|') + `|d:${draftMtime}|a:${hasActive}`;
+    return computeSessionsFingerprint(this.workspaceRoot, sessions);
   }
 
-  private async loadRecentDetails(sessions: Array<{ id: string }>, extraId?: string, limit = 15): Promise<Record<string, any>> {
+  private async loadRecentDetails(sessions: Array<{ id: string }>, extraId?: string, limit = 3): Promise<Record<string, any>> {
     const details: Record<string, any> = {};
     const targetIds = new Set(sessions.slice(0, limit).map((s) => s.id));
     if (extraId) targetIds.add(extraId);
@@ -52,7 +45,8 @@ export class LocalSyncWorker {
     try {
       const res = await this.gistClient.fetchSyncState(this.lastEtag);
       if (res.etag) this.lastEtag = res.etag;
-      const sessions = await listSessions(this.workspaceRoot);
+      const allSessions = await listSessions(this.workspaceRoot);
+      const sessions = allSessions.slice(0, 40);
       const currentFp = await this.computeFingerprint(sessions);
       if (currentFp !== this.lastSessionsFingerprint || (!res.notModified && res.data && res.data.sessions.length === 0)) {
         this.lastSessionsFingerprint = currentFp;
@@ -83,15 +77,17 @@ export class LocalSyncWorker {
         sessions.unshift({ id: activeId, title: recentDetails[activeId]?.title || activeId, createdAt: Date.now(), updatedAt: Date.now(), messageCount: 1, preview: res.data.inbox[0]?.content?.slice(0, 80) || '(empty session)' });
       }
       const activeDetail = activeId ? (recentDetails[activeId] || await getSessionDetail(this.workspaceRoot, activeId)) : undefined;
-      const outbox: SyncOutboxState = { sessionId: activeId || '', updatedAt: Date.now(), session: activeDetail || undefined, plans: activeDetail?.plans || [] };
+      const outbox: SyncOutboxState = { sessionId: activeId || '', updatedAt: Date.now(), session: activeDetail ? sanitizeSessionForSync(activeDetail) : undefined, plans: activeDetail?.plans || [] };
       this.lastSessionsFingerprint = await this.computeFingerprint(sessions);
       this.lastOutboxSyncTime = Date.now();
-      const appVer = await this.getAppVersion();
-      await this.gistClient.updateOutboxAndDrainInbox(outbox, processedIds, sessions, recentDetails, res.data, appVer);
-    } catch {} finally { this.isProcessing = false; }
+      await this.gistClient.updateOutboxAndDrainInbox(outbox, processedIds, sessions, recentDetails, res.data, await this.getAppVersion());
+    } catch (err) {
+      console.error('[SyncWorker Poll Error]', err);
+    } finally {
+      this.isProcessing = false;
+    }
   }
 
-  private cachedAppVersion?: string;
   private async getAppVersion(): Promise<string | undefined> {
     if (this.cachedAppVersion) return this.cachedAppVersion;
     try {
@@ -106,13 +102,20 @@ export class LocalSyncWorker {
     this.isSyncingOutbox = true;
     this.lastOutboxSyncTime = Date.now();
     try {
-      const sessions = await listSessions(this.workspaceRoot), targetId = activeSessionId || this.pendingActiveSessionId || sessions[0]?.id;
+      const allSessions = await listSessions(this.workspaceRoot);
+      const sessions = allSessions.slice(0, 40);
+      const targetId = activeSessionId || this.pendingActiveSessionId || sessions[0]?.id;
       this.lastSessionsFingerprint = await this.computeFingerprint(sessions);
       const recentDetails = await this.loadRecentDetails(sessions, targetId);
       const detail = targetId ? (recentDetails[targetId] || await getSessionDetail(this.workspaceRoot, targetId)) : undefined;
-      const outbox: SyncOutboxState = { sessionId: targetId || '', updatedAt: Date.now(), session: detail || undefined, plans: detail?.plans || [] };
+      const sanitizedDetail = detail ? sanitizeSessionForSync(detail) : undefined;
+      const outbox: SyncOutboxState = { sessionId: targetId || '', updatedAt: Date.now(), session: sanitizedDetail, plans: detail?.plans || [] };
       await this.gistClient.updateOutboxAndDrainInbox(outbox, [], sessions, recentDetails, null, await this.getAppVersion());
-    } catch {} finally { this.isSyncingOutbox = false; }
+    } catch (err) {
+      console.error('[SyncWorker Outbox Error]', err);
+    } finally {
+      this.isSyncingOutbox = false;
+    }
   }
 
   private async isGenerating(targetId?: string): Promise<boolean> {

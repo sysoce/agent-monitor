@@ -36,7 +36,7 @@ test('renderNavHeader shows host presence when in git-backup mode', () => {
   assert.ok(html.includes('Host Online') || html.includes('Git Backup'));
 });
 
-test('renderConnectionNotice shows queued when awaiting response and host has not synced', () => {
+test('renderConnectionNotice stays clean without banner when awaiting response', () => {
   const state = createBaseState();
   state.isAwaitingResponse = true;
   state.awaitingMessageTimestamp = Date.now();
@@ -45,44 +45,9 @@ test('renderConnectionNotice shows queued when awaiting response and host has no
     clientName: 'Desktop Host',
     deviceType: 'desktop',
     lastActiveAt: Date.now() - 60000,
-    lastSyncedAt: Date.now() - 60000, // Synced BEFORE message was sent
+    lastSyncedAt: Date.now() - 60000,
   };
 
   const html = renderConnectionNotice(state);
-  assert.ok(html.includes('Prompt Queued in Git Sync'));
-  assert.ok(html.includes('Waiting for host'));
-});
-
-test('renderConnectionNotice shows received when host synced after message timestamp', () => {
-  const state = createBaseState();
-  const now = Date.now();
-  state.isAwaitingResponse = true;
-  state.awaitingMessageTimestamp = now - 5000;
-  state.hostPresence = {
-    clientId: 'desktop-host',
-    clientName: 'Desktop Host',
-    deviceType: 'desktop',
-    lastActiveAt: now - 1000,
-    lastSyncedAt: now - 1000, // Synced AFTER message was sent
-  };
-
-  const html = renderConnectionNotice(state);
-  assert.ok(html.includes('Received by Host') || html.includes('Synced with Host') || html.includes('Host is processing'));
-});
-
-test('renderConnectionNotice warns when host is asleep / inactive for over 3 minutes', () => {
-  const state = createBaseState();
-  const now = Date.now();
-  state.isAwaitingResponse = true;
-  state.awaitingMessageTimestamp = now;
-  state.hostPresence = {
-    clientId: 'desktop-host',
-    clientName: 'Desktop Host',
-    deviceType: 'desktop',
-    lastActiveAt: now - 200000, // > 3 minutes ago
-    lastSyncedAt: now - 200000,
-  };
-
-  const html = renderConnectionNotice(state);
-  assert.ok(html.includes('asleep') || html.includes('inactive') || html.includes('different network'));
+  assert.equal(html, '');
 });

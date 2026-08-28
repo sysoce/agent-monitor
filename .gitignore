@@ -10,3 +10,4 @@ yarn-error.log*
 .env.*
 .agent-sync.json
 .gist-sync.json
+.agent/

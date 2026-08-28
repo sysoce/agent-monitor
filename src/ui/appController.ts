@@ -123,8 +123,8 @@ export class AppController {
     this.state.isAuthenticated = urlConfig.imported || !auth.required || auth.authorized;
     this.render();
     if (this.state.isAuthenticated) {
-      await this.reloadData(true);
       this.applyPersistedSyncMode();
+      await this.reloadData(true);
       void checkForUpdates(this.state, this.render);
     }
   }
