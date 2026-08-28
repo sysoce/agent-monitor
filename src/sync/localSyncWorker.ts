@@ -5,6 +5,7 @@ import type { SyncOutboxState } from './types';
 import { listSessions, getSessionDetail, stopSession } from '../server/sessionStore';
 import { sanitizeSessionForSync } from './syncSanitizer';
 import { computeSessionsFingerprint } from './syncFingerprint';
+import { CLIENT_VERSION } from '../ui/version';
 
 export class LocalSyncWorker {
   private pollTimer?: NodeJS.Timeout;
@@ -88,13 +89,8 @@ export class LocalSyncWorker {
     }
   }
 
-  private async getAppVersion(): Promise<string | undefined> {
-    if (this.cachedAppVersion) return this.cachedAppVersion;
-    try {
-      const pkg = JSON.parse(await fs.readFile(path.join(this.workspaceRoot, 'package.json'), 'utf8')) as { version?: string };
-      if (pkg.version) this.cachedAppVersion = pkg.version;
-    } catch {}
-    return this.cachedAppVersion;
+  private async getAppVersion(): Promise<string> {
+    return CLIENT_VERSION;
   }
 
   async syncOutboxOnce(activeSessionId?: string): Promise<void> {
