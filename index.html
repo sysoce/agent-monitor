@@ -4240,7 +4240,7 @@ body {
   border-color: #58a6ff;
 }
 .app-composer {
-  padding: 8px 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px)) 12px;
   background: #181818;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
@@ -4252,7 +4252,7 @@ body {
   background: #222222;
   border: 1px solid #343434;
   border-radius: 12px;
-  padding: 8px 12px 6px;
+  padding: 6px 10px 5px;
   position: relative;
   transition: none;
 }
@@ -5642,7 +5642,14 @@ body {
     padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 0 10px;
   }
   .app-composer {
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) 10px;
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom, 0px)) 8px;
+  }
+  .composer-card {
+    padding: 5px 8px 4px;
+    border-radius: 10px;
+  }
+  .composer-textarea {
+    min-height: 36px;
   }
   .composer-textarea,
   .composer-input,
@@ -7088,7 +7095,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.1" : "1.0.1";
+  var CLIENT_VERSION = true ? "1.0.2" : "1.0.2";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -10211,7 +10218,7 @@ ${thought.trim()}` : thought.trim();
           id="composer-input"
           class="composer-textarea composer-input"
           placeholder="Plan, Build, instruction... (@ for context)"
-          rows="2"
+          rows="1"
         >${escapeHtml2(state2.composerDraft || "")}</textarea>
         <div class="composer-toolbar">
           <div class="composer-toolbar-left mode-selectors">
