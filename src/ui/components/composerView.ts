@@ -29,7 +29,7 @@ export function renderComposerView(state: AppState): string {
         <textarea
           id="composer-input"
           class="composer-textarea composer-input"
-          placeholder="Plan, Build, instruction... (@ for context)"
+          placeholder="Message or instruction... (@ for context)"
           rows="1"
         >${escapeHtml(state.composerDraft || '')}</textarea>
         <div class="composer-toolbar">

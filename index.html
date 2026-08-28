@@ -3524,12 +3524,10 @@ html,
 body {
   width: 100%;
   height: 100%;
-  height: var(--app-height, 100dvh);
+  min-height: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
-  position: fixed;
-  inset: 0;
   background: #121212;
   color: #e6e6e6;
   font-family:
@@ -3541,6 +3539,7 @@ body {
     Arial,
     sans-serif;
   touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
 }
 #app {
   width: 100%;
@@ -4240,7 +4239,7 @@ body {
   border-color: #58a6ff;
 }
 .app-composer {
-  padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px)) 12px;
+  padding: 8px 12px max(8px, env(safe-area-inset-bottom, 8px)) 12px;
   background: #181818;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
@@ -4249,16 +4248,17 @@ body {
 .composer-card {
   display: flex;
   flex-direction: column;
-  background: #222222;
-  border: 1px solid #343434;
-  border-radius: 12px;
-  padding: 6px 10px 5px;
+  background: #212121;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 10px 12px 8px;
   position: relative;
-  transition: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .composer-card:focus-within {
   border-color: #388bfd;
-  box-shadow: 0 0 0 1px rgba(56, 139, 253, 0.25);
+  box-shadow: 0 0 0 1px rgba(56, 139, 253, 0.35);
 }
 .composer-attachments {
   display: flex;
@@ -4268,31 +4268,31 @@ body {
 }
 .composer-textarea {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   max-height: 180px;
   background: transparent;
   border: none;
   outline: none;
   color: #f0f0f0;
   font-family: inherit;
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.45;
   resize: none;
-  padding: 0;
+  padding: 2px 0 4px;
   margin: 0;
   box-sizing: border-box;
 }
 .composer-textarea::placeholder {
-  color: #808080;
+  color: #888888;
 }
 .composer-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 6px;
+  padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 .composer-toolbar-left {
   display: flex;
@@ -4308,16 +4308,17 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #999999;
-  font-size: 12.5px;
+  color: #a0a0a0;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  touch-action: manipulation;
 }
 .composer-icon-btn:hover {
   background: rgba(255, 255, 255, 0.12);
@@ -4327,17 +4328,19 @@ body {
 .composer-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 6px;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #d0d0d0;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
+  touch-action: manipulation;
 }
 .composer-pill:hover {
   background: rgba(255, 255, 255, 0.12);
@@ -4367,12 +4370,12 @@ body {
 }
 .btn-send,
 .send-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border: none;
   border-radius: 50%;
-  background: var(--vscode-button-background, #0078d4);
-  color: var(--vscode-button-foreground, #ffffff);
+  background: #388bfd;
+  color: #ffffff;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -4380,20 +4383,25 @@ body {
   flex-shrink: 0;
   padding: 0;
   transition: background 0.15s ease, transform 0.1s ease;
+  touch-action: manipulation;
 }
 .btn-send:hover:not(:disabled),
 .send-btn:hover:not(:disabled) {
-  background: var(--vscode-button-hoverBackground, #0284c7);
-  transform: scale(1.04);
+  background: #58a6ff;
+  transform: scale(1.05);
+}
+.btn-send:active:not(:disabled),
+.send-btn:active:not(:disabled) {
+  transform: scale(0.92);
 }
 .btn-stop,
 .send-btn.stop-mode {
-  width: 32px;
-  height: 32px;
-  background: var(--vscode-inputValidation-errorBackground, rgba(190, 17, 0, 0.25));
-  color: var(--vscode-inputValidation-errorForeground, #f48771);
+  width: 34px;
+  height: 34px;
+  background: #da3633;
+  color: #ffffff;
   border-radius: 50%;
-  border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(248, 81, 73, 0.35));
+  border: 1px solid rgba(248, 81, 73, 0.5);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -4401,12 +4409,16 @@ body {
   flex-shrink: 0;
   padding: 0;
   transition: background 0.15s ease, transform 0.1s ease;
+  touch-action: manipulation;
 }
 .btn-stop:hover:not(:disabled),
 .send-btn.stop-mode:hover:not(:disabled) {
-  background: var(--vscode-inputValidation-errorBorder, rgba(190, 17, 0, 0.45));
-  color: var(--vscode-editor-foreground, #ffffff);
-  transform: scale(1.04);
+  background: #f85149;
+  transform: scale(1.05);
+}
+.btn-stop:active:not(:disabled),
+.send-btn.stop-mode:active:not(:disabled) {
+  transform: scale(0.92);
 }
 .composer-actions {
   display: flex;
@@ -5639,17 +5651,23 @@ body {
     box-shadow: none;
   }
   .app-header {
-    padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 0 10px;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 0 12px;
+  }
+  .btn-qr-text {
+    display: none;
+  }
+  .btn-qr-pill {
+    padding: 3px 6px;
   }
   .app-composer {
-    padding: 4px 8px calc(4px + env(safe-area-inset-bottom, 0px)) 8px;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom, 8px)) 10px;
   }
   .composer-card {
-    padding: 5px 8px 4px;
-    border-radius: 10px;
+    padding: 8px 10px 6px;
+    border-radius: 14px;
   }
   .composer-textarea {
-    min-height: 36px;
+    min-height: 44px;
   }
   .composer-textarea,
   .composer-input,
@@ -5663,20 +5681,28 @@ body {
     font-size: 13px;
   }
   .chat-scroll {
-    padding: 14px 16px 10px;
+    padding: 12px 16px 8px;
+    gap: 12px;
   }
   .msg.user {
     max-width: 88%;
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+  .msg.assistant {
+    font-size: 14.5px;
   }
   .model-picker-dropdown {
     position: fixed;
     left: 10px;
     right: 10px;
-    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(75px + env(safe-area-inset-bottom, 0px));
     width: auto;
     min-width: 0;
     max-width: none;
     max-height: 55vh;
+    border-radius: 14px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45);
   }
   .diff-card,
   .code-block {
@@ -7095,7 +7121,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.2" : "1.0.2";
+  var CLIENT_VERSION = true ? "1.0.3" : "1.0.3";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -10217,7 +10243,7 @@ ${thought.trim()}` : thought.trim();
         <textarea
           id="composer-input"
           class="composer-textarea composer-input"
-          placeholder="Plan, Build, instruction... (@ for context)"
+          placeholder="Message or instruction... (@ for context)"
           rows="1"
         >${escapeHtml2(state2.composerDraft || "")}</textarea>
         <div class="composer-toolbar">
