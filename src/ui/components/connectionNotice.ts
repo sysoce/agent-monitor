@@ -14,6 +14,27 @@ export function renderConnectionNotice(state: AppState): string {
     `;
   }
 
+  if (state.availableUpdateVersion) {
+    const isDownloaded = Boolean(state.updateDownloaded);
+    const ver = escapeHtml(state.availableUpdateVersion);
+    const detail = isDownloaded
+      ? `A new version (v${ver}) has been downloaded. Reload or reopen the file to start using it.`
+      : `A new version (v${ver}) is available.`;
+    const buttons = isDownloaded
+      ? `<button type="button" class="btn btn-secondary btn-reload-update" id="btn-reload-page" style="margin-left: auto; padding: 4px 10px; font-size: 11px; flex-shrink: 0; cursor: pointer;">Reload</button>`
+      : `<button type="button" class="btn btn-secondary btn-download-update" id="btn-download-bundle" style="margin-left: auto; padding: 4px 10px; font-size: 11px; flex-shrink: 0; cursor: pointer;">Download v${ver}</button>`;
+    return `
+      <div class="connection-notice connection-notice--update" role="status">
+        <span class="connection-notice-icon">🚀</span>
+        <div class="connection-notice-content">
+          <span class="connection-notice-title">New Version Available (v${ver})</span>
+          <span class="connection-notice-text">${escapeHtml(detail)}</span>
+        </div>
+        ${buttons}
+      </div>
+    `;
+  }
+
   if (state.syncStatus === 'disconnected') {
     const isGit = state.syncMode === 'git-backup';
     const detail = isGit
@@ -31,6 +52,34 @@ export function renderConnectionNotice(state: AppState): string {
   }
 
   if (state.syncMode === 'git-backup' && state.isAwaitingResponse) {
+    const host = state.hostPresence;
+    const msgTime = state.awaitingMessageTimestamp || 0;
+    const now = Date.now();
+
+    if (host && host.lastActiveAt && (now - host.lastActiveAt > 180_000)) {
+      return `
+        <div class="connection-notice connection-notice--warning" role="status">
+          <span class="connection-notice-icon">💤</span>
+          <div class="connection-notice-content">
+            <span class="connection-notice-title">Host Computer Asleep</span>
+            <span class="connection-notice-text">Host agent appears inactive or on a different network. Wake up computer to proceed.</span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (host && host.lastSyncedAt && host.lastSyncedAt > msgTime) {
+      return `
+        <div class="connection-notice connection-notice--received" role="status">
+          <span class="connection-notice-icon">⚡</span>
+          <div class="connection-notice-content">
+            <span class="connection-notice-title">Received by Host</span>
+            <span class="connection-notice-text">Host is processing your request in background.</span>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="connection-notice connection-notice--queued" role="status">
         <span class="connection-notice-icon">⏳</span>

@@ -1,6 +1,7 @@
 import type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup } from '../server/types';
 import type { AttachmentItem } from '../types';
 import type { MentionSuggestionItem } from '../types';
+import type { ClientPresence } from '../sync/types';
 
 export type ActiveTab = 'sidebar' | 'chat' | 'plans';
 
@@ -25,6 +26,7 @@ export interface AppState {
   isSending: boolean;
   isAwaitingResponse?: boolean;
   awaitingSessionId?: string;
+  awaitingMessageTimestamp?: number;
   isAuthenticated: boolean;
   authError?: string;
   syncMode?: 'live-sse' | 'git-backup' | 'offline';
@@ -44,6 +46,18 @@ export interface AppState {
   autoUpdateEnabled?: boolean;
   availableUpdateVersion?: string;
   updateDownloaded?: boolean;
-  isUpdateModalOpen?: boolean;
+  hostPresence?: ClientPresence;
+  lastSyncedAt?: number;
+  rateLimitRemaining?: number;
+  isQrModalOpen?: boolean;
+  qrModalTarget?: 'gh_pages' | 'lan' | 'download';
+  qrCopyFeedback?: 'link' | 'hash';
+  serverSetupInfo?: {
+    githubPagesUrl?: string;
+    lanUrl?: string;
+    setupPayload?: string;
+    hasSyncConfig?: boolean;
+    gistId?: string;
+    version?: string;
+  };
 }
-

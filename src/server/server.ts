@@ -7,9 +7,11 @@ import { getLocalNetworkAddresses } from './networkAddress';
 import { startTunnel, type TunnelInstance } from './tunnel';
 import { generateSecurePin } from './auth';
 import type { MonitorServerConfig } from './types';
-import { loadSyncConfig } from '../sync/syncConfigLoader';
+import { loadSyncConfig, encodeSetupPayload } from '../sync/syncConfigLoader';
 import { LocalSyncWorker } from '../sync/localSyncWorker';
 import { GistClient } from '../sync/gistClient';
+import { generateQrMatrix } from '../qr/qrEncoder';
+import { renderQrToTerminal } from '../qr/qrRenderer';
 
 export function resolveStaticDir(): string {
   const candidates = [
@@ -83,13 +85,21 @@ export function startMonitorServer(customConfig?: Partial<MonitorServerConfig>):
       tunnelInstance = await startTunnel(port);
       if (tunnelInstance) console.log(` ▸ Public URL:   ${tunnelInstance.url}`);
     }
+    const payload = encodeSetupPayload({
+      token: syncConfig?.token || '',
+      gistId: syncConfig?.gistId || '',
+      password: password || syncConfig?.password || '',
+    });
+    const ghUrl = `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
+    console.log(` ▸ GitHub Pages: ${ghUrl}`);
     console.log(` ▸ Mobile Setup: http://localhost:${port}/setup`);
     if (password) console.log(` 🔐 Access Password:  ${password}`);
     console.log('------------------------------------------------------');
-    console.log(' 📱 Mobile Quick Connect (or visit /setup for QR):');
-    const targetUrl = tunnelInstance?.url || networks.find((n) => n.isTailscale)?.url || `http://localhost:${port}`;
-    console.log(`    ${targetUrl}`);
-    if (password) console.log(`    (Enter password "${password}" on the login screen)`);
+    console.log(' 📱 Mobile Pairing QR Code (Scan with phone camera):');
+    try {
+      const qrMatrix = generateQrMatrix(ghUrl);
+      console.log(renderQrToTerminal(qrMatrix));
+    } catch {}
     console.log('======================================================\n');
   });
 

@@ -29,6 +29,11 @@
   ],
   "author": "sysoce",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sysoce/agent-monitor.git"
+  },
+  "homepage": "https://sysoce.github.io/agent-monitor/",
   "devDependencies": {
     "@types/node": "^20.17.19",
     "esbuild": "^0.25.0",

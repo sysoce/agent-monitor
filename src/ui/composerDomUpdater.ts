@@ -53,6 +53,10 @@ export function updateComposerDOM(state: AppState, composerEl: HTMLElement): voi
     if (modelText && modelText.textContent !== modelLabel) {
       modelText.textContent = modelLabel;
     }
+    const modelBtn = modelWrapper.querySelector<HTMLButtonElement>('#btn-model-toggle');
+    if (modelBtn && typeof modelBtn.setAttribute === 'function') {
+      modelBtn.setAttribute('aria-expanded', state.isModelPickerOpen ? 'true' : 'false');
+    }
     const existingDropdown = modelWrapper.querySelector('.model-picker-dropdown');
     if (state.isModelPickerOpen) {
       const dropdownHtml = renderModelPickerDropdown(state);

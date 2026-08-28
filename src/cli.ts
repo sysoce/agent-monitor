@@ -70,11 +70,12 @@ async function main() {
     console.log(' 📱  Agent Mobile Monitor Setup Complete!');
     console.log('======================================================');
     console.log(` ▸ Gist Vault ID: ${res.config.gistId}`);
-    console.log(` ▸ Mobile Setup URL:\n   ${res.mobileUrl}\n`);
+    console.log(` ▸ Web App URL (GitHub Pages):\n   ${res.githubPagesUrl}`);
+    console.log(` ▸ Local Server URL:\n   ${res.mobileUrl}\n`);
     console.log(' Scan this QR code with your phone camera to connect:');
     console.log(res.qrTerminal);
     console.log('------------------------------------------------------');
-    console.log(' 💡 Tip: In Safari/Chrome, tap "Add to Home Screen" to install.');
+    console.log(' 💡 Tip: In Safari/Chrome, tap "Add to Home Screen" to install as PWA.');
     console.log('======================================================\n');
     return;
   }

@@ -59,12 +59,6 @@ export function handlePlanClick(target: HTMLElement, state: AppState, callbacks:
 }
 
 export function handleControlClick(target: HTMLElement, state: AppState, callbacks: EventHandlerCallbacks): boolean {
-  if (target.closest('#btn-open-settings')) {
-    state.isUpdateModalOpen = true; callbacks.onRender(); return true;
-  }
-  if (target.closest('#btn-close-update-modal, #btn-dismiss-update') || target.id === 'update-modal-backdrop') {
-    state.isUpdateModalOpen = false; callbacks.onRender(); return true;
-  }
   const autoUpdateChk = target.closest<HTMLInputElement>('#toggle-auto-update, .btn-toggle-auto-update');
   if (autoUpdateChk) {
     setAutoUpdateEnabled(autoUpdateChk.checked);
@@ -72,10 +66,12 @@ export function handleControlClick(target: HTMLElement, state: AppState, callbac
     callbacks.onRender();
     return true;
   }
-  if (target.closest('#btn-manual-download-update')) {
-    triggerBundleDownload('/download');
-    state.updateDownloaded = true;
-    callbacks.onRender();
+  if (target.closest('#btn-reload-page, .btn-reload-update')) {
+    if (typeof window !== 'undefined') window.location.reload();
+    return true;
+  }
+  if (target.closest('#btn-download-bundle, .btn-download-update')) {
+    triggerBundleDownload();
     return true;
   }
   if (target.closest('#btn-mode-toggle')) {

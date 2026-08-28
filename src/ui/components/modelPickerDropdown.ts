@@ -58,7 +58,7 @@ function renderGroupItems(
   return { groupHeaderHtml, itemsHtml };
 }
 
-export function renderModelPickerDropdown(state: AppState): string {
+export function renderModelMenuItemsHtml(state: AppState): string {
   const filter = (state.modelSearchQuery || '').toLowerCase().trim();
   const groups: ModelGroup[] = state.modelGroups?.length
     ? state.modelGroups
@@ -83,6 +83,10 @@ export function renderModelPickerDropdown(state: AppState): string {
         }</div>`
       : '';
 
+  return `${groupsHtml}${emptyHtml}`;
+}
+
+export function renderModelPickerDropdown(state: AppState): string {
   return `
     <div class="model-picker-menu model-picker-dropdown" id="model-picker-menu">
       <div class="model-menu-search-row">
@@ -97,7 +101,7 @@ export function renderModelPickerDropdown(state: AppState): string {
         />
       </div>
       <div class="model-menu-list model-picker-list" id="model-menu-list">
-        ${groupsHtml}${emptyHtml}
+        ${renderModelMenuItemsHtml(state)}
       </div>
     </div>
   `;

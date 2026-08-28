@@ -47,7 +47,7 @@ export function renderComposerView(state: AppState): string {
               </svg>
             </button>
             <div class="model-picker-wrapper mode-select">
-              <button type="button" class="composer-pill model-picker-btn model-pill" id="btn-model-toggle" title="Select Model">
+              <button type="button" class="composer-pill model-picker-btn" id="btn-model-toggle" title="Select Model" aria-expanded="${state.isModelPickerOpen ? 'true' : 'false'}">
                 <span class="model-text" id="composer-model-text">${escapeHtml(modelLabel)}</span>
                 <svg class="mode-picker-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
                   <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>

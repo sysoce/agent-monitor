@@ -10,7 +10,13 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiI+CiAgPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz4KICA8cGF0aCBkPSJNOCAxMmwyIDIgNC00Ii8+Cjwvc3ZnPgo=" />
   <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiI+CiAgPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz4KICA8cGF0aCBkPSJNOCAxMmwyIDIgNC00Ii8+Cjwvc3ZnPgo=" />
   <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIkFnZW50IE1vbml0b3IiLAogICJzaG9ydF9uYW1lIjogIkFnZW50IiwKICAiZGVzY3JpcHRpb24iOiAiQXV0b25vbW91cyBBSSBBZ2VudCBNb2JpbGUgTW9uaXRvciIsCiAgInN0YXJ0X3VybCI6ICIvIiwKICAic2NvcGUiOiAiLyIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgIm9yaWVudGF0aW9uIjogInBvcnRyYWl0LXByaW1hcnkiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMxODE4MTgiLAogICJ0aGVtZV9jb2xvciI6ICIjMTgxODE4IiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiL2ljb24uc3ZnIiwKICAgICAgInNpemVzIjogImFueSIsCiAgICAgICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLAogICAgICAicHVycG9zZSI6ICJhbnkgbWFza2FibGUiCiAgICB9CiAgXQp9Cg==" />
-  <style>
+  
+  <title>Agent Monitor</title>
+</head>
+<body>
+  <div id="app"></div>
+  
+  <style id="agent-monitor-style">
 /* src/ui/css/panel.css */
 :root {
   --vscode-font-family:
@@ -3590,6 +3596,18 @@ body {
   font-size: 13px;
   font-weight: 600;
 }
+.brand-version {
+  font-size: 10px;
+  font-weight: 500;
+  color: #888888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 2px;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
 .header-actions {
   display: flex;
   align-items: center;
@@ -5249,6 +5267,17 @@ body {
   color: #ffffff;
   margin-bottom: 4px;
 }
+.login-version {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 6px;
+  vertical-align: middle;
+}
 .login-subtitle {
   font-size: 12.5px;
   color: #888888;
@@ -5726,6 +5755,11 @@ body {
   border: 1px solid rgba(168, 85, 247, 0.35);
   color: #c084fc;
 }
+.connection-notice--update {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+}
 .connection-notice-icon {
   font-size: 16px;
   line-height: 1.2;
@@ -6107,6 +6141,81 @@ input:checked + .slider:before {
   padding: 10px 18px;
   border-top: 1px solid #27272a;
 }
+.sidebar-auto-update {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+.sidebar-auto-update-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sidebar-auto-update-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #f4f4f5;
+  display: flex;
+  align-items: center;
+}
+.sidebar-version-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: #888888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 4px;
+  line-height: 1.2;
+}
+.sidebar-auto-update-desc {
+  font-size: 11px;
+  color: #71717a;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #3f3f46;
+  border-radius: 20px;
+  transition: 0.2s;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+input:checked + .slider {
+  background-color: #2563eb;
+}
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
 .monitor-stats-widget {
   padding: 6px 0;
   margin-bottom: 4px;
@@ -6156,13 +6265,156 @@ input:checked + .slider:before {
   box-shadow: 0 0 6px #22c55e;
   animation: stream-dot-pulse 1.4s infinite ease-in-out both;
 }
+.btn-qr-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(14, 99, 156, 0.2);
+  border: 1px solid rgba(14, 99, 156, 0.45);
+  color: #4fc1ff;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-qr-pill:hover {
+  background: rgba(14, 99, 156, 0.4);
+  border-color: #0e639c;
+  color: #ffffff;
+}
+.btn-qr-icon {
+  font-size: 11.5px;
+}
+.sidebar-actions-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.sidebar-qr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: #252526;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sidebar-qr-btn:hover {
+  background: #2d2d30;
+  color: #ffffff;
+  border-color: #0e639c;
+}
+.qr-modal-card {
+  max-width: 440px;
+  width: 100%;
+}
+.qr-tabs-container {
+  display: flex;
+  gap: 6px;
+  background: #18181b;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #27272a;
+  margin: 12px 0;
+}
+.qr-tab-btn {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: transparent;
+  color: #888888;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.qr-tab-btn:hover {
+  color: #ffffff;
+}
+.qr-tab-btn.active {
+  background: #0e639c;
+  color: #ffffff;
+}
+.qr-svg-container {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 10px;
+  display: inline-block;
+  margin: 8px auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.qr-svg-container svg {
+  display: block;
+  max-width: 210px;
+  max-height: 210px;
+  width: 100%;
+  height: auto;
+}
+.qr-url-row {
+  margin: 10px 0;
+}
+.qr-link-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+  font-size: 11px;
+  text-align: center;
+  background: #141414;
+  border: 1px solid #333333;
+  padding: 6px 10px;
+  color: #cccccc;
+  border-radius: 6px;
+}
+.qr-action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.qr-btn-action {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.qr-download-row {
+  margin-top: 8px;
+}
+.qr-btn-download {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 11.5px;
+  padding: 8px 10px;
+  text-align: center;
+  text-decoration: none;
+}
+.qr-install-tips {
+  text-align: left;
+  background: #202020;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin-top: 14px;
+  border-left: 3px solid #0e639c;
+  color: #cccccc;
+}
+.qr-install-tips ol {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+}
 
-</style>
-  <title>Agent Monitor</title>
-</head>
-<body>
-  <div id="app"></div>
-  <script>
+  </style>
+  <script id="agent-monitor-bundle-fallback" type="text/plain">
 "use strict";
 (() => {
   var __create = Object.create;
@@ -6198,6 +6450,7 @@ input:checked + .slider:before {
 
   // src/ui/authStore.ts
   var TOKEN_KEY = "agent_monitor_token";
+  var SERVER_KEY = "agent_server_url";
   function getStoredToken() {
     try {
       const fromUrl = new URLSearchParams(window.location.search).get("token");
@@ -6224,6 +6477,31 @@ input:checked + .slider:before {
       localStorage.removeItem(TOKEN_KEY);
     } catch {
     }
+  }
+  function getServerBaseUrl() {
+    try {
+      const fromUrl = new URLSearchParams(window.location.search).get("server");
+      if (fromUrl) {
+        const clean = fromUrl.replace(/\/+$/, "");
+        setServerBaseUrl(clean);
+        return clean;
+      }
+      const stored = localStorage.getItem(SERVER_KEY);
+      if (stored) return stored.replace(/\/+$/, "");
+    } catch {
+    }
+    return "";
+  }
+  function setServerBaseUrl(url) {
+    try {
+      localStorage.setItem(SERVER_KEY, url.replace(/\/+$/, ""));
+    } catch {
+    }
+  }
+  function buildApiUrl(pathname) {
+    const base = getServerBaseUrl();
+    const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
+    return base ? `${base}${normalized}` : normalized;
   }
 
   // src/ui/apiClient.ts
@@ -6841,16 +7119,22 @@ input:checked + .slider:before {
     if (typeof localStorage === "undefined") return;
     localStorage.setItem(AUTO_UPDATE_KEY, String(enabled));
   }
-  function triggerBundleDownload(url = "/download") {
+  function triggerBundleDownload(url) {
     if (typeof document === "undefined") return;
+    const targetUrl = url ? url.startsWith("http") ? url : buildApiUrl(url) : buildApiUrl("/download");
+    if (!targetUrl || typeof window !== "undefined" && window.location.protocol === "file:" && !targetUrl.startsWith("http")) {
+      return;
+    }
     const a = document.createElement("a");
-    a.href = url;
+    a.href = targetUrl;
     a.download = "agent-monitor.html";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   }
-  function processVersionCheck(state2, remoteVersion, currentVersion = CLIENT_VERSION, downloader = triggerBundleDownload) {
+  function processVersionCheck(state2, remoteVersion, currentVersion = CLIENT_VERSION, downloader) {
     const hasUpdate = isNewerVersion(remoteVersion, currentVersion);
     if (!hasUpdate) {
       return { hasUpdate: false, autoDownloaded: false };
@@ -6858,18 +7142,20 @@ input:checked + .slider:before {
     state2.availableUpdateVersion = remoteVersion;
     const autoUpdate = isAutoUpdateEnabled();
     state2.autoUpdateEnabled = autoUpdate;
-    if (autoUpdate) {
-      downloader("/download");
+    const isFileProto = typeof window !== "undefined" && window.location.protocol === "file:";
+    const downloadUrl = buildApiUrl("/download");
+    if (autoUpdate && downloader && !isFileProto) {
+      downloader(downloadUrl);
       state2.updateDownloaded = true;
-      state2.isUpdateModalOpen = true;
       return { hasUpdate: true, autoDownloaded: true };
     }
     state2.updateDownloaded = false;
     return { hasUpdate: true, autoDownloaded: false };
   }
   async function checkForUpdates(state2, onRender) {
+    if (typeof window !== "undefined" && window.location.protocol === "file:" && !getServerBaseUrl()) return false;
     try {
-      const res = await fetch("/api/version", { cache: "no-store" });
+      const res = await fetch(buildApiUrl("/api/version"), { cache: "no-store" });
       if (!res.ok) return false;
       const data = await res.json();
       if (!data?.version) return false;
@@ -7265,6 +7551,17 @@ input:checked + .slider:before {
   }
 
   // src/sync/payloadCodec.ts
+  function encodeSetupPayload(config) {
+    const payload = JSON.stringify({
+      g: config.gistId || "",
+      t: config.token || "",
+      p: config.password || ""
+    });
+    if (typeof Buffer !== "undefined") {
+      return Buffer.from(payload, "utf8").toString("base64url");
+    }
+    return btoa(payload).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
   function decodeSetupPayload(raw) {
     if (!raw || typeof raw !== "string") return null;
     try {
@@ -7809,7 +8106,7 @@ input:checked + .slider:before {
   }
   function postProcessMermaidSvg(svg) {
     if (!svg) return "";
-    return svg.replace(/style="[^"]*max-width:[^;"]*;?/gi, 'style="max-width:100%;height:auto;display:block;margin:0 auto;').replace(/<svg\s+([^>]*)(width="[^"]*")([^>]*)>/i, '<svg $1 style="max-width:100%;height:auto;display:block;margin:0 auto;" $3>');
+    return svg.replace(/style="[^"]*max-width:[^;"]*;?/gi, 'style="max-width:100%;height:auto;display:block;margin:0 auto;').replace(/<svg\s+([^>]*)(width="[^"]*")([^>]*)>/i, '<svg  style="max-width:100%;height:auto;display:block;margin:0 auto;" $3>');
   }
 
   // src/ui/markdown/diagram/chartParser.ts
@@ -8076,9 +8373,9 @@ input:checked + .slider:before {
   }
   function formatInlineMarkdown(text) {
     let html = escapeHtml2(text);
-    html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    html = html.replace(/`([^`]+)`/g, '<code class="inline-code"></code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong></strong>");
+    html = html.replace(/\*([^*]+)\*/g, "<em></em>");
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, url) => {
       const cleanUrl = url.replace(/^file:\/\//, "");
       if (isPlanFilePath(cleanUrl)) {
@@ -8205,8 +8502,10 @@ input:checked + .slider:before {
     const isGit = state2.syncMode === "git-backup";
     const isConnected = state2.syncStatus === "connected";
     const isSyncing = state2.syncStatus === "syncing";
-    const statusColor = isGit ? "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
-    const statusLabel = isGit ? "Git Backup" : isConnected ? "Live" : isSyncing ? "Syncing" : "Offline";
+    const host = state2.hostPresence;
+    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
+    const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
+    const statusLabel = isGit ? isHostOnline ? "Git Backup (Host Online)" : "Git Backup" : isConnected ? "Live" : isSyncing ? "Syncing" : "Offline";
     const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
     const sessionTitle = state2.activeSession?.title?.trim();
     const sessionId = state2.activeSession?.id || state2.activeSessionId;
@@ -8218,15 +8517,16 @@ input:checked + .slider:before {
         <div class="brand">
           <span class="brand-icon">\u26A1</span>
           <span class="brand-name">Agent Monitor</span>
+          <span class="brand-version">v${escapeHtml2(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
+          <button type="button" id="btn-show-qr" class="btn-qr-pill" title="Pair mobile phone via QR code">
+            <span class="btn-qr-icon">\u{1F4F1}</span>
+            <span class="btn-qr-text">Connect Phone</span>
+          </button>
           <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / Git Backup mode">
             <span class="status-dot" style="background-color: ${statusColor}"></span>
             <span class="status-text">${statusLabel}</span>
-          </button>
-          <button type="button" id="btn-open-settings" class="btn-settings ${state2.availableUpdateVersion ? "has-update" : ""}" title="Update & Settings">
-            <span>\u2699\uFE0F</span>
-            ${state2.availableUpdateVersion ? '<span class="update-indicator-dot"></span>' : ""}
           </button>
           ${state2.isAuthenticated ? `<button type="button" id="btn-logout" class="btn-logout" title="Lock session">\u{1F512}</button>` : ""}
         </div>
@@ -8480,6 +8780,22 @@ input:checked + .slider:before {
       </div>
     `;
     }
+    if (state2.availableUpdateVersion) {
+      const isDownloaded = Boolean(state2.updateDownloaded);
+      const ver = escapeHtml2(state2.availableUpdateVersion);
+      const detail = isDownloaded ? `A new version (v${ver}) has been downloaded. Reload or reopen the file to start using it.` : `A new version (v${ver}) is available.`;
+      const buttons = isDownloaded ? `<button type="button" class="btn btn-secondary btn-reload-update" id="btn-reload-page" style="margin-left: auto; padding: 4px 10px; font-size: 11px; flex-shrink: 0; cursor: pointer;">Reload</button>` : `<button type="button" class="btn btn-secondary btn-download-update" id="btn-download-bundle" style="margin-left: auto; padding: 4px 10px; font-size: 11px; flex-shrink: 0; cursor: pointer;">Download v${ver}</button>`;
+      return `
+      <div class="connection-notice connection-notice--update" role="status">
+        <span class="connection-notice-icon">\u{1F680}</span>
+        <div class="connection-notice-content">
+          <span class="connection-notice-title">New Version Available (v${ver})</span>
+          <span class="connection-notice-text">${escapeHtml2(detail)}</span>
+        </div>
+        ${buttons}
+      </div>
+    `;
+    }
     if (state2.syncStatus === "disconnected") {
       const isGit = state2.syncMode === "git-backup";
       const detail = isGit ? "Cannot reach GitHub Gist sync or local server. Check your network connection." : "Cannot reach host agent. Your computer may be asleep or on a different network. Wake up your computer to resume live interaction.";
@@ -8494,6 +8810,31 @@ input:checked + .slider:before {
     `;
     }
     if (state2.syncMode === "git-backup" && state2.isAwaitingResponse) {
+      const host = state2.hostPresence;
+      const msgTime = state2.awaitingMessageTimestamp || 0;
+      const now = Date.now();
+      if (host && host.lastActiveAt && now - host.lastActiveAt > 18e4) {
+        return `
+        <div class="connection-notice connection-notice--warning" role="status">
+          <span class="connection-notice-icon">\u{1F4A4}</span>
+          <div class="connection-notice-content">
+            <span class="connection-notice-title">Host Computer Asleep</span>
+            <span class="connection-notice-text">Host agent appears inactive or on a different network. Wake up computer to proceed.</span>
+          </div>
+        </div>
+      `;
+      }
+      if (host && host.lastSyncedAt && host.lastSyncedAt > msgTime) {
+        return `
+        <div class="connection-notice connection-notice--received" role="status">
+          <span class="connection-notice-icon">\u26A1</span>
+          <div class="connection-notice-content">
+            <span class="connection-notice-title">Received by Host</span>
+            <span class="connection-notice-text">Host is processing your request in background.</span>
+          </div>
+        </div>
+      `;
+      }
       return `
       <div class="connection-notice connection-notice--queued" role="status">
         <span class="connection-notice-icon">\u23F3</span>
@@ -8544,6 +8885,28 @@ input:checked + .slider:before {
   `;
   }
 
+  // src/ui/components/sidebarAutoUpdate.ts
+  function renderSidebarAutoUpdate(state2) {
+    const autoUpdate = state2.autoUpdateEnabled ?? isAutoUpdateEnabled();
+    return `
+    <div class="sidebar-auto-update" role="region" aria-label="Auto Update Settings">
+      <div class="sidebar-auto-update-label">
+        <span class="sidebar-auto-update-title">Auto-update <span class="sidebar-version-tag">v${CLIENT_VERSION}</span></span>
+        <span class="sidebar-auto-update-desc">Automatically download new releases</span>
+      </div>
+      <label class="switch" for="toggle-auto-update" aria-label="Toggle Auto-update">
+        <input
+          type="checkbox"
+          id="toggle-auto-update"
+          class="btn-toggle-auto-update"
+          ${autoUpdate ? "checked" : ""}
+        />
+        <span class="slider round"></span>
+      </label>
+    </div>
+  `;
+  }
+
   // src/ui/components/sidebarView.ts
   function formatRelativeTime(ts) {
     const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
@@ -8582,10 +8945,16 @@ input:checked + .slider:before {
     <div class="sidebar-view">
       ${renderConnectionNotice(state2)}
       <div class="sidebar-actions">
-        <button type="button" class="btn btn-primary new-session-btn" id="btn-new-session">
-          <span class="btn-icon">+</span>
-          <span>New Session</span>
-        </button>
+        <div class="sidebar-actions-row">
+          <button type="button" class="btn btn-primary new-session-btn" id="btn-new-session">
+            <span class="btn-icon">+</span>
+            <span>New Session</span>
+          </button>
+          <button type="button" class="btn btn-secondary sidebar-qr-btn" id="btn-sidebar-qr" title="Pair Phone via QR Code">
+            <span class="btn-icon">\u{1F4F1}</span>
+            <span>Pair Phone</span>
+          </button>
+        </div>
         <div class="search-bar">
           <span class="search-icon">\u{1F50D}</span>
           <input
@@ -8600,6 +8969,7 @@ input:checked + .slider:before {
       </div>
 
       ${renderMonitorSidebarStats(state2)}
+      ${renderSidebarAutoUpdate(state2)}
 
       <div class="section-divider">
         <span>${q ? `FOUND (${filtered.length})` : `RECENT SESSIONS (${displaySessions.length})`}</span>
@@ -9793,7 +10163,7 @@ ${thought.trim()}` : thought.trim();
     }).join("");
     return { groupHeaderHtml, itemsHtml };
   }
-  function renderModelPickerDropdown(state2) {
+  function renderModelMenuItemsHtml(state2) {
     const filter = (state2.modelSearchQuery || "").toLowerCase().trim();
     const groups = state2.modelGroups?.length ? state2.modelGroups : MONITOR_MODEL_GROUPS;
     let totalItemsRendered = 0;
@@ -9806,6 +10176,9 @@ ${thought.trim()}` : thought.trim();
       return "";
     }).join("");
     const emptyHtml = totalItemsRendered === 0 ? `<div class="model-menu-empty" style="padding: 12px 16px; font-size: 12px; color: var(--cursor-muted, #888); text-align: center;">${filter ? "No matching models found" : "No models available"}</div>` : "";
+    return `${groupsHtml}${emptyHtml}`;
+  }
+  function renderModelPickerDropdown(state2) {
     return `
     <div class="model-picker-menu model-picker-dropdown" id="model-picker-menu">
       <div class="model-menu-search-row">
@@ -9820,7 +10193,7 @@ ${thought.trim()}` : thought.trim();
         />
       </div>
       <div class="model-menu-list model-picker-list" id="model-menu-list">
-        ${groupsHtml}${emptyHtml}
+        ${renderModelMenuItemsHtml(state2)}
       </div>
     </div>
   `;
@@ -9889,7 +10262,7 @@ ${thought.trim()}` : thought.trim();
               </svg>
             </button>
             <div class="model-picker-wrapper mode-select">
-              <button type="button" class="composer-pill model-picker-btn model-pill" id="btn-model-toggle" title="Select Model">
+              <button type="button" class="composer-pill model-picker-btn" id="btn-model-toggle" title="Select Model" aria-expanded="${state2.isModelPickerOpen ? "true" : "false"}">
                 <span class="model-text" id="composer-model-text">${escapeHtml2(modelLabel)}</span>
                 <svg class="mode-picker-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
                   <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -9942,7 +10315,7 @@ ${thought.trim()}` : thought.trim();
       <div class="login-card">
         <div class="login-header">
           <div class="login-icon">\u{1F510}</div>
-          <div class="login-title">Agent Monitor</div>
+          <div class="login-title">Agent Monitor <span class="login-version">v${CLIENT_VERSION}</span></div>
           <div class="login-subtitle">${subtitle}</div>
         </div>
         <form class="login-form" id="login-form" onsubmit="return false;" autocomplete="on">
@@ -9992,123 +10365,452 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
-  // src/ui/components/updateModal.ts
-  var FIREFOX_PRIMARY_PATH = "file:///storage/emulated/0/Download/agent-monitor.html";
-  var FIREFOX_SDCARD_PATH = "file:///sdcard/Download/agent-monitor.html";
-  function renderUpdateModal(state2) {
-    if (!state2.isUpdateModalOpen) return "";
-    const autoUpdate = state2.autoUpdateEnabled ?? isAutoUpdateEnabled();
-    const updateVer = state2.availableUpdateVersion || "Latest";
-    const isDownloaded = Boolean(state2.updateDownloaded);
+  // src/qr/qrEncoder.ts
+  var EXP = new Array(256);
+  var LOG = new Array(256);
+  for (let i = 0, x = 1; i < 256; i++) {
+    EXP[i] = x;
+    LOG[x] = i;
+    x = x << 1 ^ (x & 128 ? 285 : 0);
+  }
+  function gfMul(x, y) {
+    return x === 0 || y === 0 ? 0 : EXP[(LOG[x] + LOG[y]) % 255];
+  }
+  function rsGenPoly(n) {
+    let poly = [1];
+    for (let i = 0; i < n; i++) {
+      const next = new Array(poly.length + 1).fill(0);
+      for (let j = 0; j < poly.length; j++) {
+        next[j] ^= gfMul(poly[j], EXP[i]);
+        next[j + 1] ^= poly[j];
+      }
+      poly = next;
+    }
+    return poly;
+  }
+  function rsEncode(data, numEc) {
+    const gen = rsGenPoly(numEc);
+    const res = new Array(numEc).fill(0);
+    for (let i = 0; i < data.length; i++) {
+      const factor = data[i] ^ res[0];
+      res.shift();
+      res.push(0);
+      for (let j = 0; j < numEc; j++) res[j] ^= gfMul(gen[j], factor);
+    }
+    return res;
+  }
+  var VERSIONS = [
+    { ver: 1, size: 21, dataCap: 19, ecCount: 7, align: [] },
+    { ver: 2, size: 25, dataCap: 34, ecCount: 10, align: [6, 18] },
+    { ver: 3, size: 29, dataCap: 55, ecCount: 15, align: [6, 22] },
+    { ver: 4, size: 33, dataCap: 80, ecCount: 20, align: [6, 26] },
+    { ver: 5, size: 37, dataCap: 108, ecCount: 26, align: [6, 30] },
+    { ver: 6, size: 41, dataCap: 136, ecCount: 36, align: [6, 34] },
+    { ver: 7, size: 45, dataCap: 156, ecCount: 40, align: [6, 22, 38] },
+    { ver: 8, size: 49, dataCap: 194, ecCount: 48, align: [6, 24, 42] },
+    { ver: 9, size: 53, dataCap: 232, ecCount: 56, align: [6, 26, 46] },
+    { ver: 10, size: 57, dataCap: 274, ecCount: 68, align: [6, 28, 50] }
+  ];
+  function generateQrMatrix(text) {
+    const utf8 = typeof TextEncoder !== "undefined" ? new TextEncoder().encode(text) : Buffer.from(text, "utf8");
+    const v = VERSIONS.find((entry) => entry.dataCap >= utf8.length + 3) || VERSIONS[VERSIONS.length - 1];
+    const bits = [0, 1, 0, 0];
+    const lenBits = v.ver < 10 ? 8 : 16;
+    for (let i = lenBits - 1; i >= 0; i--) bits.push(utf8.length >> i & 1);
+    for (const byte of utf8) {
+      for (let i = 7; i >= 0; i--) bits.push(byte >> i & 1);
+    }
+    while (bits.length < v.dataCap * 8 && bits.length % 8 !== 0) bits.push(0);
+    const dataBytes = [];
+    for (let i = 0; i < bits.length; i += 8) {
+      let b = 0;
+      for (let j = 0; j < 8; j++) b = b << 1 | (bits[i + j] || 0);
+      dataBytes.push(b);
+    }
+    const pad = [236, 17];
+    let padIdx = 0;
+    while (dataBytes.length < v.dataCap) dataBytes.push(pad[padIdx++ % 2]);
+    const ecBytes = rsEncode(dataBytes, v.ecCount);
+    const allCodewords = [...dataBytes, ...ecBytes];
+    const allBits = [];
+    for (const b of allCodewords) {
+      for (let i = 7; i >= 0; i--) allBits.push(b >> i & 1);
+    }
+    const mat = Array.from({ length: v.size }, () => Array(v.size).fill(null));
+    const placeFinder = (r, c) => {
+      for (let dr = -1; dr <= 7; dr++) {
+        for (let dc = -1; dc <= 7; dc++) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < v.size && nc >= 0 && nc < v.size) {
+            if (dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6) {
+              mat[nr][nc] = dr === 0 || dr === 6 || dc === 0 || dc === 6 || dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+            } else {
+              mat[nr][nc] = false;
+            }
+          }
+        }
+      }
+    };
+    placeFinder(0, 0);
+    placeFinder(0, v.size - 7);
+    placeFinder(v.size - 7, 0);
+    for (let i = 8; i < v.size - 8; i++) {
+      if (mat[6][i] === null) mat[6][i] = i % 2 === 0;
+      if (mat[i][6] === null) mat[i][6] = i % 2 === 0;
+    }
+    if (v.align.length) {
+      for (const r of v.align) {
+        for (const c of v.align) {
+          if (mat[r][c] !== null) continue;
+          for (let dr = -2; dr <= 2; dr++) {
+            for (let dc = -2; dc <= 2; dc++) {
+              mat[r + dr][c + dc] = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+            }
+          }
+        }
+      }
+    }
+    const fmt = 30660;
+    for (let i = 0; i < 15; i++) {
+      const bit = (fmt >> 14 - i & 1) === 1;
+      const [r, c] = i < 6 ? [i, 8] : i < 8 ? [i + 1, 8] : i === 8 ? [8, 7] : [8, 14 - i];
+      mat[r][c] = bit;
+      const [r2, c2] = i < 8 ? [8, v.size - 1 - i] : [v.size - 15 + i, 8];
+      mat[r2][c2] = bit;
+    }
+    mat[v.size - 8][8] = true;
+    let bitIdx = 0;
+    for (let right = v.size - 1; right > 0; right -= 2) {
+      if (right === 6) right--;
+      const cols = [right, right - 1];
+      const rows = (right + 1) / 2 % 2 === 0 ? Array.from({ length: v.size }, (_, i) => i) : Array.from({ length: v.size }, (_, i) => v.size - 1 - i);
+      for (const r of rows) {
+        for (const c of cols) {
+          if (mat[r][c] === null) {
+            const rawBit = (allBits[bitIdx++] || 0) === 1;
+            const mask = (r + c) % 2 === 0;
+            mat[r][c] = rawBit !== mask;
+          }
+        }
+      }
+    }
+    return mat.map((row) => row.map((cell) => cell ?? false));
+  }
+
+  // src/qr/qrRenderer.ts
+  function renderQrToSvg(matrix, cellSize = 10, margin = 20) {
+    const size = matrix.length;
+    const totalSize = size * cellSize + margin * 2;
+    const rects = [];
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (matrix[r][c]) {
+          const x = margin + c * cellSize;
+          const y = margin + r * cellSize;
+          rects.push(`<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="#000000"/>`);
+        }
+      }
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" width="${totalSize}" height="${totalSize}"><rect width="100%" height="100%" fill="#ffffff"/>${rects.join("")}</svg>`;
+  }
+
+  // src/ui/components/qrModal.ts
+  function buildQrSetupUrl(opts) {
+    const payload = opts.payload || "";
+    if (opts.target === "lan") {
+      if (opts.customLanUrl) return opts.customLanUrl;
+      const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200");
+      return `${origin}/#setup=${payload}`;
+    }
+    if (opts.target === "download") {
+      const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200");
+      return `${origin}/download#setup=${payload}`;
+    }
+    if (opts.customGhPagesUrl) return opts.customGhPagesUrl;
+    return `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
+  }
+  function getCurrentClientPayload(state2) {
+    if (state2.serverSetupInfo?.setupPayload) return state2.serverSetupInfo.setupPayload;
+    const cfg = loadCachedGistConfig();
+    const token = getStoredToken();
+    return encodeSetupPayload({
+      gistId: cfg?.gistId || "",
+      token: cfg?.token || "",
+      password: token || ""
+    });
+  }
+  function renderQrModal(state2) {
+    if (!state2.isQrModalOpen) return "";
+    const target = state2.qrModalTarget || "gh_pages";
+    const payload = getCurrentClientPayload(state2);
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4200";
+    const activeUrl = buildQrSetupUrl({
+      target,
+      payload,
+      origin,
+      customGhPagesUrl: state2.serverSetupInfo?.githubPagesUrl,
+      customLanUrl: state2.serverSetupInfo?.lanUrl
+    });
+    let qrSvg = "";
+    try {
+      const matrix = generateQrMatrix(activeUrl);
+      qrSvg = renderQrToSvg(matrix, 4, 10);
+    } catch {
+    }
+    const copyStatus = state2.qrCopyFeedback || "";
     return `
-    <div class="modal-backdrop update-modal-backdrop" id="update-modal-backdrop">
-      <div class="modal-dialog update-modal" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+    <div class="update-modal-backdrop qr-modal-backdrop" id="qr-modal" role="dialog" aria-modal="true">
+      <div class="update-modal qr-modal-card">
         <div class="update-modal-header">
-          <div class="update-modal-badge ${isDownloaded ? "update-modal-badge--success" : "update-modal-badge--info"}">
-            <span>${isDownloaded ? "\u{1F680} Update Ready" : "\u26A1 Update Available"}</span>
+          <div class="update-modal-badge update-modal-badge--info">
+            <span>\u{1F4F1}</span>
+            <span>Connect Phone</span>
           </div>
-          <button type="button" class="btn-close-modal" id="btn-close-update-modal" aria-label="Close">\u2715</button>
+          <button type="button" class="btn-close-modal" id="btn-close-qr" title="Close QR Modal">\u2715</button>
         </div>
+        <div class="update-modal-body" style="text-align:center;">
+          <h3 class="update-modal-title">Pair Mobile / Web Device</h3>
+          <p class="update-modal-subtitle">
+            Scan with your phone camera to open and communicate via Git Sync over any network.
+          </p>
 
-        <div class="update-modal-body">
-          <h2 id="update-modal-title" class="update-modal-title">
-            ${isDownloaded ? `Version v${escapeHtml2(updateVer)} Ready` : `Version v${escapeHtml2(updateVer)} Available`}
-          </h2>
-          <div class="update-modal-subtitle">
-            <span>Current:</span>
-            <span class="version-tag">v${escapeHtml2(CLIENT_VERSION)}</span>
-            <span class="version-arrow">&rarr;</span>
-            <span>New:</span>
-            <span class="version-tag version-tag--new">v${escapeHtml2(updateVer)}</span>
+          <div class="qr-tabs-container">
+            <button type="button" id="qr-tab-gh" class="qr-tab-btn ${target === "gh_pages" ? "active" : ""}">
+              \u{1F310} GitHub Pages
+            </button>
+            <button type="button" id="qr-tab-lan" class="qr-tab-btn ${target === "lan" ? "active" : ""}">
+              \u{1F3E0} Local LAN
+            </button>
+            <button type="button" id="qr-tab-dl" class="qr-tab-btn ${target === "download" ? "active" : ""}">
+              \u{1F4E5} Offline App
+            </button>
           </div>
 
-          ${isDownloaded ? `
-            <div class="update-card update-card--downloaded">
-              <div class="update-card-icon">\u{1F4E5}</div>
-              <div class="update-card-info">
-                <strong>Offline Bundle Downloaded</strong>
-                <p>The updated <code>agent-monitor.html</code> file has been saved to your Downloads.</p>
-              </div>
-            </div>
-
-            <div class="update-action-group">
-              <a
-                href="${FIREFOX_PRIMARY_PATH}"
-                class="btn btn-primary btn-open-local"
-                target="_blank"
-                rel="noopener"
-              >
-                <span>\u{1F4C2} Open in Browser / Firefox</span>
-              </a>
-              <div class="update-secondary-row">
-                <a
-                  href="${FIREFOX_SDCARD_PATH}"
-                  class="btn btn-secondary btn-open-sdcard"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <span>\u{1F4C1} Alt SD Card</span>
-                </a>
-                <button
-                  type="button"
-                  id="btn-copy-firefox-link"
-                  class="btn btn-secondary copy-btn"
-                  data-copy-text="${FIREFOX_PRIMARY_PATH}"
-                >
-                  <span>\u{1F4CB} Copy Path</span>
-                </button>
-              </div>
-              <button type="button" id="btn-manual-download-update" class="btn btn-secondary">
-                <span>\u{1F504} Download Again</span>
-              </button>
-            </div>
-
-            <div class="update-hint">
-              <strong>\u{1F4A1} Tip:</strong> Open the downloaded file in your browser to start using v${escapeHtml2(updateVer)}. Your vault password, settings, and session history remain securely intact.
-            </div>
-          ` : `
-            <div class="update-card update-card--available">
-              <div class="update-card-icon">\u2728</div>
-              <div class="update-card-info">
-                <strong>New Version Available</strong>
-                <p>Includes the latest performance improvements, UI enhancements, and fixes.</p>
-              </div>
-            </div>
-
-            <div class="update-action-group">
-              <button type="button" id="btn-manual-download-update" class="btn btn-primary">
-                <span>\u{1F4E5} Download Update (v${escapeHtml2(updateVer)})</span>
-              </button>
-            </div>
-
-            <div class="update-hint">
-              <strong>\u{1F4A1} Offline Ready:</strong> Downloading saves a single-file <code>agent-monitor.html</code> that runs anywhere with zero dependencies.
-            </div>
-          `}
-
-          <div class="update-settings-card">
-            <div class="update-toggle-label">
-              <strong>Auto-Download Updates</strong>
-              <span class="update-toggle-desc">Automatically download new releases to your device</span>
-            </div>
-            <label class="switch" for="toggle-auto-update">
-              <input
-                type="checkbox"
-                id="toggle-auto-update"
-                class="btn-toggle-auto-update"
-                ${autoUpdate ? "checked" : ""}
-              />
-              <span class="slider round"></span>
-            </label>
+          <div class="qr-svg-container" id="qr-svg-box">
+            ${qrSvg}
           </div>
-        </div>
 
-        <div class="update-modal-footer">
-          <button type="button" class="btn btn-ghost" id="btn-dismiss-update">Close</button>
+          <div class="qr-url-row">
+            <input class="search-input qr-link-input" id="mobile-link-url" readonly value="${escapeHtml2(activeUrl)}" />
+          </div>
+
+          <div class="qr-action-buttons">
+            <button type="button" class="btn btn-primary qr-btn-action" id="btn-copy-qr-link">
+              ${copyStatus === "link" ? "\u2705 Copied Link!" : "\u{1F4CB} Copy Link"}
+            </button>
+            <button type="button" class="btn btn-secondary qr-btn-action" id="btn-copy-setup-hash">
+              ${copyStatus === "hash" ? "\u2705 Copied Hash!" : "\u{1F511} Copy Setup Hash"}
+            </button>
+          </div>
+
+          <div class="qr-download-row">
+            <a class="btn btn-secondary qr-btn-download" id="btn-download-app-bundle" href="/download" download="agent-monitor.html">
+              \u{1F4E5} Download Standalone agent-monitor.html
+            </a>
+          </div>
+
+          <div class="qr-install-tips">
+            <strong>\u{1F4A1} Install as a Phone App:</strong>
+            <ol>
+              <li>Scan the QR code with Safari (iOS) or Chrome (Android).</li>
+              <li>Tap <strong>Share &rarr; Add to Home Screen</strong> (iOS) or <strong>&vellip; &rarr; Install app</strong> (Android).</li>
+              <li>Launch from your home screen for instant fullscreen monitoring!</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>
   `;
+  }
+
+  // src/ui/modelPickerEvents.ts
+  function handleModelPickerClick(target, state2, callbacks) {
+    const toggleBtn = target.closest("#btn-model-toggle, .model-picker-btn");
+    if (toggleBtn) {
+      state2.isModelPickerOpen = !state2.isModelPickerOpen;
+      if (state2.isModelPickerOpen) state2.modelSearchQuery = "";
+      callbacks.onRender();
+      if (state2.isModelPickerOpen && typeof document !== "undefined") {
+        setTimeout(() => {
+          document.getElementById("model-search-input")?.focus();
+        }, 0);
+      }
+      return true;
+    }
+    const modelItem = target.closest(".model-picker-item, [data-model-id]");
+    if (modelItem) {
+      const modelId = modelItem.getAttribute("data-model-id");
+      if (modelId) {
+        state2.selectedModel = modelId;
+        state2.isModelPickerOpen = false;
+        state2.modelSearchQuery = "";
+        callbacks.onSelectModel?.(modelId);
+        callbacks.onRender();
+        return true;
+      }
+    }
+    if (target.closest(".model-picker-menu, .model-picker-dropdown")) {
+      return true;
+    }
+    if (state2.isModelPickerOpen && !target.closest(".model-picker-wrapper")) {
+      state2.isModelPickerOpen = false;
+      callbacks.onRender();
+      return false;
+    }
+    return false;
+  }
+  function filterModelListInPlace(state2) {
+    if (typeof document === "undefined") return;
+    const list = document.getElementById("model-menu-list");
+    if (list) {
+      list.innerHTML = renderModelMenuItemsHtml(state2);
+    }
+  }
+  function handleModelMenuKeyboardNav(direction) {
+    if (typeof document === "undefined") return;
+    const items = Array.from(document.querySelectorAll(".model-picker-item"));
+    if (items.length === 0) return;
+    const activeIdx = items.findIndex((el) => el === document.activeElement);
+    if (direction === "ArrowDown") {
+      const nextIdx = activeIdx < items.length - 1 ? activeIdx + 1 : 0;
+      items[nextIdx]?.focus();
+    } else {
+      const prevIdx = activeIdx > 0 ? activeIdx - 1 : items.length - 1;
+      items[prevIdx]?.focus();
+    }
+  }
+  function setupModelSearchInput(state2, callbacks) {
+    if (typeof document === "undefined") return;
+    const searchInput = document.getElementById("model-search-input");
+    if (!searchInput || searchInput.dataset.bound) return;
+    searchInput.dataset.bound = "true";
+    searchInput.addEventListener("input", () => {
+      state2.modelSearchQuery = searchInput.value;
+      filterModelListInPlace(state2);
+    });
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        state2.isModelPickerOpen = false;
+        callbacks.onRender();
+        document.getElementById("composer-input")?.focus();
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        handleModelMenuKeyboardNav(e.key);
+      } else if (e.key === "Enter") {
+        const firstItem = document.querySelector(".model-picker-item");
+        if (firstItem) firstItem.click();
+      }
+    });
+  }
+  function bindModelPickerEvents(state2, callbacks) {
+    setupModelSearchInput(state2, callbacks);
+  }
+
+  // src/ui/qrModalEvents.ts
+  async function fetchServerSetupInfo(state2, onRender) {
+    if (state2.serverSetupInfo) return;
+    try {
+      const res = await fetch("/api/setup-info");
+      if (res.ok) {
+        const data = await res.json();
+        state2.serverSetupInfo = data;
+        onRender();
+      }
+    } catch {
+    }
+  }
+  function openQrModal(state2, onRender) {
+    state2.isQrModalOpen = true;
+    state2.qrModalTarget = state2.qrModalTarget || "gh_pages";
+    state2.qrCopyFeedback = void 0;
+    onRender();
+    void fetchServerSetupInfo(state2, onRender);
+  }
+  function closeQrModal(state2, onRender) {
+    state2.isQrModalOpen = false;
+    state2.qrCopyFeedback = void 0;
+    onRender();
+  }
+  function selectQrTab(state2, target, onRender) {
+    state2.qrModalTarget = target;
+    state2.qrCopyFeedback = void 0;
+    onRender();
+  }
+  async function copyQrLink(state2, onRender) {
+    const target = state2.qrModalTarget || "gh_pages";
+    const payload = getCurrentClientPayload(state2);
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4200";
+    const url = buildQrSetupUrl({
+      target,
+      payload,
+      origin,
+      customGhPagesUrl: state2.serverSetupInfo?.githubPagesUrl,
+      customLanUrl: state2.serverSetupInfo?.lanUrl
+    });
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+      state2.qrCopyFeedback = "link";
+      onRender();
+      setTimeout(() => {
+        if (state2.qrCopyFeedback === "link") {
+          state2.qrCopyFeedback = void 0;
+          onRender();
+        }
+      }, 2500);
+    } catch {
+    }
+  }
+  async function copySetupHash(state2, onRender) {
+    const payload = getCurrentClientPayload(state2);
+    const hash = `#setup=${payload}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(hash);
+      }
+      state2.qrCopyFeedback = "hash";
+      onRender();
+      setTimeout(() => {
+        if (state2.qrCopyFeedback === "hash") {
+          state2.qrCopyFeedback = void 0;
+          onRender();
+        }
+      }, 2500);
+    } catch {
+    }
+  }
+  function handleQrModalClick(state2, target, onRender) {
+    if (target.closest("#btn-show-qr") || target.closest("#btn-sidebar-qr")) {
+      openQrModal(state2, onRender);
+      return true;
+    }
+    if (target.closest("#btn-close-qr") || target.id === "qr-modal") {
+      closeQrModal(state2, onRender);
+      return true;
+    }
+    if (target.closest("#qr-tab-gh")) {
+      selectQrTab(state2, "gh_pages", onRender);
+      return true;
+    }
+    if (target.closest("#qr-tab-lan")) {
+      selectQrTab(state2, "lan", onRender);
+      return true;
+    }
+    if (target.closest("#qr-tab-dl")) {
+      selectQrTab(state2, "download", onRender);
+      return true;
+    }
+    if (target.closest("#btn-copy-qr-link")) {
+      void copyQrLink(state2, onRender);
+      return true;
+    }
+    if (target.closest("#btn-copy-setup-hash")) {
+      void copySetupHash(state2, onRender);
+      return true;
+    }
+    return false;
   }
 
   // src/ui/sessionFilter.ts
@@ -10179,16 +10881,6 @@ ${thought.trim()}` : thought.trim();
     return false;
   }
   function handleControlClick(target, state2, callbacks) {
-    if (target.closest("#btn-open-settings")) {
-      state2.isUpdateModalOpen = true;
-      callbacks.onRender();
-      return true;
-    }
-    if (target.closest("#btn-close-update-modal, #btn-dismiss-update") || target.id === "update-modal-backdrop") {
-      state2.isUpdateModalOpen = false;
-      callbacks.onRender();
-      return true;
-    }
     const autoUpdateChk = target.closest("#toggle-auto-update, .btn-toggle-auto-update");
     if (autoUpdateChk) {
       setAutoUpdateEnabled(autoUpdateChk.checked);
@@ -10196,10 +10888,12 @@ ${thought.trim()}` : thought.trim();
       callbacks.onRender();
       return true;
     }
-    if (target.closest("#btn-manual-download-update")) {
-      triggerBundleDownload("/download");
-      state2.updateDownloaded = true;
-      callbacks.onRender();
+    if (target.closest("#btn-reload-page, .btn-reload-update")) {
+      if (typeof window !== "undefined") window.location.reload();
+      return true;
+    }
+    if (target.closest("#btn-download-bundle, .btn-download-update")) {
+      triggerBundleDownload();
       return true;
     }
     if (target.closest("#btn-mode-toggle")) {
@@ -10342,6 +11036,8 @@ ${thought.trim()}` : thought.trim();
       }
       return true;
     }
+    if (handleQrModalClick(state2, target, callbacks.onRender)) return true;
+    if (handleModelPickerClick(target, state2, callbacks)) return true;
     if (handlePlanClick(target, state2, callbacks)) return true;
     if (handleControlClick(target, state2, callbacks)) return true;
     return false;
@@ -10476,61 +11172,6 @@ ${thought.trim()}` : thought.trim();
         state2.isMentionOpen = false;
         onRender();
       });
-    }
-  }
-
-  // src/ui/modelPickerEvents.ts
-  function bindModelPickerEvents(state2, callbacks) {
-    const toggleBtn = document.getElementById("btn-model-toggle");
-    toggleBtn?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      state2.isModelPickerOpen = !state2.isModelPickerOpen;
-      callbacks.onRender();
-      if (state2.isModelPickerOpen) {
-        setTimeout(() => {
-          const input = document.getElementById("model-search-input");
-          input?.focus();
-        }, 0);
-      }
-    });
-    const searchInput = document.getElementById("model-search-input");
-    searchInput?.addEventListener("input", () => {
-      state2.modelSearchQuery = searchInput.value;
-      callbacks.onRender();
-    });
-    searchInput?.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        state2.isModelPickerOpen = false;
-        callbacks.onRender();
-        document.getElementById("composer-input")?.focus();
-      }
-    });
-    document.querySelectorAll(".model-picker-item").forEach((item) => {
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const modelId = item.getAttribute("data-model-id");
-        if (modelId) {
-          state2.selectedModel = modelId;
-          state2.isModelPickerOpen = false;
-          state2.modelSearchQuery = "";
-          callbacks.onSelectModel?.(modelId);
-          callbacks.onRender();
-        }
-      });
-    });
-    if (state2.isModelPickerOpen) {
-      const handleOutsideClick = (e) => {
-        const target = e.target;
-        if (!target?.closest(".model-picker-wrapper")) {
-          state2.isModelPickerOpen = false;
-          document.removeEventListener("click", handleOutsideClick);
-          callbacks.onRender();
-        }
-      };
-      setTimeout(() => {
-        document.addEventListener("click", handleOutsideClick, { once: true });
-      }, 0);
     }
   }
 
@@ -10947,6 +11588,10 @@ ${thought.trim()}` : thought.trim();
       if (modelText && modelText.textContent !== modelLabel) {
         modelText.textContent = modelLabel;
       }
+      const modelBtn = modelWrapper.querySelector("#btn-model-toggle");
+      if (modelBtn && typeof modelBtn.setAttribute === "function") {
+        modelBtn.setAttribute("aria-expanded", state2.isModelPickerOpen ? "true" : "false");
+      }
       const existingDropdown = modelWrapper.querySelector(".model-picker-dropdown");
       if (state2.isModelPickerOpen) {
         const dropdownHtml = renderModelPickerDropdown(state2);
@@ -11020,7 +11665,7 @@ ${thought.trim()}` : thought.trim();
     if (state.activeTab === "sidebar") mainHtml = renderSidebarView(state);
     else if (state.activeTab === "chat") mainHtml = renderChatView(state);
     else if (state.activeTab === "plans") mainHtml = renderPlanView(state);
-    const updateModalHtml = renderUpdateModal(state);
+    const qrModalHtml = renderQrModal(state);
     const existingLayout = app.querySelector(".app-layout");
     let mainUpdated = false;
     if (!existingLayout) {
@@ -11029,7 +11674,7 @@ ${thought.trim()}` : thought.trim();
         ${renderNavHeader(state)}
         <main class="app-main">${mainHtml}</main>
         ${renderComposerView(state)}
-        ${updateModalHtml}
+        ${qrModalHtml}
       </div>
     `;
       mainUpdated = true;
@@ -11054,13 +11699,15 @@ ${thought.trim()}` : thought.trim();
       } else if (!composerEl && newComposerHtml) {
         existingLayout.insertAdjacentHTML("beforeend", newComposerHtml);
       }
-      const existingModal = existingLayout.querySelector(".update-modal-backdrop");
-      if (existingModal && !updateModalHtml) {
-        existingModal.remove();
-      } else if (existingModal && updateModalHtml) {
-        existingModal.outerHTML = updateModalHtml;
-      } else if (!existingModal && updateModalHtml) {
-        existingLayout.insertAdjacentHTML("beforeend", updateModalHtml);
+      const qrModalEl = existingLayout.querySelector("#qr-modal");
+      if (qrModalHtml) {
+        if (qrModalEl) {
+          qrModalEl.outerHTML = qrModalHtml;
+        } else {
+          existingLayout.insertAdjacentHTML("beforeend", qrModalHtml);
+        }
+      } else if (qrModalEl) {
+        qrModalEl.remove();
       }
     }
     bindAppEvents(state, {
@@ -11083,10 +11730,95 @@ ${thought.trim()}` : thought.trim();
     if (mainUpdated) {
       hydrateAllDiagrams(app);
     }
+    if (typeof window !== "undefined") {
+      window.__state = state;
+      window.renderApp = render;
+    }
   }
-  controller.init();
+  if (typeof document !== "undefined" && document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      void controller.init();
+    });
+  } else {
+    void controller.init();
+  }
 })();
 
-</script>
+  </script>
+  <script>
+  (function() {
+    var K_JS = 'agent_monitor_cached_js';
+    var K_CSS = 'agent_monitor_cached_css';
+    var GH_PAGES = 'https://sysoce.github.io/agent-monitor';
+    var CDN_FALLBACK = 'https://cdn.jsdelivr.net/gh/sysoce/agent-monitor@master/dist';
+
+    var booted = false;
+    function boot(code) {
+      if (booted || !code) return;
+      booted = true;
+      try {
+        var s = document.createElement('script');
+        s.textContent = code;
+        document.body.appendChild(s);
+      } catch (e) {
+        console.error('[Bootloader] Boot failure:', e);
+      }
+    }
+
+    try {
+      var cachedCss = localStorage.getItem(K_CSS);
+      if (cachedCss) {
+        var styleEl = document.getElementById('agent-monitor-style');
+        if (styleEl) styleEl.textContent = cachedCss;
+      }
+      var cachedJs = localStorage.getItem(K_JS);
+      if (cachedJs) {
+        boot(cachedJs);
+      } else {
+        var fb = document.getElementById('agent-monitor-bundle-fallback');
+        if (fb && fb.textContent) boot(fb.textContent);
+      }
+    } catch (e) {
+      var fallback = document.getElementById('agent-monitor-bundle-fallback');
+      if (fallback && fallback.textContent) boot(fallback.textContent);
+    }
+
+    async function checkRemote() {
+      if (typeof fetch === 'undefined' || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+      var urls = [
+        { css: GH_PAGES + '/monitor.css', js: GH_PAGES + '/bundle.js' },
+        { css: CDN_FALLBACK + '/monitor.css', js: CDN_FALLBACK + '/bundle.js' }
+      ];
+      for (var i = 0; i < urls.length; i++) {
+        try {
+          var bust = '?_v=' + Date.now();
+          var results = await Promise.all([
+            fetch(urls[i].css + bust, { cache: 'no-cache' }),
+            fetch(urls[i].js + bust, { cache: 'no-cache' })
+          ]);
+          if (results[0].ok && results[1].ok) {
+            var newCss = await results[0].text();
+            var newJs = await results[1].text();
+            if (newJs && newJs.length > 500) {
+              var currJs = localStorage.getItem(K_JS) || document.getElementById('agent-monitor-bundle-fallback')?.textContent;
+              if (newJs !== currJs) {
+                localStorage.setItem(K_CSS, newCss);
+                localStorage.setItem(K_JS, newJs);
+                console.log('[Bootloader] New Agent Monitor version cached from GitHub.');
+              }
+              break;
+            }
+          }
+        } catch (err) {}
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('load', function() {
+        setTimeout(checkRemote, 1200);
+      });
+    }
+  })();
+  </script>
 </body>
 </html>

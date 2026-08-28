@@ -81,6 +81,7 @@ test('LocalSyncWorker scheduleOutboxSync throttles rapid outbox updates', async 
   const sessionDir = path.join(tmpDir, '.agent', 'sessions', 'sess-gamma');
   await fs.mkdir(sessionDir, { recursive: true });
   await fs.writeFile(path.join(sessionDir, 'chat.jsonl'), JSON.stringify({ role: 'user', content: 'test' }) + '\n', 'utf8');
+  await fs.writeFile(path.join(sessionDir, '.active'), '', 'utf8');
 
   let callCount = 0;
   const fakeGistClient = {
@@ -91,11 +92,11 @@ test('LocalSyncWorker scheduleOutboxSync throttles rapid outbox updates', async 
 
   try {
     const worker = new LocalSyncWorker(tmpDir, fakeGistClient);
-    worker.scheduleOutboxSync('sess-gamma');
-    worker.scheduleOutboxSync('sess-gamma');
-    worker.scheduleOutboxSync('sess-gamma');
+    worker.scheduleOutboxSync('sess-gamma', 10);
+    worker.scheduleOutboxSync('sess-gamma', 10);
+    worker.scheduleOutboxSync('sess-gamma', 10);
 
-    await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 50));
 
     // Only 1 call should have gone through
     assert.equal(callCount, 1, 'Rapid calls should be throttled to 1 call');

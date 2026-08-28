@@ -6,7 +6,7 @@ import { renderChatView } from './components/chatView';
 import { renderPlanView } from './components/planView';
 import { renderComposerView } from './components/composerView';
 import { renderLoginView } from './components/loginView';
-import { renderUpdateModal } from './components/updateModal';
+import { renderQrModal } from './components/qrModal';
 import { bindLoginEvents, bindAppEvents } from './eventHandlers';
 import { captureFocusState, restoreFocusState, restoreScrollState } from './domFocusPreserver';
 import { getSavedTab } from './tabStore';
@@ -73,7 +73,7 @@ function render() {
   else if (state.activeTab === 'chat') mainHtml = renderChatView(state);
   else if (state.activeTab === 'plans') mainHtml = renderPlanView(state);
 
-  const updateModalHtml = renderUpdateModal(state);
+  const qrModalHtml = renderQrModal(state);
   const existingLayout = app.querySelector('.app-layout');
   let mainUpdated = false;
   if (!existingLayout) {
@@ -82,7 +82,7 @@ function render() {
         ${renderNavHeader(state)}
         <main class="app-main">${mainHtml}</main>
         ${renderComposerView(state)}
-        ${updateModalHtml}
+        ${qrModalHtml}
       </div>
     `;
     mainUpdated = true;
@@ -110,13 +110,15 @@ function render() {
       existingLayout.insertAdjacentHTML('beforeend', newComposerHtml);
     }
 
-    const existingModal = existingLayout.querySelector('.update-modal-backdrop');
-    if (existingModal && !updateModalHtml) {
-      existingModal.remove();
-    } else if (existingModal && updateModalHtml) {
-      existingModal.outerHTML = updateModalHtml;
-    } else if (!existingModal && updateModalHtml) {
-      existingLayout.insertAdjacentHTML('beforeend', updateModalHtml);
+    const qrModalEl = existingLayout.querySelector('#qr-modal');
+    if (qrModalHtml) {
+      if (qrModalEl) {
+        qrModalEl.outerHTML = qrModalHtml;
+      } else {
+        existingLayout.insertAdjacentHTML('beforeend', qrModalHtml);
+      }
+    } else if (qrModalEl) {
+      qrModalEl.remove();
     }
   }
 
@@ -140,7 +142,19 @@ function render() {
   if (mainUpdated) {
     hydrateAllDiagrams(app);
   }
+
+  if (typeof window !== 'undefined') {
+    (window as any).__state = state;
+    (window as any).renderApp = render;
+  }
 }
 
-controller.init();
+if (typeof document !== 'undefined' && document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    void controller.init();
+  });
+} else {
+  void controller.init();
+}
+
 

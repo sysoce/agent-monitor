@@ -80,6 +80,19 @@ body {
   font-weight: 600;
 }
 
+.brand-version {
+  font-size: 10px;
+  font-weight: 500;
+  color: #888888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 2px;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -1906,6 +1919,18 @@ body {
   margin-bottom: 4px;
 }
 
+.login-version {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .login-subtitle {
   font-size: 12.5px;
   color: #888888;
@@ -2451,6 +2476,12 @@ body {
   color: #c084fc;
 }
 
+.connection-notice--update {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+}
+
 .connection-notice-icon {
   font-size: 16px;
   line-height: 1.2;
@@ -2874,6 +2905,94 @@ input:checked + .slider:before {
 }
 
 
+/* ---------------- Sidebar Auto-Update Toggle ---------------- */
+.sidebar-auto-update {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.sidebar-auto-update-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-auto-update-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #f4f4f5;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-version-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: #888888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 4px;
+  line-height: 1.2;
+}
+
+.sidebar-auto-update-desc {
+  font-size: 11px;
+  color: #71717a;
+}
+
+/* Switch styling */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #3f3f46;
+  border-radius: 20px;
+  transition: 0.2s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+input:checked + .slider {
+  background-color: #2563eb;
+}
+
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
 /* ---------------- Monitor Sidebar Dashboard Stats Widget ---------------- */
 .monitor-stats-widget {
   padding: 6px 0;
@@ -2931,3 +3050,173 @@ input:checked + .slider:before {
   box-shadow: 0 0 6px #22c55e;
   animation: stream-dot-pulse 1.4s infinite ease-in-out both;
 }
+
+/* ---------------- QR Code Mobile Pairing & Modal ---------------- */
+.btn-qr-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(14, 99, 156, 0.2);
+  border: 1px solid rgba(14, 99, 156, 0.45);
+  color: #4fc1ff;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-qr-pill:hover {
+  background: rgba(14, 99, 156, 0.4);
+  border-color: #0e639c;
+  color: #ffffff;
+}
+
+.btn-qr-icon {
+  font-size: 11.5px;
+}
+
+.sidebar-actions-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.sidebar-qr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: #252526;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sidebar-qr-btn:hover {
+  background: #2d2d30;
+  color: #ffffff;
+  border-color: #0e639c;
+}
+
+.qr-modal-card {
+  max-width: 440px;
+  width: 100%;
+}
+
+.qr-tabs-container {
+  display: flex;
+  gap: 6px;
+  background: #18181b;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #27272a;
+  margin: 12px 0;
+}
+
+.qr-tab-btn {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: transparent;
+  color: #888888;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.qr-tab-btn:hover {
+  color: #ffffff;
+}
+
+.qr-tab-btn.active {
+  background: #0e639c;
+  color: #ffffff;
+}
+
+.qr-svg-container {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 10px;
+  display: inline-block;
+  margin: 8px auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.qr-svg-container svg {
+  display: block;
+  max-width: 210px;
+  max-height: 210px;
+  width: 100%;
+  height: auto;
+}
+
+.qr-url-row {
+  margin: 10px 0;
+}
+
+.qr-link-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+  font-size: 11px;
+  text-align: center;
+  background: #141414;
+  border: 1px solid #333333;
+  padding: 6px 10px;
+  color: #cccccc;
+  border-radius: 6px;
+}
+
+.qr-action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.qr-btn-action {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.qr-download-row {
+  margin-top: 8px;
+}
+
+.qr-btn-download {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 11.5px;
+  padding: 8px 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.qr-install-tips {
+  text-align: left;
+  background: #202020;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin-top: 14px;
+  border-left: 3px solid #0e639c;
+  color: #cccccc;
+}
+
+.qr-install-tips ol {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+}
+

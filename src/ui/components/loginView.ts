@@ -1,4 +1,5 @@
 import type { AppState } from '../types';
+import { CLIENT_VERSION } from '../version';
 
 export function renderLoginView(state: AppState): string {
   let cachedGistId = '', cachedToken = '';
@@ -24,7 +25,7 @@ export function renderLoginView(state: AppState): string {
       <div class="login-card">
         <div class="login-header">
           <div class="login-icon">🔐</div>
-          <div class="login-title">Agent Monitor</div>
+          <div class="login-title">Agent Monitor <span class="login-version">v${CLIENT_VERSION}</span></div>
           <div class="login-subtitle">${subtitle}</div>
         </div>
         <form class="login-form" id="login-form" onsubmit="return false;" autocomplete="on">

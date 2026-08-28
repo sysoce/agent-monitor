@@ -1,5 +1,6 @@
 import type { AppState } from './types';
 import { CLIENT_VERSION, isNewerVersion } from './version';
+import { buildApiUrl, getServerBaseUrl } from './authStore';
 
 const AUTO_UPDATE_KEY = 'agent_auto_update';
 
@@ -13,11 +14,17 @@ export function setAutoUpdateEnabled(enabled: boolean): void {
   localStorage.setItem(AUTO_UPDATE_KEY, String(enabled));
 }
 
-export function triggerBundleDownload(url = '/download'): void {
+export function triggerBundleDownload(url?: string): void {
   if (typeof document === 'undefined') return;
+  const targetUrl = url ? (url.startsWith('http') ? url : buildApiUrl(url)) : buildApiUrl('/download');
+  if (!targetUrl || (typeof window !== 'undefined' && window.location.protocol === 'file:' && !targetUrl.startsWith('http'))) {
+    return;
+  }
   const a = document.createElement('a');
-  a.href = url;
+  a.href = targetUrl;
   a.download = 'agent-monitor.html';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -32,7 +39,7 @@ export function processVersionCheck(
   state: AppState,
   remoteVersion: string,
   currentVersion: string = CLIENT_VERSION,
-  downloader: (url: string) => void = triggerBundleDownload
+  downloader?: (url: string) => void
 ): VersionCheckResult {
   const hasUpdate = isNewerVersion(remoteVersion, currentVersion);
   if (!hasUpdate) {
@@ -43,10 +50,12 @@ export function processVersionCheck(
   const autoUpdate = isAutoUpdateEnabled();
   state.autoUpdateEnabled = autoUpdate;
 
-  if (autoUpdate) {
-    downloader('/download');
+  const isFileProto = typeof window !== 'undefined' && window.location.protocol === 'file:';
+  const downloadUrl = buildApiUrl('/download');
+
+  if (autoUpdate && downloader && !isFileProto) {
+    downloader(downloadUrl);
     state.updateDownloaded = true;
-    state.isUpdateModalOpen = true;
     return { hasUpdate: true, autoDownloaded: true };
   }
 
@@ -58,8 +67,9 @@ export async function checkForUpdates(
   state: AppState,
   onRender: () => void
 ): Promise<boolean> {
+  if (typeof window !== 'undefined' && window.location.protocol === 'file:' && !getServerBaseUrl()) return false;
   try {
-    const res = await fetch('/api/version', { cache: 'no-store' });
+    const res = await fetch(buildApiUrl('/api/version'), { cache: 'no-store' });
     if (!res.ok) return false;
     const data = await res.json() as { version?: string };
     if (!data?.version) return false;
@@ -74,3 +84,4 @@ export async function checkForUpdates(
   }
   return false;
 }
+

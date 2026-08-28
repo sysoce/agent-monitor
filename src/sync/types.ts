@@ -21,11 +21,22 @@ export interface SyncOutboxState {
   plans?: PlanSummary[];
 }
 
+export interface ClientPresence {
+  clientId: string;
+  clientName: string;
+  deviceType: 'desktop' | 'mobile' | 'web';
+  lastActiveAt: number;
+  lastSyncedAt: number;
+  lastHandledMsgId?: string;
+  appVersion?: string;
+}
+
 export interface SyncGistPayload {
   inbox: SyncInboxMessage[];
   sessions: SessionSummary[];
   activeSession?: SyncOutboxState;
   sessionDetails?: Record<string, SessionDetail>;
+  clients?: Record<string, ClientPresence>;
   version: number;
   updatedAt: number;
   appVersion?: string;
@@ -43,5 +54,7 @@ export interface SyncStatusEvent {
   mode: TransportMode;
   isSyncing: boolean;
   lastSyncedAt?: number;
+  hostPresence?: ClientPresence;
+  rateLimitRemaining?: number;
   error?: string;
 }

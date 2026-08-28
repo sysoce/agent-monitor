@@ -6,6 +6,8 @@ import { encodeSetupPayload } from '../sync/syncConfigLoader';
 import { generateQrMatrix } from '../qr/qrEncoder';
 import { renderQrToSvg } from '../qr/qrRenderer';
 
+import { getLocalNetworkAddresses } from './networkAddress';
+
 export async function handleSetupRoute(
   res: ServerResponse,
   pathname: string,
@@ -32,6 +34,36 @@ export async function handleSetupRoute(
       res.end('Standalone bundle not found. Run npm run monitor:export first.');
       return true;
     }
+  }
+
+  if (pathname === '/api/setup-info') {
+    const port = url.port ? Number(url.port) : 4200;
+    const networks = getLocalNetworkAddresses(port);
+    const bestAddress = networks.find((n) => n.isTailscale) || networks.find((n) => !n.name.includes('localhost')) || { url: url.origin };
+
+    const payload = encodeSetupPayload({
+      token: syncConfig?.token || '',
+      gistId: syncConfig?.gistId || '',
+      password: password || syncConfig?.password || '',
+    });
+
+    const githubPagesUrl = `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
+    const lanUrl = `${bestAddress.url}/#setup=${payload}`;
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(JSON.stringify({
+      githubPagesUrl,
+      lanUrl,
+      setupPayload: payload,
+      hasSyncConfig: Boolean(syncConfig?.gistId),
+      gistId: syncConfig?.gistId || '',
+      version: '1.0.0',
+    }));
+    return true;
   }
 
   if (pathname === '/api/version') {

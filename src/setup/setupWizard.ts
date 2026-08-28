@@ -21,6 +21,7 @@ export interface SetupWizardResult {
   config: GistSyncConfig;
   setupPayload: string;
   mobileUrl: string;
+  githubPagesUrl: string;
   qrTerminal: string;
   qrSvg: string;
 }
@@ -80,14 +81,15 @@ export async function runSetupWizard(options: SetupWizardOptions = {}): Promise<
   await saveSyncConfig(root, config);
 
   const setupPayload = encodeSetupPayload(config);
+  const githubPagesUrl = `https://sysoce.github.io/agent-monitor/#setup=${setupPayload}`;
   const port = options.port || 4200;
   const networks = getLocalNetworkAddresses(port);
   const bestAddress = networks.find((n) => n.isTailscale) || networks.find((n) => !n.name.includes('localhost')) || { url: `http://localhost:${port}` };
   const mobileUrl = `${bestAddress.url}/#setup=${setupPayload}`;
 
-  const matrix = generateQrMatrix(mobileUrl);
+  const matrix = generateQrMatrix(githubPagesUrl || mobileUrl);
   const qrTerminal = renderQrToTerminal(matrix);
   const qrSvg = renderQrToSvg(matrix);
 
-  return { config, setupPayload, mobileUrl, qrTerminal, qrSvg };
+  return { config, setupPayload, mobileUrl, githubPagesUrl, qrTerminal, qrSvg };
 }

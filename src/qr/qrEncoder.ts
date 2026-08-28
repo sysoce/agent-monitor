@@ -49,7 +49,7 @@ const VERSIONS = [
 ];
 
 export function generateQrMatrix(text: string): boolean[][] {
-  const utf8 = Buffer.from(text, 'utf8');
+  const utf8 = typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(text) : Buffer.from(text, 'utf8');
   const v = VERSIONS.find((entry) => entry.dataCap >= utf8.length + 3) || VERSIONS[VERSIONS.length - 1]!;
   const bits: number[] = [0, 1, 0, 0]; // Byte mode
   const lenBits = v.ver < 10 ? 8 : 16;
