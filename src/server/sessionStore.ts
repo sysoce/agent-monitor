@@ -32,19 +32,20 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
     }
     for (const f of inFiles) {
       try {
-        const p = JSON.parse(await fs.readFile(path.join(inDir, f), 'utf8')) as { role?: string; content?: string; action?: string };
-        if (p?.action !== 'abort' && p?.content?.trim()) {
-          const content = p.content.trim();
-          if (!seenUser.has(content)) {
-            seenUser.add(content);
-            messages.push({ role: (p.role as 'user' | 'assistant') ?? 'user', content });
+        const p = JSON.parse(await fs.readFile(path.join(inDir, f), 'utf8')) as { role?: string; content?: string; action?: string; attachments?: any[] };
+        if (p?.action !== 'abort' && (p?.content?.trim() || (p?.attachments && p.attachments.length > 0))) {
+          const content = p.content?.trim() || '';
+          if (!content || !seenUser.has(content)) {
+            if (content) seenUser.add(content);
+            messages.push({ role: (p.role as 'user' | 'assistant') ?? 'user', content, attachments: p.attachments });
           }
         }
       } catch {}
     }
   } catch {}
 
-  const title = messages.find((m) => m.role === 'user' && m.content?.trim())?.content?.trim().split(/\r?\n/)[0]?.slice(0, 50) || sessionId;
+  const firstUser = messages.find((m) => m.role === 'user' && (m.content?.trim() || (m.attachments && m.attachments.length > 0)));
+  const title = firstUser?.content?.trim().split(/\r?\n/)[0]?.slice(0, 50) || firstUser?.attachments?.[0]?.label || sessionId;
   const artifacts: Array<{ name: string; path: string; type: string }> = [];
   const filesChanged: Array<{ path: string; status?: string }> = [];
   for (const m of messages) {

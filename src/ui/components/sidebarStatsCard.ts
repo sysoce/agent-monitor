@@ -4,12 +4,32 @@ export function renderMonitorSidebarStats(state: AppState): string {
   let running = 0;
   let totalMessages = 0;
   let totalArtifacts = 0;
+  const seenIds = new Set<string>();
 
   for (const s of state.sessions) {
-    if (s.isGenerating) running++;
-    totalMessages += s.messageCount || 0;
-    if (s.artifacts) totalArtifacts += s.artifacts.length;
+    seenIds.add(s.id);
+    const isActive = s.id === state.activeSessionId;
+    const isGen = Boolean(
+      s.isGenerating ||
+      (isActive && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === s.id))))
+    );
+    if (isGen) running++;
+    const msgCount = isActive && state.activeSession?.messages ? state.activeSession.messages.length : (s.messageCount || 0);
+    totalMessages += msgCount;
+    const artCount = isActive && state.activeSession?.artifacts ? state.activeSession.artifacts.length : (s.artifacts?.length || 0);
+    totalArtifacts += artCount;
   }
+
+  if (state.activeSession && !seenIds.has(state.activeSession.id)) {
+    const isGen = Boolean(state.activeSession.isGenerating || state.isAwaitingResponse);
+    if (isGen) running++;
+    totalMessages += state.activeSession.messages?.length || 0;
+    totalArtifacts += state.activeSession.artifacts?.length || 0;
+  }
+
+  const sessionCount = state.activeSession && !seenIds.has(state.activeSession.id)
+    ? state.sessions.length + 1
+    : state.sessions.length;
 
   return `
     <div class="monitor-stats-widget" role="region" aria-label="Dashboard Metrics">
@@ -23,7 +43,7 @@ export function renderMonitorSidebarStats(state: AppState): string {
         </div>
         <div class="monitor-stat-item">
           <div class="monitor-stat-label">Sessions</div>
-          <div class="monitor-stat-val">${state.sessions.length}</div>
+          <div class="monitor-stat-val">${sessionCount}</div>
         </div>
         <div class="monitor-stat-item">
           <div class="monitor-stat-label">Messages</div>
@@ -37,3 +57,4 @@ export function renderMonitorSidebarStats(state: AppState): string {
     </div>
   `;
 }
+

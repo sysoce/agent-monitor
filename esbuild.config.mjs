@@ -192,7 +192,7 @@ ${safeJs}
 
     standalone = standalone
       .replace(/<link rel="stylesheet" href="(\/|\.\/)?monitor\.css" \/>/g, '')
-      .replace(/<script src="(\/|\.\/)?bundle\.js"><\/script>/g, bootloader);
+      .replace(/<script src="(\/|\.\/)?bundle\.js"><\/script>/g, () => bootloader);
 
     writeFileSync('dist/standalone.html', standalone, 'utf8');
     writeFileSync('dist/index.html', standalone, 'utf8');

@@ -47,7 +47,7 @@ export class LocalSyncWorker {
         } else {
           const inDir = path.join(this.workspaceRoot, '.agent', 'sessions', msg.sessionId, 'incoming');
           await fs.mkdir(inDir, { recursive: true });
-          await fs.writeFile(path.join(inDir, `${msg.timestamp}_${msg.id}.json`), JSON.stringify({ role: msg.role || 'user', content: msg.content, model: msg.model, mode: msg.mode, action: msg.action || 'message', timestamp: msg.timestamp, commandId: msg.commandId, allowed: msg.allowed }), 'utf8');
+          await fs.writeFile(path.join(inDir, `${msg.timestamp}_${msg.id}.json`), JSON.stringify({ role: msg.role || 'user', content: msg.content, model: msg.model, mode: msg.mode, action: msg.action || 'message', timestamp: msg.timestamp, commandId: msg.commandId, allowed: msg.allowed, attachments: msg.attachments }), 'utf8');
         }
         processedIds.push(msg.id);
       }
@@ -58,7 +58,7 @@ export class LocalSyncWorker {
         for (const sid of Object.keys(recentDetails)) if (recentDetails[sid]) recentDetails[sid].isGenerating = false;
       } else if (activeId && !recentDetails[activeId] && res.data.inbox[0]) {
         const first = res.data.inbox[0];
-        recentDetails[activeId] = { id: activeId, title: first.content?.slice(0, 40) || activeId, mode: first.mode || 'agent', createdAt: Date.now(), updatedAt: Date.now(), messages: [{ role: first.role || 'user', content: first.content || '' }], filesChanged: [], artifacts: [], subagents: [], backgroundTasks: [], plans: [], isGenerating: true };
+        recentDetails[activeId] = { id: activeId, title: first.content?.slice(0, 40) || (first.attachments?.[0]?.label ?? activeId), mode: first.mode || 'agent', createdAt: Date.now(), updatedAt: Date.now(), messages: [{ role: first.role || 'user', content: first.content || '', attachments: first.attachments }], filesChanged: [], artifacts: [], subagents: [], backgroundTasks: [], plans: [], isGenerating: true };
       }
       if (activeId && !sessions.some((s) => s.id === activeId)) {
         sessions.unshift({ id: activeId, title: recentDetails[activeId]?.title || activeId, createdAt: Date.now(), updatedAt: Date.now(), messageCount: 1, preview: res.data.inbox[0]?.content?.slice(0, 80) || '(empty session)' });

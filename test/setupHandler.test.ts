@@ -137,8 +137,9 @@ test('handleSetupRoute serves /api/version with agent-monitor package version, i
     assert.equal(statusCode, 200);
     assert.equal(headers['Content-Type'], 'application/json');
 
+    const pkg = JSON.parse(await fs.promises.readFile(path.resolve(__dirname, '../package.json'), 'utf8'));
     const data = JSON.parse(body);
-    assert.equal(data.version, '1.0.14');
+    assert.equal(data.version, pkg.version);
     assert.equal(data.downloadUrl, '/download');
   } finally {
     await fs.promises.rm(tmpDir, { recursive: true, force: true });

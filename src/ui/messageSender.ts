@@ -1,4 +1,5 @@
 import type { AppState } from './types';
+import type { AttachmentItem } from '../types';
 import { createSession, sendSessionMessage, stopSession } from './apiClient';
 import type { SyncStateMachine } from './syncStateMachine';
 import { appendOptimisticUserMessage } from './sessionMerge';
@@ -6,9 +7,10 @@ import { appendOptimisticUserMessage } from './sessionMerge';
 export async function submitUserMessage(
   state: AppState,
   syncMachine: SyncStateMachine,
-  text: string
+  text: string,
+  attachmentsParam?: AttachmentItem[]
 ): Promise<void> {
-  const attachments = state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined;
+  const attachments = attachmentsParam ?? (state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined);
   const sid = state.activeSessionId || `sess-${Math.random().toString(36).slice(2, 10)}`;
   state.activeSessionId = sid;
   state.awaitingSessionId = sid;
@@ -22,13 +24,14 @@ export async function submitUserMessage(
         role: 'user',
         model: state.selectedModel,
         mode: state.composerMode,
+        attachments,
         timestamp: Date.now(),
       });
     } catch (err) {
       try {
         const exists = state.sessions.some((s) => s.id === sid);
         if (!exists) {
-          const s = await createSession(text || 'New Session');
+          const s = await createSession(text || attachments?.[0]?.label || 'New Session');
           state.activeSessionId = s.id;
           state.awaitingSessionId = s.id;
           if (state.activeSession) state.activeSession.id = s.id;
@@ -42,7 +45,7 @@ export async function submitUserMessage(
   } else {
     const exists = state.sessions.some((s) => s.id === state.activeSessionId);
     if (!state.activeSessionId || !exists) {
-      const newSess = await createSession(text || 'New Session');
+      const newSess = await createSession(text || attachments?.[0]?.label || 'New Session');
       state.activeSessionId = newSess.id;
       state.awaitingSessionId = newSess.id;
       if (state.activeSession) state.activeSession.id = newSess.id;
@@ -115,6 +118,7 @@ export async function submitMessageFlow(
   onReload: () => Promise<void>, onRender: () => void
 ): Promise<void> {
   const input = typeof document !== 'undefined' ? (document.getElementById('composer-input') as HTMLTextAreaElement | null) : null;
+  const attachments = state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined;
   appendOptimisticUserMessage(state, text);
   Object.assign(state, {
     composerDraft: '', attachments: [], isMentionOpen: false,
@@ -125,7 +129,7 @@ export async function submitMessageFlow(
   syncMachine.setAwaitingResponse(true);
   onRender();
   try {
-    await submitUserMessage(state, syncMachine, text);
+    await submitUserMessage(state, syncMachine, text, attachments);
     state.errorMessage = undefined;
     if (state.syncMode !== 'git-backup') await onReload();
   } catch (err) {

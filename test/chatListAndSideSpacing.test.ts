@@ -17,7 +17,7 @@ test('renderMarkdownDocument renders unordered and ordered lists with correct cl
 
   const html = renderMarkdownDocument(md);
   assert.match(html, /<ul class="md-ul">/);
-  assert.match(html, /<li><strong>Workspace:<\/strong> <code class="inline-code">\/Users\/user\/Work\/code\/agent<\/code><\/li>/);
+  assert.match(html, /<li><strong>Workspace:<\/strong> <code class="inline-code[^"]*"[^>]*>\/Users\/user\/Work\/code\/agent<\/code><\/li>/);
   assert.match(html, /<ol class="md-ol">/);
   assert.match(html, /<li>Step one<\/li>/);
 });

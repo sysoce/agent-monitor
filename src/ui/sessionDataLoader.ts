@@ -54,7 +54,20 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
           if (s.id === state.lastAbortedSessionId || s.id === state.activeSessionId) s.isGenerating = false;
         }
       }
-      state.sessions = sessions;
+      if (state.activeSessionId && state.activeSession) {
+        const matching = sessions.find((s) => s.id === state.activeSessionId);
+        if (matching) {
+          if (state.activeSession.isGenerating !== undefined) matching.isGenerating = state.activeSession.isGenerating;
+          matching.messageCount = Math.max(matching.messageCount || 0, state.activeSession.messages?.length || 0);
+          matching.updatedAt = Math.max(matching.updatedAt || 0, state.activeSession.updatedAt || 0);
+        }
+      }
+      state.sessions = sessions.sort((a, b) => {
+        const aRunning = a.isGenerating ? 1 : 0;
+        const bRunning = b.isGenerating ? 1 : 0;
+        if (aRunning !== bRunning) return bRunning - aRunning;
+        return b.updatedAt - a.updatedAt;
+      });
     }
     state.isLoadingSessions = false;
     if (catalog.models?.length) state.availableModels = catalog.models;
@@ -78,8 +91,23 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       if (state.activeSession?.messages?.slice(-1)[0]?.role === 'assistant') {
         Object.assign(state, { isAwaitingResponse: false, awaitingSessionId: undefined });
       }
+      if (state.activeSession && state.sessions) {
+        const matching = state.sessions.find((s) => s.id === state.activeSession!.id);
+        if (matching) {
+          matching.isGenerating = state.activeSession.isGenerating;
+          matching.messageCount = Math.max(matching.messageCount || 0, state.activeSession.messages?.length || 0);
+          matching.updatedAt = Math.max(matching.updatedAt || 0, state.activeSession.updatedAt || 0);
+          state.sessions.sort((a, b) => {
+            const aRunning = a.isGenerating ? 1 : 0;
+            const bRunning = b.isGenerating ? 1 : 0;
+            if (aRunning !== bRunning) return bRunning - aRunning;
+            return b.updatedAt - a.updatedAt;
+          });
+        }
+      }
       await syncSessionPlans(state);
     }
+
   } catch {
     state.isLoadingSessions = false;
   }

@@ -1,0 +1,108 @@
+import type { AppState, SessionSummary } from './types';
+import { escapeHtml } from './components/markdown';
+
+export function formatRelativeTime(ts: number): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (diffSec < 60) return 'just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  return `${Math.floor(diffSec / 86400)}d ago`;
+}
+
+export function renderCardPlans(plans: Array<{ path: string; title?: string; name?: string }>): string {
+  if (!plans || plans.length === 0) return '';
+  return `
+    <div class="session-card-plans">
+      ${plans
+        .map(
+          (p) => `
+        <button type="button" class="session-plan-chip md-plan-link" data-plan-path="${escapeHtml(p.path)}">
+          <span class="plan-chip-icon">📋</span>
+          <span class="plan-chip-title">${escapeHtml(p.title || p.name || 'Plan')}</span>
+        </button>
+      `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+export function getSortedSessions(state: AppState): SessionSummary[] {
+  const list = [...state.sessions];
+  if (state.activeSession && !list.some((s) => s.id === state.activeSession!.id)) {
+    list.unshift({
+      id: state.activeSession.id,
+      title: state.activeSession.title || state.activeSession.id,
+      createdAt: state.activeSession.createdAt || Date.now(),
+      updatedAt: state.activeSession.updatedAt || Date.now(),
+      messageCount: state.activeSession.messages?.length || 0,
+      preview: state.activeSession.messages?.[0]?.content?.slice(0, 80) || '(empty session)',
+      isGenerating: state.activeSession.isGenerating,
+      plans: state.activeSession.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path })),
+      artifacts: state.activeSession.artifacts?.map((a) => ({ name: a.name, path: a.path, type: a.type })),
+    });
+  }
+  return list.sort((a, b) => {
+    const aRunning = Boolean(
+      a.isGenerating ||
+      (a.id === state.activeSessionId && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === a.id))))
+    ) ? 1 : 0;
+    const bRunning = Boolean(
+      b.isGenerating ||
+      (b.id === state.activeSessionId && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === b.id))))
+    ) ? 1 : 0;
+    if (aRunning !== bRunning) return bRunning - aRunning;
+    const aTime = a.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(a.updatedAt || 0, state.activeSession.updatedAt) : (a.updatedAt || 0);
+    const bTime = b.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(b.updatedAt || 0, state.activeSession.updatedAt) : (b.updatedAt || 0);
+    return bTime - aTime;
+  });
+}
+
+export function renderSessionCard(s: SessionSummary, state: AppState): string {
+  const isGenerating = Boolean(
+    s.isGenerating ||
+    (s.id === state.activeSessionId && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === s.id))))
+  );
+  const msgCount = s.id === state.activeSessionId && state.activeSession?.messages ? state.activeSession.messages.length : (s.messageCount || 0);
+  const updatedTs = s.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state.activeSession.updatedAt) : (s.updatedAt || 0);
+  const timeStr = isGenerating ? 'running' : formatRelativeTime(updatedTs);
+
+  return `
+    <div
+      class="session-card ${s.id === state.activeSessionId ? 'active' : ''} ${isGenerating ? 'running' : ''}"
+      data-session-id="${s.id}"
+    >
+      <div class="session-card-header">
+        <span class="session-card-title">${isGenerating ? '<span class="pulse-indicator live" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span>' : ''}${escapeHtml(s.title)}</span>
+        <span class="session-card-time ${isGenerating ? 'running-time' : ''}">${timeStr}</span>
+      </div>
+      <div class="session-card-preview">${escapeHtml(s.preview || 'No messages yet')}</div>
+      ${renderCardPlans(s.plans || [])}
+      <div class="session-card-footer">
+        <span class="session-badge ${isGenerating ? 'session-badge--running' : ''}">${msgCount} msgs</span>
+        <span class="session-card-id">${s.id}</span>
+      </div>
+    </div>
+  `;
+}
+
+export function renderSessionListHtml(state: AppState): string {
+  const q = state.searchQuery.toLowerCase().trim();
+  const sorted = getSortedSessions(state);
+  const filtered = sorted.filter((s) => {
+    if (!q) return true;
+    if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
+    if (s.plans?.some((p: { name?: string; title?: string }) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
+    if (s.artifacts?.some((a: { name?: string; path?: string }) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
+    return false;
+  });
+  const displaySessions = q ? filtered : filtered.slice(0, 8);
+
+  if (displaySessions.length === 0) {
+    return state.isLoadingSessions
+      ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>`
+      : `<div class="empty-state">No matching sessions, plans, or artifacts</div>`;
+  }
+
+  return displaySessions.map((s) => renderSessionCard(s, state)).join('');
+}

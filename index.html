@@ -6995,7 +6995,7 @@ input:checked + .slider:before {
     if (!state2.activeSession) {
       state2.activeSession = {
         id: sid,
-        title: text.slice(0, 30) || "Session",
+        title: text.slice(0, 30) || (state2.attachments?.[0]?.label || "Session"),
         mode: state2.composerMode,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -7022,12 +7022,13 @@ input:checked + .slider:before {
         incomingUserTexts.add(m.content.trim());
       }
     }
-    const pendingInboxMsgs = (inbox || []).filter((m) => m.sessionId === incoming.id && m.content && !incomingUserTexts.has(m.content.trim())).map((m) => ({
+    const pendingInboxMsgs = (inbox || []).filter((m) => m.sessionId === incoming.id && (m.content || m.attachments && m.attachments.length > 0) && !incomingUserTexts.has((m.content || "").trim())).map((m) => ({
       role: "user",
-      content: m.content,
+      content: m.content || "",
       timestamp: m.timestamp || Date.now(),
       model: m.model,
-      mode: m.mode
+      mode: m.mode,
+      attachments: m.attachments
     }));
     if (!existing || existing.id !== incoming.id) {
       let baseDetail = incoming;
@@ -7037,17 +7038,24 @@ input:checked + .slider:before {
       return applyAbortSuppression(baseDetail, lastAbortedAt);
     }
     const pendingUserMsgs = (existing.messages || []).filter((m) => {
-      if (m.role !== "user" || typeof m.content !== "string") return false;
-      const text = m.content.trim();
-      if (!text || incomingUserTexts.has(text)) return false;
+      if (m.role !== "user") return false;
+      const text = typeof m.content === "string" ? m.content.trim() : "";
+      const hasAtts = Boolean(m.attachments && m.attachments.length > 0);
+      if (!text && !hasAtts) return false;
+      if (text && incomingUserTexts.has(text)) return false;
       const ts = m.timestamp || 0;
       return ts === 0 || Date.now() - ts < 12e4;
     });
     const allPending = [...pendingUserMsgs];
     for (const p of pendingInboxMsgs) {
-      if (!allPending.some((e) => typeof e.content === "string" && e.content.trim() === p.content.trim())) {
-        allPending.push(p);
-      }
+      const pText = typeof p.content === "string" ? p.content.trim() : "";
+      const isDup = allPending.some((e) => {
+        const eText = typeof e.content === "string" ? e.content.trim() : "";
+        if (pText && eText && eText === pText) return true;
+        if (!pText && !eText && JSON.stringify(e.attachments) === JSON.stringify(p.attachments)) return true;
+        return false;
+      });
+      if (!isDup) allPending.push(p);
     }
     const mergedMessages = [...incoming.messages || []];
     let isGenerating = incoming.isGenerating;
@@ -7077,22 +7085,17 @@ input:checked + .slider:before {
   function applyAbortSuppression(detail, lastAbortedAt) {
     if (!lastAbortedAt || lastAbortedAt <= 0) return detail;
     const msgs = detail.messages || [];
-    const hasUserMsgAfterAbort = msgs.some((m) => {
-      if (m.role !== "user") return false;
-      const ts = m.timestamp || 0;
-      return ts > lastAbortedAt;
-    });
+    const hasUserMsgAfterAbort = msgs.some((m) => m.role === "user" && (m.timestamp || 0) > lastAbortedAt);
     if (hasUserMsgAfterAbort) return detail;
-    const sanitized = msgs.map((m) => m.isLive ? { ...m, isLive: false } : m);
     return {
       ...detail,
       isGenerating: false,
-      messages: sanitized
+      messages: msgs.map((m) => m.isLive ? { ...m, isLive: false } : m)
     };
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.15" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.16" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7387,8 +7390,8 @@ input:checked + .slider:before {
   }
 
   // src/ui/messageSender.ts
-  async function submitUserMessage(state2, syncMachine, text) {
-    const attachments = state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0;
+  async function submitUserMessage(state2, syncMachine, text, attachmentsParam) {
+    const attachments = attachmentsParam ?? (state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0);
     const sid = state2.activeSessionId || `sess-${Math.random().toString(36).slice(2, 10)}`;
     state2.activeSessionId = sid;
     state2.awaitingSessionId = sid;
@@ -7401,13 +7404,14 @@ input:checked + .slider:before {
           role: "user",
           model: state2.selectedModel,
           mode: state2.composerMode,
+          attachments,
           timestamp: Date.now()
         });
       } catch (err) {
         try {
           const exists = state2.sessions.some((s) => s.id === sid);
           if (!exists) {
-            const s = await createSession(text || "New Session");
+            const s = await createSession(text || attachments?.[0]?.label || "New Session");
             state2.activeSessionId = s.id;
             state2.awaitingSessionId = s.id;
             if (state2.activeSession) state2.activeSession.id = s.id;
@@ -7421,7 +7425,7 @@ input:checked + .slider:before {
     } else {
       const exists = state2.sessions.some((s) => s.id === state2.activeSessionId);
       if (!state2.activeSessionId || !exists) {
-        const newSess = await createSession(text || "New Session");
+        const newSess = await createSession(text || attachments?.[0]?.label || "New Session");
         state2.activeSessionId = newSess.id;
         state2.awaitingSessionId = newSess.id;
         if (state2.activeSession) state2.activeSession.id = newSess.id;
@@ -7495,6 +7499,7 @@ input:checked + .slider:before {
   }
   async function submitMessageFlow(state2, syncMachine, text, onReload, onRender) {
     const input = typeof document !== "undefined" ? document.getElementById("composer-input") : null;
+    const attachments = state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0;
     appendOptimisticUserMessage(state2, text);
     Object.assign(state2, {
       composerDraft: "",
@@ -7514,7 +7519,7 @@ input:checked + .slider:before {
     syncMachine.setAwaitingResponse(true);
     onRender();
     try {
-      await submitUserMessage(state2, syncMachine, text);
+      await submitUserMessage(state2, syncMachine, text, attachments);
       state2.errorMessage = void 0;
       if (state2.syncMode !== "git-backup") await onReload();
     } catch (err) {
@@ -8253,7 +8258,20 @@ input:checked + .slider:before {
             if (s.id === state2.lastAbortedSessionId || s.id === state2.activeSessionId) s.isGenerating = false;
           }
         }
-        state2.sessions = sessions;
+        if (state2.activeSessionId && state2.activeSession) {
+          const matching = sessions.find((s) => s.id === state2.activeSessionId);
+          if (matching) {
+            if (state2.activeSession.isGenerating !== void 0) matching.isGenerating = state2.activeSession.isGenerating;
+            matching.messageCount = Math.max(matching.messageCount || 0, state2.activeSession.messages?.length || 0);
+            matching.updatedAt = Math.max(matching.updatedAt || 0, state2.activeSession.updatedAt || 0);
+          }
+        }
+        state2.sessions = sessions.sort((a, b) => {
+          const aRunning = a.isGenerating ? 1 : 0;
+          const bRunning = b.isGenerating ? 1 : 0;
+          if (aRunning !== bRunning) return bRunning - aRunning;
+          return b.updatedAt - a.updatedAt;
+        });
       }
       state2.isLoadingSessions = false;
       if (catalog.models?.length) state2.availableModels = catalog.models;
@@ -8276,6 +8294,20 @@ input:checked + .slider:before {
         }
         if (state2.activeSession?.messages?.slice(-1)[0]?.role === "assistant") {
           Object.assign(state2, { isAwaitingResponse: false, awaitingSessionId: void 0 });
+        }
+        if (state2.activeSession && state2.sessions) {
+          const matching = state2.sessions.find((s) => s.id === state2.activeSession.id);
+          if (matching) {
+            matching.isGenerating = state2.activeSession.isGenerating;
+            matching.messageCount = Math.max(matching.messageCount || 0, state2.activeSession.messages?.length || 0);
+            matching.updatedAt = Math.max(matching.updatedAt || 0, state2.activeSession.updatedAt || 0);
+            state2.sessions.sort((a, b) => {
+              const aRunning = a.isGenerating ? 1 : 0;
+              const bRunning = b.isGenerating ? 1 : 0;
+              if (aRunning !== bRunning) return bRunning - aRunning;
+              return b.updatedAt - a.updatedAt;
+            });
+          }
         }
         await syncSessionPlans(state2);
       }
@@ -8437,6 +8469,529 @@ input:checked + .slider:before {
       }
     }
   };
+
+  // src/ui/markdown/tokenizePatterns.ts
+  var FENCE_RE = /^(\s*)(`{3,}|~{3,})\s*(.*)$/;
+  var HEADING_RE = /^(#{1,6})\s+(.*)$/;
+  var HR_RE = /^\s*(?:[-*_]\s*){3,}$/;
+  var QUOTE_RE = /^\s*>\s?(.*)$/;
+  var BULLET_RE = /^(\s*)[-*+]\s+(.*)$/;
+  var ORDERED_RE = /^(\s*)(\d{1,9})[.)]\s+(.*)$/;
+  var TASK_RE = /^\[([ xX])\]\s+(.*)$/;
+  var TABLE_DIVIDER_RE = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
+  var LONE_BOLD_RE = /^\s*(\*\*|__)[^*_]+(\*\*|__)\s*$/;
+  function splitRow(line) {
+    return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+  }
+  function alignments(divider) {
+    return splitRow(divider).map((cell) => {
+      const left = cell.startsWith(":");
+      const right = cell.endsWith(":");
+      if (left && right) return "center";
+      if (right) return "right";
+      if (left) return "left";
+      return null;
+    });
+  }
+  var PROSE_STARTER_RE = /^(?:Actually|Wait|Okay|Ok|Alright|Hmm|Looking|Next|Now|So|Let's|Let|I'll|I've|I'm|I\s|We\s|The\s|This\s|That\s|Here\s|Therefore|However|Alternatively|First|Second|Third|Finally|Note|If\s|In\s|When\s|As\s|Since\s|Because\s|To\s|For\s|You\s|It\s|There\s|Based\s|According\s|Overall)\b/i;
+  function isCodeLike(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (/^\s{2,}\S/.test(line) || /^\t\S/.test(line)) return true;
+    if (/^(?:import|export|from|const|let|var|function|return|def|class|public|private|protected|if|else|for|while|switch|case|try|catch|async|await|yield|type|interface|struct|enum|namespace|package|using)\b/i.test(
+      trimmed
+    )) {
+      return true;
+    }
+    if (/^#(?:include|define|ifdef|ifndef|pragma|if|else|endif)\b/i.test(trimmed)) return true;
+    if (/^(?:\/\/|\/\*|\*|<!--|#\s*[a-z0-9_]+)/i.test(trimmed)) return true;
+    if (/^(?:cat|grep|ls|cd|echo|git|npm|yarn|pnpm|docker|curl|wget|python|node|pytest|make|cargo|go|find|sed|awk|rm|mkdir|cp|mv|chmod|sudo)\b/i.test(
+      trimmed
+    )) {
+      return true;
+    }
+    if (/[;{}()\[\]=><+|&]$/.test(trimmed)) return true;
+    return false;
+  }
+  function isProseResumptionLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (isCodeLike(trimmed)) return false;
+    if (/^\s*#{1,6}\s+\S/.test(line)) return true;
+    if (/^\s*>\s+\S/.test(line)) return true;
+    if (/^\s*[-*+]\s+[A-Za-z]/.test(line)) return true;
+    if (/^\s*\d+[.)]\s+[A-Za-z]/.test(line)) return true;
+    if (/^["'][A-Z]/.test(trimmed)) return true;
+    if (PROSE_STARTER_RE.test(trimmed)) return true;
+    if (/^[A-Z][a-zA-Z0-9\s`'"',.\(\)]+[.?!"]$/.test(trimmed) && trimmed.includes(" ")) {
+      return true;
+    }
+    return false;
+  }
+
+  // src/ui/markdown/tokenizeList.ts
+  function readList(lines, start) {
+    const first = lines[start];
+    const ordered = ORDERED_RE.exec(first);
+    const kind = ordered ? "ordered" : "bullet";
+    const startNumber = ordered ? Number(ordered[2]) : 1;
+    const items = [];
+    let i = start;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) {
+        const following = lines[i + 1];
+        const continues = following && (kind === "ordered" ? ORDERED_RE.test(following) : BULLET_RE.test(following));
+        if (!continues) break;
+        i += 1;
+        continue;
+      }
+      const bullet = kind === "bullet" ? BULLET_RE.exec(line) : null;
+      const numbered = kind === "ordered" ? ORDERED_RE.exec(line) : null;
+      if (!bullet && !numbered) {
+        if (items.length && /^\s{2,}\S/.test(line)) {
+          items[items.length - 1].text += `
+${line.trim()}`;
+          i += 1;
+          continue;
+        }
+        break;
+      }
+      const indent = (bullet ? bullet[1] : numbered[1]).replace(/\t/g, "  ").length;
+      const rawText = bullet ? bullet[2] : numbered[3];
+      const task = TASK_RE.exec(rawText);
+      items.push({
+        depth: Math.floor(indent / 2),
+        text: task ? task[2] : rawText,
+        checked: task ? task[1].toLowerCase() === "x" : void 0
+      });
+      i += 1;
+    }
+    return { token: { type: "list", kind, start: startNumber, items }, next: i };
+  }
+
+  // src/ui/markdown/tokenizeCodeFence.ts
+  function readCodeFence(lines, start, fenceMatch) {
+    const marker = fenceMatch[2][0];
+    const width = fenceMatch[2].length;
+    const info = fenceMatch[3].trim();
+    const body = [];
+    let closed = false;
+    let i = start + 1;
+    while (i < lines.length) {
+      const candidate = lines[i];
+      const closing = candidate.match(/^\s*(`{3,}|~{3,})\s*$/);
+      if (closing && closing[1][0] === marker && closing[1].length >= width) {
+        closed = true;
+        i += 1;
+        break;
+      }
+      if (body.length > 0 && !body[body.length - 1].trim() && isProseResumptionLine(candidate)) {
+        body.pop();
+        closed = true;
+        break;
+      }
+      body.push(candidate);
+      i += 1;
+    }
+    const [lang, ...rest] = info.split(/\s+/);
+    return {
+      token: {
+        type: "code",
+        lang: lang ?? "",
+        meta: rest.join(" ") || void 0,
+        code: body.join("\n"),
+        closed
+      },
+      next: i
+    };
+  }
+
+  // src/ui/markdown/tokenize.ts
+  function tokenizeBlocks(source) {
+    const lines = source.replace(/\r\n?/g, "\n").split("\n");
+    const tokens = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) {
+        i += 1;
+        continue;
+      }
+      const fence = line.match(FENCE_RE);
+      if (fence) {
+        const { token, next } = readCodeFence(lines, i, fence);
+        tokens.push(token);
+        i = next;
+        continue;
+      }
+      const heading = line.match(HEADING_RE);
+      if (heading) {
+        tokens.push({ type: "heading", level: heading[1].length, text: heading[2].trim() });
+        i += 1;
+        continue;
+      }
+      if (HR_RE.test(line)) {
+        tokens.push({ type: "hr" });
+        i += 1;
+        continue;
+      }
+      if (QUOTE_RE.test(line)) {
+        const body = [];
+        while (i < lines.length && QUOTE_RE.test(lines[i])) {
+          body.push(lines[i].match(QUOTE_RE)[1]);
+          i += 1;
+        }
+        tokens.push({ type: "quote", text: body.join("\n").trim() });
+        continue;
+      }
+      if (line.includes("|") && i + 1 < lines.length && TABLE_DIVIDER_RE.test(lines[i + 1])) {
+        const header = splitRow(line);
+        const align = alignments(lines[i + 1]);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
+          rows.push(splitRow(lines[i]));
+          i += 1;
+        }
+        tokens.push({ type: "table", header, align, rows });
+        continue;
+      }
+      if (BULLET_RE.test(line) || ORDERED_RE.test(line)) {
+        const { token, next } = readList(lines, i);
+        tokens.push(token);
+        i = next;
+        continue;
+      }
+      const paragraph = [];
+      while (i < lines.length && lines[i].trim()) {
+        const current = lines[i];
+        if (FENCE_RE.test(current) || HEADING_RE.test(current) || HR_RE.test(current) || QUOTE_RE.test(current) || BULLET_RE.test(current) || ORDERED_RE.test(current)) {
+          break;
+        }
+        if (LONE_BOLD_RE.test(current)) {
+          if (paragraph.length > 0) break;
+          paragraph.push(current.trim());
+          i += 1;
+          break;
+        }
+        paragraph.push(current.trim());
+        i += 1;
+      }
+      if (paragraph.length) {
+        tokens.push({ type: "paragraph", text: paragraph.join("\n") });
+      }
+    }
+    return collapseRepeatedBlocks(tokens);
+  }
+  function collapseRepeatedBlocks(tokens) {
+    const out = [];
+    for (const token of tokens) {
+      const prev = out[out.length - 1];
+      if (prev?.type === "paragraph" && token.type === "paragraph" && normalizeParagraphText(prev.text) === normalizeParagraphText(token.text)) {
+        continue;
+      }
+      out.push(token);
+    }
+    return out;
+  }
+  function normalizeParagraphText(text) {
+    return text.replace(/\s+/g, " ").trim();
+  }
+
+  // src/ui/markdown/inlineLink.ts
+  var AUTOLINK_RE = /^((?:https?|file|vscode):\/\/[^\s<>()]+[^\s<>().,;:!?'"])/i;
+  function parseLinkLike(source, start) {
+    let depth = 0;
+    let labelEnd = -1;
+    for (let i = start; i < source.length; i += 1) {
+      const char = source[i];
+      if (char === "\\") {
+        i += 1;
+        continue;
+      }
+      if (char === "[") depth += 1;
+      else if (char === "]") {
+        depth -= 1;
+        if (depth === 0) {
+          labelEnd = i;
+          break;
+        }
+      }
+    }
+    if (labelEnd === -1 || source[labelEnd + 1] !== "(") return void 0;
+    let parenDepth = 0;
+    let hrefEnd = -1;
+    for (let i = labelEnd + 1; i < source.length; i += 1) {
+      const char = source[i];
+      if (char === "(") parenDepth += 1;
+      else if (char === ")") {
+        parenDepth -= 1;
+        if (parenDepth === 0) {
+          hrefEnd = i;
+          break;
+        }
+      }
+    }
+    if (hrefEnd === -1) return void 0;
+    const inner = source.slice(labelEnd + 2, hrefEnd).trim();
+    const titleMatch = inner.match(/^(\S+)\s+["'](.*)["']$/);
+    return {
+      label: source.slice(start + 1, labelEnd),
+      href: titleMatch ? titleMatch[1] : inner,
+      title: titleMatch ? titleMatch[2] : void 0,
+      end: hrefEnd + 1
+    };
+  }
+
+  // src/ui/markdown/inlineEmphasis.ts
+  function parseEmphasis(source, start, marker, parseInlineFn) {
+    const run = new RegExp(`^\\${marker}{1,3}`).exec(source.slice(start))[0];
+    const width = run.length >= 2 ? 2 : 1;
+    const delimiter = marker.repeat(width);
+    if (marker === "_" && start > 0 && /\w/.test(source[start - 1])) return void 0;
+    const searchFrom = start + delimiter.length;
+    if (/^\s/.test(source.slice(searchFrom))) return void 0;
+    const close = source.indexOf(delimiter, searchFrom);
+    if (close === -1) return void 0;
+    const content = source.slice(searchFrom, close);
+    if (!content.trim()) return void 0;
+    return {
+      node: {
+        type: width === 2 ? "strong" : "em",
+        children: parseInlineFn(content)
+      },
+      end: close + delimiter.length
+    };
+  }
+
+  // src/ui/markdown/inline.ts
+  function parseInline(source) {
+    const nodes = [];
+    let buffer = "";
+    let i = 0;
+    const flush = () => {
+      if (buffer) {
+        nodes.push({ type: "text", value: buffer });
+        buffer = "";
+      }
+    };
+    while (i < source.length) {
+      const char = source[i];
+      if (char === "\\" && i + 1 < source.length) {
+        buffer += source[i + 1];
+        i += 2;
+        continue;
+      }
+      if (char === "\n") {
+        flush();
+        nodes.push({ type: "break" });
+        i += 1;
+        continue;
+      }
+      if (char === "`") {
+        const run = /^`+/.exec(source.slice(i))[0];
+        const close = source.indexOf(run, i + run.length);
+        if (close !== -1) {
+          flush();
+          nodes.push({ type: "code", value: source.slice(i + run.length, close).trim() });
+          i = close + run.length;
+          continue;
+        }
+      }
+      if (char === "!" && source[i + 1] === "[") {
+        const parsed = parseLinkLike(source, i + 1);
+        if (parsed) {
+          flush();
+          nodes.push({ type: "image", src: parsed.href, alt: parsed.label });
+          i = parsed.end;
+          continue;
+        }
+      }
+      if (char === "[") {
+        const parsed = parseLinkLike(source, i);
+        if (parsed) {
+          flush();
+          nodes.push({
+            type: "link",
+            href: parsed.href,
+            title: parsed.title,
+            children: parseInline(parsed.label)
+          });
+          i = parsed.end;
+          continue;
+        }
+      }
+      if (char === "*" || char === "_") {
+        const emphasis = parseEmphasis(source, i, char, parseInline);
+        if (emphasis) {
+          flush();
+          nodes.push(emphasis.node);
+          i = emphasis.end;
+          continue;
+        }
+      }
+      if (char === "~" && source[i + 1] === "~") {
+        const close = source.indexOf("~~", i + 2);
+        if (close !== -1) {
+          flush();
+          nodes.push({ type: "strike", children: parseInline(source.slice(i + 2, close)) });
+          i = close + 2;
+          continue;
+        }
+      }
+      if ((char === "h" || char === "H" || char === "f" || char === "F" || char === "v" || char === "V") && (i === 0 || /[\s(]/.test(source[i - 1]))) {
+        const match = AUTOLINK_RE.exec(source.slice(i));
+        if (match) {
+          flush();
+          nodes.push({
+            type: "link",
+            href: match[1],
+            children: [{ type: "text", value: match[1] }]
+          });
+          i += match[1].length;
+          continue;
+        }
+      }
+      buffer += char;
+      i += 1;
+    }
+    flush();
+    return nodes;
+  }
+
+  // src/ui/markdown/boldParagraph.ts
+  var STATUS_LABEL_RE = /^(Error|Warning|Note|Failed|Success|Info|Erro)$/i;
+  var TITLE_MAX_LENGTH = 80;
+  function classifyLoneBoldText(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return "body";
+    if (STATUS_LABEL_RE.test(text)) return "status";
+    if (!looksLikeBoldTitle(text)) return "body";
+    return "title";
+  }
+  function looksLikeBoldTitle(text) {
+    if (text.length > TITLE_MAX_LENGTH) return false;
+    if (/[.!?]$/.test(text)) return false;
+    if (/\.\s/.test(text)) return false;
+    const colon = text.indexOf(":");
+    if (colon >= 0 && text.length - colon - 1 > 40) return false;
+    return true;
+  }
+
+  // src/ui/markdown/filePathDetector.ts
+  var KNOWN_EXTENSIONS = /* @__PURE__ */ new Set([
+    "ts",
+    "tsx",
+    "js",
+    "jsx",
+    "mjs",
+    "cjs",
+    "json",
+    "json5",
+    "jsonc",
+    "md",
+    "markdown",
+    "css",
+    "scss",
+    "sass",
+    "less",
+    "html",
+    "htm",
+    "xml",
+    "svg",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "py",
+    "pyi",
+    "rs",
+    "go",
+    "c",
+    "h",
+    "cpp",
+    "hpp",
+    "cc",
+    "cxx",
+    "java",
+    "kt",
+    "kts",
+    "swift",
+    "rb",
+    "php",
+    "cs",
+    "sql",
+    "graphql",
+    "gql",
+    "vue",
+    "svelte",
+    "astro",
+    "wasm",
+    "map",
+    "lock",
+    "txt",
+    "log",
+    "env",
+    "csv",
+    "tsv",
+    "conf",
+    "config",
+    "proto"
+  ]);
+  var SPECIAL_FILENAMES = /* @__PURE__ */ new Set([
+    "dockerfile",
+    "makefile",
+    "containerfile",
+    "procfile",
+    "gemfile",
+    "rakefile",
+    ".gitignore",
+    ".npmignore",
+    ".eslintrc",
+    ".prettierrc",
+    ".env",
+    "license",
+    "readme",
+    "agents.md"
+  ]);
+  function isFilePathCandidate(rawText) {
+    if (!rawText || typeof rawText !== "string") return false;
+    const str = rawText.trim();
+    if (!str || str.length > 300) return false;
+    if (/^(?:file|vscode):\/\//i.test(str)) return true;
+    if (/^https?:\/\//i.test(str)) return true;
+    if (/[\r\n\t\s]/.test(str)) return false;
+    if (/[;{}()=><`"'$*?|!]/.test(str)) return false;
+    if (/^v?\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9_.-]+)?$/i.test(str)) return false;
+    const clean = str.replace(/#L\d+(?:-L?\d+)?$/i, "").replace(/:\d+(?:[:-]\d+)?$/, "");
+    if (!clean) return false;
+    const normalized = clean.replace(/\\/g, "/");
+    const baseName = normalized.split("/").pop() || "";
+    const lowerBase = baseName.toLowerCase();
+    if (SPECIAL_FILENAMES.has(lowerBase)) return true;
+    if (lowerBase.endsWith(".d.ts")) return true;
+    if (lowerBase.includes(".")) {
+      const ext = lowerBase.split(".").pop() || "";
+      if (ext && KNOWN_EXTENSIONS.has(ext)) {
+        return true;
+      }
+    }
+    if (normalized.includes("/")) {
+      if (normalized.startsWith("./") || normalized.startsWith("../") || normalized.startsWith("/")) {
+        return true;
+      }
+      const segments = normalized.split("/").filter(Boolean);
+      if (segments.length >= 2) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // src/ui/markdown/languageSpecs.ts
   var JS_KEYWORDS = "const let var function return if else for while do break continue class extends new delete typeof instanceof in of this super import export from default async await yield try catch finally throw switch case void null undefined true false static get set";
@@ -8692,7 +9247,7 @@ input:checked + .slider:before {
   }
   function postProcessMermaidSvg(svg) {
     if (!svg) return "";
-    return svg.replace(/style="[^"]*max-width:[^;"]*;?/gi, 'style="max-width:100%;height:auto;display:block;margin:0 auto;').replace(/<svg\s+([^>]*)(width="[^"]*")([^>]*)>/i, '<svg  style="max-width:100%;height:auto;display:block;margin:0 auto;" $3>');
+    return svg.replace(/style="[^"]*max-width:[^;"]*;?/gi, 'style="max-width:100%;height:auto;display:block;margin:0 auto;').replace(/<svg\s+([^>]*)(width="[^"]*")([^>]*)>/i, '<svg $1 style="max-width:100%;height:auto;display:block;margin:0 auto;" $3>');
   }
 
   // src/ui/markdown/diagram/chartParser.ts
@@ -8953,134 +9508,107 @@ input:checked + .slider:before {
     return (str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // src/ui/components/markdown.ts
+  // src/ui/markdown/renderHtml.ts
   function escapeHtml2(str) {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
-  function formatInlineMarkdown(text) {
-    let html = escapeHtml2(text);
-    html = html.replace(/`([^`]+)`/g, '<code class="inline-code"></code>');
-    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong></strong>");
-    html = html.replace(/\*([^*]+)\*/g, "<em></em>");
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, url) => {
-      const cleanUrl = url.replace(/^file:\/\//, "");
-      if (isPlanFilePath(cleanUrl)) {
-        return `<button type="button" class="plan-view-btn md-plan-link" data-plan-path="${cleanUrl}">\u{1F4CB} ${label}</button>`;
+  function renderInlineHtml(nodes) {
+    return nodes.map((node) => {
+      switch (node.type) {
+        case "text":
+          return escapeHtml2(node.value).replace(
+            /(^|[\s(>])([a-zA-Z0-9_\-./]*plan[a-zA-Z0-9_\-./]*\.md|[a-zA-Z0-9_\-./]+\.plan\.md)(?=[)\s.,;:<]|$)/gi,
+            (_m, prefix, file) => {
+              if (isPlanFilePath(file)) {
+                return `${prefix}<button type="button" class="plan-view-btn md-plan-link" data-plan-path="${file}">\u{1F4CB} ${file}</button>`;
+              }
+              return `${prefix}${file}`;
+            }
+          );
+        case "break":
+          return "<br />";
+        case "code":
+          if (isFilePathCandidate(node.value)) {
+            return `<code class="inline-code inline-code--link" data-file-path="${escapeHtml2(node.value)}" title="Open ${escapeHtml2(node.value)}">${escapeHtml2(node.value)}</code>`;
+          }
+          return `<code class="inline-code">${escapeHtml2(node.value)}</code>`;
+        case "strong":
+          return `<strong>${renderInlineHtml(node.children)}</strong>`;
+        case "em":
+          return `<em>${renderInlineHtml(node.children)}</em>`;
+        case "strike":
+          return `<s>${renderInlineHtml(node.children)}</s>`;
+        case "image":
+          return `<img class="md-image" src="${escapeHtml2(node.src)}" alt="${escapeHtml2(node.alt)}" />`;
+        case "link": {
+          const cleanUrl = node.href.replace(/^file:\/\//, "");
+          if (isPlanFilePath(cleanUrl)) {
+            return `<button type="button" class="plan-view-btn md-plan-link" data-plan-path="${escapeHtml2(cleanUrl)}">\u{1F4CB} ${renderInlineHtml(node.children)}</button>`;
+          }
+          const titleAttr = node.title ? ` title="${escapeHtml2(node.title)}"` : "";
+          return `<a href="${escapeHtml2(node.href)}" target="_blank" rel="noopener" class="md-link"${titleAttr}>${renderInlineHtml(node.children)}</a>`;
+        }
+        default:
+          return "";
       }
-      return `<a href="${url}" target="_blank" rel="noopener" class="md-link">${label}</a>`;
-    });
-    html = html.replace(/(^|[\s(>])([a-zA-Z0-9_\-./]*plan[a-zA-Z0-9_\-./]*\.md|[a-zA-Z0-9_\-./]+\.plan\.md)(?=[)\s.,;:<]|$)/gi, (_m, prefix, file) => {
-      if (isPlanFilePath(file)) {
-        return `${prefix}<button type="button" class="plan-view-btn md-plan-link" data-plan-path="${file}">\u{1F4CB} ${file}</button>`;
-      }
-      return `${prefix}${file}`;
-    });
-    return html;
+    }).join("");
   }
   function renderCodeBlockHtml(code, lang) {
     const displayLang = lang || "text";
     const pieces = highlight(code, lang);
     const highlighted = pieces.map((p) => p.kind === "plain" ? escapeHtml2(p.value) : `<span class="tok-${p.kind}">${escapeHtml2(p.value)}</span>`).join("");
-    return `
-    <div class="code-block">
-      <div class="code-header">
-        <span class="code-lang">${escapeHtml2(displayLang)}</span>
-        <button type="button" class="code-copy-btn copy-btn" data-copy-text="${escapeHtml2(code)}" title="Copy code">Copy</button>
-      </div>
-      <pre><code>${highlighted}</code></pre>
-    </div>
-  `;
+    return `<div class="code-block"><div class="code-header"><span class="code-lang">${escapeHtml2(displayLang)}</span><button type="button" class="code-copy-btn copy-btn" data-copy-text="${escapeHtml2(code)}" title="Copy code">Copy</button></div><pre><code>${highlighted}</code></pre></div>`;
   }
-  function renderBlock(line) {
-    const trimmed = line.trim();
-    if (!trimmed) return null;
-    if (/^(\*\*\*|---|___)$/.test(trimmed)) return { type: "hr", html: '<hr class="md-hr" />' };
-    const hm = trimmed.match(/^(#{1,6})\s+(.*)$/);
-    if (hm) return { type: "h", html: `<h${hm[1].length} class="md-h md-h${hm[1].length}">${formatInlineMarkdown(hm[2])}</h${hm[1].length}>` };
-    const check = trimmed.match(/^-\s+\[([ xX])\]\s+(.*)$/);
-    if (check) {
-      const checked = check[1].toLowerCase() === "x";
-      return {
-        type: "checklist",
-        html: `<li class="checklist-item ${checked ? "done" : ""}"><span class="check-box ${checked ? "checked" : ""}">${checked ? "\u2713" : "\u25CB"}</span> ${formatInlineMarkdown(check[2])}</li>`
-      };
+  function renderBlockTokenHtml(token) {
+    switch (token.type) {
+      case "heading":
+        return `<h${token.level} class="md-heading md-h md-h${token.level} h${token.level}">${renderInlineHtml(parseInline(token.text))}</h${token.level}>`;
+      case "paragraph": {
+        const inlines = parseInline(token.text);
+        let pClass = "md-paragraph md-p";
+        if (inlines.length === 1 && inlines[0].type === "strong") {
+          const raw = token.text.replace(/^[*_]{2}|[*_]{2}$/g, "").trim();
+          const kind = classifyLoneBoldText(raw);
+          if (kind === "title") pClass += " md-bold-title";
+          else if (kind === "status") pClass += " md-status-label";
+        }
+        return `<p class="${pClass}">${renderInlineHtml(inlines)}</p>`;
+      }
+      case "hr":
+        return '<hr class="md-hr" />';
+      case "quote":
+        return `<blockquote class="md-quote">${renderInlineHtml(parseInline(token.text))}</blockquote>`;
+      case "code":
+        return isDiagramLanguage(token.lang) ? renderDiagramCardHtml(token.code, token.lang) : renderCodeBlockHtml(token.code, token.lang);
+      case "list": {
+        const isCheck = token.items.some((i) => i.checked !== void 0);
+        if (isCheck) {
+          const items2 = token.items.map((i) => `<li class="checklist-item ${i.checked ? "done" : ""}"><span class="check-box ${i.checked ? "checked" : ""}">${i.checked ? "\u2713" : "\u25CB"}</span> ${renderInlineHtml(parseInline(i.text))}</li>`).join("\n");
+          return `<ul class="md-checklist">
+${items2}
+</ul>`;
+        }
+        const tag = token.kind === "ordered" ? "ol" : "ul";
+        const listClass = token.kind === "ordered" ? "md-ol" : "md-ul";
+        const items = token.items.map((i) => `<li>${renderInlineHtml(parseInline(i.text))}</li>`).join("\n");
+        return `<${tag} class="${listClass}">
+${items}
+</${tag}>`;
+      }
+      case "table": {
+        const thead = `<thead><tr>${token.header.map((col, idx) => `<th${token.align[idx] ? ` align="${token.align[idx]}"` : ""}>${renderInlineHtml(parseInline(col))}</th>`).join("")}</tr></thead>`;
+        const tbody = `<tbody>${token.rows.map((row) => `<tr>${row.map((cell, idx) => `<td${token.align[idx] ? ` align="${token.align[idx]}"` : ""}>${renderInlineHtml(parseInline(cell))}</td>`).join("")}</tr>`).join("")}</tbody>`;
+        return `<div class="md-table-wrap"><table class="md-table">${thead}${tbody}</table></div>`;
+      }
+      default:
+        return "";
     }
-    const ul = trimmed.match(/^[-*]\s+(.*)$/);
-    if (ul) return { type: "ul", html: `<li>${formatInlineMarkdown(ul[1])}</li>` };
-    const ol = trimmed.match(/^(\d+\.|[A-Za-z]\.)\s+(.*)$/);
-    if (ol) return { type: "ol", html: `<li>${formatInlineMarkdown(ol[2])}</li>` };
-    const quote = trimmed.match(/^>\s*(.*)$/);
-    if (quote) return { type: "quote", html: `<blockquote class="md-quote">${formatInlineMarkdown(quote[1])}</blockquote>` };
-    return { type: "p", html: formatInlineMarkdown(trimmed) };
   }
+
+  // src/ui/components/markdown.ts
   function renderMarkdownDocument(content) {
-    const lines = content.replace(/\r\n/g, "\n").split("\n");
-    const out = [];
-    let inCode = false;
-    let codeLang = "";
-    let codeLines = [];
-    let listType = null;
-    let pLines = [];
-    const flushP = () => {
-      if (pLines.length) {
-        out.push(`<p class="md-p">${pLines.join(" ")}</p>`);
-        pLines = [];
-      }
-    };
-    const closeList = () => {
-      if (listType) {
-        out.push(listType === "ol" ? "</ol>" : "</ul>");
-        listType = null;
-      }
-    };
-    for (const raw of lines) {
-      const trimmed = raw.trim();
-      if (trimmed.startsWith("```")) {
-        flushP();
-        closeList();
-        if (inCode) {
-          const fullCode = codeLines.join("\n");
-          out.push(isDiagramLanguage(codeLang) ? renderDiagramCardHtml(fullCode, codeLang) : renderCodeBlockHtml(fullCode, codeLang));
-          inCode = false;
-          codeLang = "";
-          codeLines = [];
-        } else {
-          inCode = true;
-          codeLang = trimmed.slice(3).trim();
-          codeLines = [];
-        }
-        continue;
-      }
-      if (inCode) {
-        codeLines.push(raw);
-        continue;
-      }
-      const block = renderBlock(raw);
-      if (!block) {
-        flushP();
-        closeList();
-        continue;
-      }
-      if (block.type === "checklist" || block.type === "ul" || block.type === "ol") {
-        flushP();
-        if (listType !== block.type) {
-          closeList();
-          listType = block.type;
-          out.push(listType === "ol" ? '<ol class="md-ol">' : listType === "checklist" ? '<ul class="md-checklist">' : '<ul class="md-ul">');
-        }
-        out.push(block.html);
-      } else if (block.type === "p") {
-        closeList();
-        pLines.push(block.html);
-      } else {
-        flushP();
-        closeList();
-        out.push(block.html);
-      }
-    }
-    flushP();
-    closeList();
-    return out.join("\n");
+    const tokens = tokenizeBlocks(content);
+    return tokens.map(renderBlockTokenHtml).filter(Boolean).join("\n");
   }
 
   // src/ui/sidebar/sidebarDom.ts
@@ -9343,11 +9871,26 @@ input:checked + .slider:before {
     let running = 0;
     let totalMessages = 0;
     let totalArtifacts = 0;
+    const seenIds = /* @__PURE__ */ new Set();
     for (const s of state2.sessions) {
-      if (s.isGenerating) running++;
-      totalMessages += s.messageCount || 0;
-      if (s.artifacts) totalArtifacts += s.artifacts.length;
+      seenIds.add(s.id);
+      const isActive = s.id === state2.activeSessionId;
+      const isGen = Boolean(
+        s.isGenerating || isActive && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === s.id))
+      );
+      if (isGen) running++;
+      const msgCount = isActive && state2.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0;
+      totalMessages += msgCount;
+      const artCount = isActive && state2.activeSession?.artifacts ? state2.activeSession.artifacts.length : s.artifacts?.length || 0;
+      totalArtifacts += artCount;
     }
+    if (state2.activeSession && !seenIds.has(state2.activeSession.id)) {
+      const isGen = Boolean(state2.activeSession.isGenerating || state2.isAwaitingResponse);
+      if (isGen) running++;
+      totalMessages += state2.activeSession.messages?.length || 0;
+      totalArtifacts += state2.activeSession.artifacts?.length || 0;
+    }
+    const sessionCount = state2.activeSession && !seenIds.has(state2.activeSession.id) ? state2.sessions.length + 1 : state2.sessions.length;
     return `
     <div class="monitor-stats-widget" role="region" aria-label="Dashboard Metrics">
       <div class="monitor-stats-grid">
@@ -9360,7 +9903,7 @@ input:checked + .slider:before {
         </div>
         <div class="monitor-stat-item">
           <div class="monitor-stat-label">Sessions</div>
-          <div class="monitor-stat-val">${state2.sessions.length}</div>
+          <div class="monitor-stat-val">${sessionCount}</div>
         </div>
         <div class="monitor-stat-item">
           <div class="monitor-stat-label">Messages</div>
@@ -9375,7 +9918,7 @@ input:checked + .slider:before {
   `;
   }
 
-  // src/ui/components/sidebarView.ts
+  // src/ui/sidebarSessionUtils.ts
   function formatRelativeTime(ts) {
     const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
     if (diffSec < 60) return "just now";
@@ -9398,13 +9941,85 @@ input:checked + .slider:before {
     </div>
   `;
   }
-  function renderSidebarView(state2) {
+  function getSortedSessions(state2) {
+    const list = [...state2.sessions];
+    if (state2.activeSession && !list.some((s) => s.id === state2.activeSession.id)) {
+      list.unshift({
+        id: state2.activeSession.id,
+        title: state2.activeSession.title || state2.activeSession.id,
+        createdAt: state2.activeSession.createdAt || Date.now(),
+        updatedAt: state2.activeSession.updatedAt || Date.now(),
+        messageCount: state2.activeSession.messages?.length || 0,
+        preview: state2.activeSession.messages?.[0]?.content?.slice(0, 80) || "(empty session)",
+        isGenerating: state2.activeSession.isGenerating,
+        plans: state2.activeSession.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path })),
+        artifacts: state2.activeSession.artifacts?.map((a) => ({ name: a.name, path: a.path, type: a.type }))
+      });
+    }
+    return list.sort((a, b) => {
+      const aRunning = Boolean(
+        a.isGenerating || a.id === state2.activeSessionId && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === a.id))
+      ) ? 1 : 0;
+      const bRunning = Boolean(
+        b.isGenerating || b.id === state2.activeSessionId && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === b.id))
+      ) ? 1 : 0;
+      if (aRunning !== bRunning) return bRunning - aRunning;
+      const aTime = a.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(a.updatedAt || 0, state2.activeSession.updatedAt) : a.updatedAt || 0;
+      const bTime = b.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(b.updatedAt || 0, state2.activeSession.updatedAt) : b.updatedAt || 0;
+      return bTime - aTime;
+    });
+  }
+  function renderSessionCard(s, state2) {
+    const isGenerating = Boolean(
+      s.isGenerating || s.id === state2.activeSessionId && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === s.id))
+    );
+    const msgCount = s.id === state2.activeSessionId && state2.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0;
+    const updatedTs = s.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state2.activeSession.updatedAt) : s.updatedAt || 0;
+    const timeStr = isGenerating ? "running" : formatRelativeTime(updatedTs);
+    return `
+    <div
+      class="session-card ${s.id === state2.activeSessionId ? "active" : ""} ${isGenerating ? "running" : ""}"
+      data-session-id="${s.id}"
+    >
+      <div class="session-card-header">
+        <span class="session-card-title">${isGenerating ? '<span class="pulse-indicator live" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span>' : ""}${escapeHtml2(s.title)}</span>
+        <span class="session-card-time ${isGenerating ? "running-time" : ""}">${timeStr}</span>
+      </div>
+      <div class="session-card-preview">${escapeHtml2(s.preview || "No messages yet")}</div>
+      ${renderCardPlans(s.plans || [])}
+      <div class="session-card-footer">
+        <span class="session-badge ${isGenerating ? "session-badge--running" : ""}">${msgCount} msgs</span>
+        <span class="session-card-id">${s.id}</span>
+      </div>
+    </div>
+  `;
+  }
+  function renderSessionListHtml(state2) {
     const q = state2.searchQuery.toLowerCase().trim();
-    const filtered = state2.sessions.filter((s) => {
+    const sorted = getSortedSessions(state2);
+    const filtered = sorted.filter((s) => {
       if (!q) return true;
       if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
-      if (s.plans?.some((p) => p.name.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
-      if (s.artifacts?.some((a) => a.name.toLowerCase().includes(q) || a.path.toLowerCase().includes(q))) return true;
+      if (s.plans?.some((p) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
+      if (s.artifacts?.some((a) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
+      return false;
+    });
+    const displaySessions = q ? filtered : filtered.slice(0, 8);
+    if (displaySessions.length === 0) {
+      return state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>`;
+    }
+    return displaySessions.map((s) => renderSessionCard(s, state2)).join("");
+  }
+
+  // src/ui/components/sidebarView.ts
+  function renderSidebarView(state2) {
+    const q = state2.searchQuery.toLowerCase().trim();
+    const sorted = getSortedSessions(state2);
+    const filtered = sorted.filter((s) => {
+      if (!q) return true;
+      if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
+      if (s.plans?.some((p) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
+      if (s.artifacts?.some((a) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
       return false;
     });
     const displaySessions = q ? filtered : filtered.slice(0, 8);
@@ -9439,25 +10054,7 @@ input:checked + .slider:before {
       </div>
 
       <div class="session-list">
-        ${displaySessions.length === 0 ? state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>` : displaySessions.map(
-      (s) => `
-          <div
-            class="session-card ${s.id === state2.activeSessionId ? "active" : ""}"
-            data-session-id="${s.id}"
-          >
-            <div class="session-card-header">
-              <span class="session-card-title">${escapeHtml2(s.title)}</span>
-              <span class="session-card-time">${formatRelativeTime(s.updatedAt)}</span>
-            </div>
-            <div class="session-card-preview">${escapeHtml2(s.preview || "No messages yet")}</div>
-            ${renderCardPlans(s.plans || [])}
-            <div class="session-card-footer">
-              <span class="session-badge">${s.messageCount} msgs</span>
-              <span class="session-card-id">${s.id}</span>
-            </div>
-          </div>
-        `
-    ).join("")}
+        ${displaySessions.length === 0 ? state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>` : displaySessions.map((s) => renderSessionCard(s, state2)).join("")}
       </div>
 
       ${active ? `
@@ -9790,7 +10387,12 @@ ${thought.trim()}` : thought.trim();
   function formatThoughtDuration(seconds) {
     if (seconds == null || Number.isNaN(seconds)) return "briefly";
     if (seconds < 1) return "briefly";
-    return `${Math.round(seconds)}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    if (mins > 0) {
+      return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+    }
+    return `${secs}s`;
   }
 
   // src/utils/toolDiffHelper.ts
@@ -11456,61 +12058,6 @@ ${thought.trim()}` : thought.trim();
   }
 
   // src/ui/sidebarDomUpdater.ts
-  function formatRelativeTime2(ts) {
-    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
-    if (diffSec < 60) return "just now";
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return `${Math.floor(diffSec / 86400)}d ago`;
-  }
-  function renderCardPlans2(plans) {
-    if (!plans || plans.length === 0) return "";
-    return `
-    <div class="session-card-plans">
-      ${plans.map(
-      (p) => `
-        <button type="button" class="session-plan-chip md-plan-link" data-plan-path="${escapeHtml2(p.path)}">
-          <span class="plan-chip-icon">\u{1F4CB}</span>
-          <span class="plan-chip-title">${escapeHtml2(p.title || p.name || "Plan")}</span>
-        </button>
-      `
-    ).join("")}
-    </div>
-  `;
-  }
-  function renderSessionListHtml(state2) {
-    const q = state2.searchQuery.toLowerCase().trim();
-    const filtered = state2.sessions.filter((s) => {
-      if (!q) return true;
-      if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
-      if (s.plans?.some((p) => p.name.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
-      if (s.artifacts?.some((a) => a.name.toLowerCase().includes(q) || a.path.toLowerCase().includes(q))) return true;
-      return false;
-    });
-    const displaySessions = q ? filtered : filtered.slice(0, 8);
-    if (displaySessions.length === 0) {
-      return state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>`;
-    }
-    return displaySessions.map(
-      (s) => `
-      <div
-        class="session-card ${s.id === state2.activeSessionId ? "active" : ""}"
-        data-session-id="${s.id}"
-      >
-        <div class="session-card-header">
-          <span class="session-card-title">${escapeHtml2(s.title)}</span>
-          <span class="session-card-time">${formatRelativeTime2(s.updatedAt)}</span>
-        </div>
-        <div class="session-card-preview">${escapeHtml2(s.preview || "No messages yet")}</div>
-        ${renderCardPlans2(s.plans || [])}
-        <div class="session-card-footer">
-          <span class="session-badge">${s.messageCount} msgs</span>
-          <span class="session-card-id">${s.id}</span>
-        </div>
-      </div>
-    `
-    ).join("");
-  }
   function updateSidebarDOM(state2, container) {
     const sidebarEl = container.querySelector(".sidebar-view");
     if (!sidebarEl) {
@@ -11536,11 +12083,12 @@ ${thought.trim()}` : thought.trim();
         clearBtn.remove();
       }
     }
-    const statsEl = sidebarEl.querySelector(".monitor-stats-container");
+    const statsEl = sidebarEl.querySelector(".monitor-stats-widget") || sidebarEl.querySelector(".monitor-stats-container");
     const nextStatsHtml = renderMonitorSidebarStats(state2);
     if (statsEl) {
-      if (statsEl.dataset.renderedHtml !== nextStatsHtml) {
+      if (!statsEl.dataset || statsEl.dataset.renderedHtml !== nextStatsHtml) {
         statsEl.outerHTML = nextStatsHtml;
+        if (statsEl.dataset) statsEl.dataset.renderedHtml = nextStatsHtml;
       }
     }
     const listEl = sidebarEl.querySelector(".session-list");
@@ -12326,7 +12874,7 @@ ${thought.trim()}` : thought.trim();
       filterSessionCardsInPlace("");
       return true;
     }
-    const attRemove = target.closest(".attachment-pill-remove");
+    const attRemove = target.closest(".attachment-pill-remove, .attachment-image-remove");
     if (attRemove) {
       const id = attRemove.getAttribute("data-att-id");
       state2.attachments = (state2.attachments || []).filter((a) => a.id !== id);
@@ -12439,10 +12987,8 @@ ${thought.trim()}` : thought.trim();
   function selectMentionItem(state2, item, onRender) {
     const composer = document.getElementById("composer-input");
     if (composer) {
-      const text = composer.value;
-      const pos = composer.selectionStart ?? text.length;
-      const before = text.slice(0, pos).replace(/(?:^|\s)@[^\s]*$/, "");
-      const after = text.slice(pos);
+      const text = composer.value, pos = composer.selectionStart ?? text.length;
+      const before = text.slice(0, pos).replace(/(?:^|\s)@[^\s]*$/, ""), after = text.slice(pos);
       composer.value = `${before}${after}`;
       state2.composerDraft = composer.value;
       composer.selectionStart = before.length;
@@ -12453,25 +12999,42 @@ ${thought.trim()}` : thought.trim();
       id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: item.type === "folder" ? "directory" : item.type === "git" ? "git" : item.type === "problems" ? "problems" : "file",
       label: item.label,
-      path: item.label.replace(/^@/, "")
+      path: item.label.replace(/^@/, ""),
+      uri: item.uri
     };
     state2.attachments = [...state2.attachments || [], att];
     state2.isMentionOpen = false;
     onRender();
+  }
+  async function processFilesToAttachments(state2, files) {
+    for (const file of files) {
+      const reader = new FileReader();
+      await new Promise((resolve) => {
+        reader.onload = () => {
+          const isImg = file.type.startsWith("image/");
+          state2.attachments = [...state2.attachments || [], {
+            id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            type: isImg ? "image" : "file",
+            label: file.name || (isImg ? "pasted-image.png" : "pasted-file"),
+            content: typeof reader.result === "string" ? reader.result : ""
+          }];
+          resolve();
+        };
+        if (file.type.startsWith("image/")) reader.readAsDataURL(file);
+        else reader.readAsText(file);
+      });
+    }
   }
   function setupMentionInput(state2, onRender) {
     const composer = document.getElementById("composer-input");
     if (!composer || composer.dataset.mentionBound) return;
     composer.dataset.mentionBound = "true";
     const checkMentionQuery = async () => {
-      const text = composer.value;
-      const pos = composer.selectionStart ?? text.length;
+      const text = composer.value, pos = composer.selectionStart ?? text.length;
       const match = text.slice(0, pos).match(/(?:^|\s)@([^\s]*)$/);
       if (match) {
-        const q = match[1] || "";
-        const items = await fetchMentions(q);
+        state2.mentionSuggestions = await fetchMentions(match[1] || "");
         state2.isMentionOpen = true;
-        state2.mentionSuggestions = items;
         state2.activeMentionIndex = 0;
         updateMentionPopupDOM(state2, onRender);
       } else if (state2.isMentionOpen) {
@@ -12483,6 +13046,14 @@ ${thought.trim()}` : thought.trim();
       state2.composerDraft = composer.value;
       updateComposerButton(state2);
       void checkMentionQuery();
+    });
+    composer.addEventListener("paste", async (e) => {
+      const items = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === "file");
+      const files = items.map((it) => it.getAsFile()).filter((f) => Boolean(f));
+      if (files.length > 0) {
+        await processFilesToAttachments(state2, files);
+        onRender();
+      }
     });
     composer.addEventListener("keydown", (e) => {
       if (!state2.isMentionOpen || !state2.mentionSuggestions?.length) return;
@@ -12513,35 +13084,14 @@ ${thought.trim()}` : thought.trim();
       trigger.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const fileInput2 = document.getElementById("attach-file-input");
-        fileInput2?.click();
+        document.getElementById("attach-file-input")?.click();
       });
     }
     const fileInput = document.getElementById("attach-file-input");
     if (fileInput && !fileInput.dataset.bound) {
       fileInput.dataset.bound = "true";
       fileInput.addEventListener("change", async () => {
-        const files = Array.from(fileInput.files || []);
-        for (const file of files) {
-          const reader = new FileReader();
-          await new Promise((resolve) => {
-            reader.onload = () => {
-              const isImg = file.type.startsWith("image/");
-              state2.attachments = [
-                ...state2.attachments || [],
-                {
-                  id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  type: isImg ? "image" : "file",
-                  label: file.name,
-                  content: typeof reader.result === "string" ? reader.result : ""
-                }
-              ];
-              resolve();
-            };
-            if (file.type.startsWith("image/")) reader.readAsDataURL(file);
-            else reader.readAsText(file);
-          });
-        }
+        await processFilesToAttachments(state2, Array.from(fileInput.files || []));
         fileInput.value = "";
         state2.isMentionOpen = false;
         onRender();

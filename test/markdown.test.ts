@@ -39,9 +39,9 @@ test('renderMarkdownDocument parses headings, lists, checklists and paragraphs',
   ].join('\n');
 
   const html = renderMarkdownDocument(doc);
-  assert.match(html, /<h1 class="md-h md-h1">Title Header<\/h1>/);
-  assert.match(html, /<h2 class="md-h md-h2">Goal<\/h2>/);
-  assert.match(html, /<p class="md-p">Complete the refactor by <strong>eliminating over 12,000 lines<\/strong> of legacy code \(<code class="inline-code">src\/extension\/llm\/<\/code>\)\.<\/p>/);
+  assert.match(html, /<h1 class="[^"]*md-h1[^"]*">Title Header<\/h1>/);
+  assert.match(html, /<h2 class="[^"]*md-h2[^"]*">Goal<\/h2>/);
+  assert.match(html, /<p class="[^"]*md-p[^"]*">Complete the refactor by <strong>eliminating over 12,000 lines<\/strong> of legacy code \(<code class="inline-code[^"]*"[^>]*>src\/extension\/llm\/<\/code>\)\.<\/p>/);
   assert.match(html, /<hr class="md-hr" \/>/);
   assert.match(html, /<li class="checklist-item ">.*Task 1<\/li>/);
   assert.match(html, /<div class="code-block">/);

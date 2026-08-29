@@ -104,7 +104,7 @@ ${safeJs}
 
   let output = html
     .replace('<link rel="stylesheet" href="/monitor.css" />', '')
-    .replace('<script src="/bundle.js"></script>', bootloader);
+    .replace('<script src="/bundle.js"></script>', () => bootloader);
 
   if (options.setupPayload) {
     output = output.replace('</head>', `<script>if(!window.location.hash) window.location.hash='#setup=${options.setupPayload}';</script></head>`);

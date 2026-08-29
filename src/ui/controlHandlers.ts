@@ -114,7 +114,7 @@ export function handleControlClick(target: HTMLElement, state: AppState, callbac
     filterSessionCardsInPlace('');
     return true;
   }
-  const attRemove = target.closest<HTMLElement>('.attachment-pill-remove');
+  const attRemove = target.closest<HTMLElement>('.attachment-pill-remove, .attachment-image-remove');
   if (attRemove) {
     const id = attRemove.getAttribute('data-att-id');
     state.attachments = (state.attachments || []).filter((a) => a.id !== id);

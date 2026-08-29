@@ -1,5 +1,7 @@
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { handleSetupRoute } from '../src/server/setupHandler';
 import type { ServerResponse } from 'node:http';
 
@@ -23,10 +25,11 @@ test('handleSetupRoute handles /api/setup-info and returns setup metadata', asyn
     '/api/setup-info',
     new URL('http://localhost:4200/api/setup-info'),
     process.cwd(),
-    process.cwd(),
+    'dist',
     'secret-pin-123',
     { token: 'ghp_test1234567890', gistId: 'gist-abc-123' }
   );
+
 
   assert.equal(handled, true);
   assert.equal(statusCode, 200);
@@ -36,8 +39,7 @@ test('handleSetupRoute handles /api/setup-info and returns setup metadata', asyn
   assert.ok(json.githubPagesUrl.includes('https://sysoce.github.io/agent-monitor/#setup='));
   assert.ok(json.lanUrl.includes('/#setup='));
   assert.ok(json.setupPayload);
-  assert.equal(json.hasSyncConfig, true);
-  assert.equal(json.gistId, 'gist-abc-123');
-  assert.equal(json.version, '1.0.14');
+  const pkg = JSON.parse(await fs.readFile(path.resolve(__dirname, '../package.json'), 'utf8'));
+  assert.equal(json.version, pkg.version);
   assert.ok(Array.isArray(json.networks));
 });

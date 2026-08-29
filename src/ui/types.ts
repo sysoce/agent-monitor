@@ -2,8 +2,9 @@ import type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOptio
 import type { AttachmentItem } from '../types';
 import type { MentionSuggestionItem } from '../types';
 import type { ClientPresence } from '../sync/types';
-
 import type { NetworkAddressInfo } from '../server/networkAddress';
+
+export type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup };
 
 export type ActiveTab = 'sidebar' | 'chat' | 'plans';
 

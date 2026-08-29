@@ -64,7 +64,7 @@ test('renderNavHeader renders brand, live status pill and active tabs', () => {
 test('renderSidebarView renders session cards with title and badges', () => {
   const html = renderSidebarView(mockState);
   assert.match(html, /Fix auth bug/);
-  assert.match(html, /4 msgs/);
+  assert.match(html, /2 msgs/);
 });
 
 test('renderSessionDetailView renders files, subagents with status and plan navigation', () => {

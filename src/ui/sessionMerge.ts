@@ -9,7 +9,7 @@ export function appendOptimisticUserMessage(state: AppState, text: string): void
   if (!state.activeSession) {
     state.activeSession = {
       id: sid,
-      title: text.slice(0, 30) || 'Session',
+      title: text.slice(0, 30) || (state.attachments?.[0]?.label || 'Session'),
       mode: state.composerMode,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -46,13 +46,14 @@ export function mergeSessionDetail(
   }
 
   const pendingInboxMsgs: ChatMessage[] = (inbox || [])
-    .filter((m) => m.sessionId === incoming.id && m.content && !incomingUserTexts.has(m.content.trim()))
+    .filter((m) => m.sessionId === incoming.id && (m.content || (m.attachments && m.attachments.length > 0)) && !incomingUserTexts.has((m.content || '').trim()))
     .map((m) => ({
       role: 'user',
-      content: m.content,
+      content: m.content || '',
       timestamp: m.timestamp || Date.now(),
       model: m.model,
       mode: m.mode as any,
+      attachments: m.attachments,
     } as any));
 
   if (!existing || existing.id !== incoming.id) {
@@ -64,18 +65,25 @@ export function mergeSessionDetail(
   }
 
   const pendingUserMsgs = (existing.messages || []).filter((m) => {
-    if (m.role !== 'user' || typeof m.content !== 'string') return false;
-    const text = m.content.trim();
-    if (!text || incomingUserTexts.has(text)) return false;
+    if (m.role !== 'user') return false;
+    const text = typeof m.content === 'string' ? m.content.trim() : '';
+    const hasAtts = Boolean(m.attachments && m.attachments.length > 0);
+    if (!text && !hasAtts) return false;
+    if (text && incomingUserTexts.has(text)) return false;
     const ts = (m as any).timestamp || 0;
     return ts === 0 || Date.now() - ts < 120_000;
   });
 
   const allPending = [...pendingUserMsgs];
   for (const p of pendingInboxMsgs) {
-    if (!allPending.some((e) => typeof e.content === 'string' && e.content.trim() === (p.content as string).trim())) {
-      allPending.push(p);
-    }
+    const pText = typeof p.content === 'string' ? p.content.trim() : '';
+    const isDup = allPending.some((e) => {
+      const eText = typeof e.content === 'string' ? e.content.trim() : '';
+      if (pText && eText && eText === pText) return true;
+      if (!pText && !eText && JSON.stringify(e.attachments) === JSON.stringify(p.attachments)) return true;
+      return false;
+    });
+    if (!isDup) allPending.push(p);
   }
 
   const mergedMessages = [...(incoming.messages || [])];
@@ -125,18 +133,12 @@ export function mergeSessionDetail(
 function applyAbortSuppression(detail: SessionDetail, lastAbortedAt?: number): SessionDetail {
   if (!lastAbortedAt || lastAbortedAt <= 0) return detail;
   const msgs = detail.messages || [];
-  const hasUserMsgAfterAbort = msgs.some((m) => {
-    if (m.role !== 'user') return false;
-    const ts = (m as { timestamp?: number }).timestamp || 0;
-    return ts > lastAbortedAt;
-  });
+  const hasUserMsgAfterAbort = msgs.some((m) => m.role === 'user' && ((m as { timestamp?: number }).timestamp || 0) > lastAbortedAt);
   if (hasUserMsgAfterAbort) return detail;
-
-  const sanitized = msgs.map((m) => ((m as { isLive?: boolean }).isLive ? { ...m, isLive: false } : m));
   return {
     ...detail,
     isGenerating: false,
-    messages: sanitized,
+    messages: msgs.map((m) => ((m as { isLive?: boolean }).isLive ? { ...m, isLive: false } : m)),
   };
 }
 
