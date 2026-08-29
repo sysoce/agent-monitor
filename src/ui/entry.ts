@@ -1,18 +1,16 @@
 import type { AppState } from './types';
 import { AppController } from './appController';
-import { renderNavHeader } from './components/navHeader';
 import { renderSidebarView } from './components/sidebarView';
 import { renderChatView } from './components/chatView';
 import { renderPlanView } from './components/planView';
-import { renderComposerView } from './components/composerView';
 import { renderLoginView } from './components/loginView';
 import { renderSettingsModal } from './components/settingsModal';
+import { updateLayoutDOM } from './layoutDomUpdater';
 import { bindLoginEvents, bindAppEvents } from './eventHandlers';
 import { captureFocusState, restoreFocusState, restoreScrollState } from './domFocusPreserver';
 import { getSavedTab } from './tabStore';
 import { initViewportManager } from './viewportManager';
 import { hydrateAllDiagrams } from './markdown/diagram/diagramHydrator';
-import { updateComposerDOM } from './composerDomUpdater';
 
 initViewportManager();
 
@@ -74,53 +72,7 @@ function render() {
   else if (state.activeTab === 'plans') mainHtml = renderPlanView(state);
 
   const settingsModalHtml = renderSettingsModal(state);
-  const existingLayout = app.querySelector('.app-layout');
-  let mainUpdated = false;
-  if (!existingLayout) {
-    app.innerHTML = `
-      <div class="app-layout">
-        ${renderNavHeader(state)}
-        <main class="app-main">${mainHtml}</main>
-        ${renderComposerView(state)}
-        ${settingsModalHtml}
-      </div>
-    `;
-    mainUpdated = true;
-  } else {
-    const navEl = existingLayout.querySelector('.app-header, .app-nav-header');
-    const newNavHtml = renderNavHeader(state);
-    if (navEl && navEl.outerHTML !== newNavHtml) {
-      navEl.outerHTML = newNavHtml;
-    }
-
-    const mainEl = existingLayout.querySelector<HTMLElement>('.app-main');
-    if (mainEl && mainEl.dataset.renderedHtml !== mainHtml) {
-      mainEl.innerHTML = mainHtml;
-      mainEl.dataset.renderedHtml = mainHtml;
-      mainUpdated = true;
-    }
-
-    const composerEl = existingLayout.querySelector<HTMLElement>('.app-composer');
-    const newComposerHtml = renderComposerView(state);
-    if (composerEl && newComposerHtml) {
-      updateComposerDOM(state, composerEl);
-    } else if (composerEl && !newComposerHtml) {
-      composerEl.remove();
-    } else if (!composerEl && newComposerHtml) {
-      existingLayout.insertAdjacentHTML('beforeend', newComposerHtml);
-    }
-
-    const modalEl = existingLayout.querySelector('#settings-modal, #qr-modal');
-    if (settingsModalHtml) {
-      if (modalEl) {
-        modalEl.outerHTML = settingsModalHtml;
-      } else {
-        existingLayout.insertAdjacentHTML('beforeend', settingsModalHtml);
-      }
-    } else if (modalEl) {
-      modalEl.remove();
-    }
-  }
+  const mainUpdated = updateLayoutDOM(app, state, mainHtml, settingsModalHtml);
 
   bindAppEvents(state, {
     onSelectSession: (id) => controller.selectSession(id),

@@ -6873,23 +6873,44 @@ input:checked + .slider:before {
   }
 
   // src/ui/sseClient.ts
+  function isStaticHostEnvironment() {
+    if (typeof window === "undefined") return false;
+    const { hostname, protocol } = window.location;
+    return protocol === "file:" || hostname.endsWith("github.io") || hostname.endsWith(".pages.dev");
+  }
   function initSseClient(opts) {
     let es = null;
     let retryTimeout = null;
     let closed = false;
+    if (isStaticHostEnvironment()) {
+      setTimeout(() => {
+        if (!closed) opts.onStatusChange("disconnected");
+      }, 0);
+      return () => {
+        closed = true;
+      };
+    }
     function connect() {
       if (closed) return;
       opts.onStatusChange("syncing");
       const token = getStoredToken();
       const url = token ? `/api/events?token=${encodeURIComponent(token)}` : "/api/events";
-      es = new EventSource(url);
+      try {
+        es = new EventSource(url);
+      } catch {
+        opts.onStatusChange("disconnected");
+        return;
+      }
       es.onopen = () => {
+        if (closed) return;
         opts.onStatusChange("connected");
       };
       es.addEventListener("change", () => {
+        if (closed) return;
         opts.onChange();
       });
       es.onerror = () => {
+        if (closed) return;
         opts.onStatusChange("disconnected");
         es?.close();
         if (!closed) {
@@ -6900,418 +6921,16 @@ input:checked + .slider:before {
     connect();
     return () => {
       closed = true;
-      if (retryTimeout) clearTimeout(retryTimeout);
-      es?.close();
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
+      if (es) {
+        es.close();
+        es = null;
+      }
     };
   }
-
-  // src/sync/syncCrypto.ts
-  function xorTransform(data, key) {
-    const out = new Uint8Array(data.length);
-    for (let i = 0; i < data.length; i++) {
-      out[i] = data[i] ^ key[i % key.length];
-    }
-    return out;
-  }
-  function stringToBytes(str) {
-    if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(str);
-    return Uint8Array.from(Buffer.from(str, "utf8"));
-  }
-  function bytesToString(bytes) {
-    if (typeof TextDecoder !== "undefined") return new TextDecoder().decode(bytes);
-    return Buffer.from(bytes).toString("utf8");
-  }
-  function bytesToBase64(bytes) {
-    if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
-  }
-  function base64ToBytes(base64) {
-    if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-  function computeChecksum(data, key) {
-    let hash = 5381;
-    const combined = `${key}:${data}`;
-    for (let i = 0; i < combined.length; i++) {
-      hash = (hash << 5) + hash + combined.charCodeAt(i);
-      hash = hash & hash;
-    }
-    return hash;
-  }
-  function encryptSyncData(plaintext, password) {
-    if (!password) return plaintext;
-    const chk = computeChecksum(plaintext, password);
-    const payload = `v1:${chk}:${plaintext}`;
-    const data = stringToBytes(payload);
-    const key = stringToBytes(password);
-    const encrypted = xorTransform(data, key);
-    return `enc:${bytesToBase64(encrypted)}`;
-  }
-  function decryptSyncData(encoded, password) {
-    if (!password || !encoded.startsWith("enc:")) return encoded;
-    const raw = base64ToBytes(encoded.slice(4));
-    const key = stringToBytes(password);
-    const decrypted = xorTransform(raw, key);
-    const text = bytesToString(decrypted);
-    if (!text.startsWith("v1:")) throw new Error("Invalid encryption payload header");
-    const parts = text.split(":");
-    if (parts.length < 3) throw new Error("Malformed payload");
-    const chk = Number(parts[1]);
-    const plaintext = parts.slice(2).join(":");
-    if (computeChecksum(plaintext, password) !== chk) throw new Error("Decryption checksum mismatch");
-    return plaintext;
-  }
-
-  // src/sync/payloadCompressor.ts
-  var COMPRESSED_PREFIX = "cz:";
-  function getNodeZlib() {
-    try {
-      if (typeof process !== "undefined" && process.versions?.node) {
-        const dynamicRequire = typeof module !== "undefined" && module.require || globalThis.require || new Function("name", "try { return require(name); } catch { return null; }");
-        return dynamicRequire("zlib");
-      }
-    } catch {
-    }
-    return null;
-  }
-  function isCompressedPayload(payload) {
-    return typeof payload === "string" && payload.startsWith(COMPRESSED_PREFIX);
-  }
-  async function compressPayload(plaintext) {
-    if (!plaintext) return plaintext;
-    try {
-      const zlib = getNodeZlib();
-      if (zlib && typeof zlib.deflateSync === "function") {
-        const buffer = zlib.deflateSync(Buffer.from(plaintext, "utf8"), { level: 6 });
-        return `${COMPRESSED_PREFIX}${buffer.toString("base64")}`;
-      }
-      if (typeof CompressionStream !== "undefined") {
-        const stream = new Blob([plaintext]).stream().pipeThrough(new CompressionStream("deflate"));
-        const buffer = await new Response(stream).arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        return `${COMPRESSED_PREFIX}${btoa(binary)}`;
-      }
-    } catch {
-    }
-    return plaintext;
-  }
-  async function decompressPayload(raw) {
-    if (!isCompressedPayload(raw)) return raw;
-    try {
-      const base64Data = raw.slice(COMPRESSED_PREFIX.length);
-      const zlib = getNodeZlib();
-      if (zlib && typeof zlib.inflateSync === "function") {
-        const buffer = zlib.inflateSync(Buffer.from(base64Data, "base64"));
-        return buffer.toString("utf8");
-      }
-      if (typeof DecompressionStream !== "undefined") {
-        const binary = atob(base64Data);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
-        return await new Response(stream).text();
-      }
-    } catch {
-    }
-    return raw;
-  }
-
-  // src/sync/gistHttp.ts
-  function createRateLimitState() {
-    return { rateLimitReset: 0, isRateLimited: false, remaining: 5e3, limit: 5e3, consecutiveFailures: 0 };
-  }
-  function updateRateLimitFromResponse(state2, res) {
-    const retryAfter = res.headers.get("retry-after");
-    const remaining = res.headers.get("x-ratelimit-remaining");
-    const reset = res.headers.get("x-ratelimit-reset");
-    const limit = res.headers.get("x-ratelimit-limit");
-    if (limit) state2.limit = parseInt(limit, 10) || 5e3;
-    if (remaining) state2.remaining = parseInt(remaining, 10) || 0;
-    if (retryAfter) {
-      const seconds = parseInt(retryAfter, 10) || 60;
-      state2.rateLimitReset = Date.now() + seconds * 1e3;
-      state2.isRateLimited = true;
-      state2.consecutiveFailures++;
-      return;
-    }
-    if (res.status === 403 || res.status === 429 || res.status === 409) {
-      state2.consecutiveFailures++;
-      const backoffSeconds = Math.min(120, 30 * Math.pow(2, Math.min(state2.consecutiveFailures - 1, 3)));
-      if (remaining && parseInt(remaining, 10) === 0 && reset) {
-        state2.rateLimitReset = parseInt(reset, 10) * 1e3;
-      } else {
-        state2.rateLimitReset = Date.now() + backoffSeconds * 1e3;
-      }
-      state2.isRateLimited = true;
-    } else if (remaining && parseInt(remaining, 10) === 0 && reset) {
-      state2.rateLimitReset = parseInt(reset, 10) * 1e3;
-      state2.isRateLimited = true;
-    } else if (res.ok && remaining && parseInt(remaining, 10) > 0) {
-      state2.isRateLimited = false;
-      state2.consecutiveFailures = 0;
-    }
-  }
-  function buildGistHeaders(token, etag) {
-    const h = {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "Content-Type": "application/json"
-    };
-    if (typeof window === "undefined") {
-      h["User-Agent"] = "AgentMonitor-Sync";
-    }
-    if (etag) h["If-None-Match"] = etag;
-    return h;
-  }
-  async function parseGistError(res, fallback) {
-    try {
-      const body = await res.json();
-      if (body?.message) return `${res.status} (${body.message})`;
-    } catch {
-    }
-    return `${res.status} ${res.statusText}`.trim() || fallback;
-  }
-
-  // src/sync/gistClient.ts
-  var GistClient = class {
-    constructor(config, baseUrl = "https://api.github.com") {
-      this.config = config;
-      __publicField(this, "baseUrl");
-      __publicField(this, "rateLimit", createRateLimitState());
-      __publicField(this, "cachedPayload", null);
-      this.baseUrl = baseUrl.replace(/\/+$/, "");
-    }
-    get rateLimitReset() {
-      return this.rateLimit.rateLimitReset;
-    }
-    set rateLimitReset(val) {
-      this.rateLimit.rateLimitReset = val;
-    }
-    get isRateLimited() {
-      return this.rateLimit.isRateLimited;
-    }
-    set isRateLimited(val) {
-      this.rateLimit.isRateLimited = val;
-    }
-    updateRateLimit(res) {
-      updateRateLimitFromResponse(this.rateLimit, res);
-    }
-    isBlockedByRateLimit() {
-      if (this.rateLimit.isRateLimited && Date.now() < this.rateLimit.rateLimitReset) return true;
-      this.rateLimit.isRateLimited = false;
-      return false;
-    }
-    getRateLimitInfo() {
-      return {
-        remaining: this.rateLimit.remaining,
-        limit: this.rateLimit.limit,
-        resetTime: this.rateLimit.rateLimitReset,
-        isBlocked: this.isBlockedByRateLimit()
-      };
-    }
-    async fetchSyncState(etag) {
-      if (this.isBlockedByRateLimit()) return { data: null, etag, notModified: true };
-      const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag) });
-      this.updateRateLimit(res);
-      if (res.status === 304) return { data: null, etag, notModified: true };
-      if (!res.ok) throw new Error(`GitHub Gist API error: ${await parseGistError(res, "Gist error")}`);
-      const newEtag = res.headers.get("etag") || void 0;
-      const json = await res.json();
-      const fileObj = json.files?.["agent-sync.json"];
-      let raw = fileObj?.content;
-      if (fileObj?.truncated && fileObj?.raw_url) {
-        try {
-          const rawRes = await fetch(fileObj.raw_url, { headers: { Authorization: `Bearer ${this.config.token}`, "User-Agent": "AgentMonitor-Sync" } });
-          if (rawRes.ok) raw = await rawRes.text();
-        } catch {
-        }
-      }
-      if (!raw) return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now() }, etag: newEtag, notModified: false };
-      try {
-        const decrypted = decryptSyncData(raw, this.config.password);
-        const decompressed = await decompressPayload(decrypted);
-        const p = JSON.parse(decompressed);
-        const data = {
-          inbox: Array.isArray(p?.inbox) ? p.inbox : [],
-          sessions: Array.isArray(p?.sessions) ? p.sessions : [],
-          version: typeof p?.version === "number" ? p.version : 1,
-          updatedAt: typeof p?.updatedAt === "number" ? p.updatedAt : Date.now(),
-          sessionDetails: p?.sessionDetails && typeof p.sessionDetails === "object" ? p.sessionDetails : {},
-          activeSession: p?.activeSession,
-          appVersion: typeof p?.appVersion === "string" ? p.appVersion : void 0
-        };
-        this.cachedPayload = data;
-        return { data, etag: newEtag, notModified: false };
-      } catch (err) {
-        if (raw.startsWith("enc:") || raw.startsWith("cz:")) {
-          throw new Error(`Failed to decrypt/parse Gist payload: ${err?.message || "Invalid password or format"}`);
-        }
-        return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now(), sessionDetails: {} }, etag: newEtag, notModified: false };
-      }
-    }
-    async pushInboxMessage(msg) {
-      const cur = this.cachedPayload || (await this.fetchSyncState()).data || { inbox: [], sessions: [], version: 1, updatedAt: Date.now() };
-      if (!Array.isArray(cur.inbox)) cur.inbox = [];
-      if (!cur.inbox.some((m) => m.id === msg.id)) cur.inbox.push(msg);
-      cur.updatedAt = Date.now();
-      await this.saveSyncPayload(cur);
-    }
-    async updateOutboxAndDrainInbox(outbox, processedInboxIds, sessions, sessionDetails, existingPayload, appVersion) {
-      const cur = existingPayload || this.cachedPayload || (await this.fetchSyncState()).data || { inbox: [], sessions: [], version: 1, updatedAt: Date.now() };
-      cur.inbox = (cur.inbox || []).filter((m) => !processedInboxIds.includes(m.id));
-      cur.activeSession = outbox;
-      cur.sessions = sessions;
-      if (sessionDetails) cur.sessionDetails = sessionDetails;
-      if (appVersion) cur.appVersion = appVersion;
-      cur.updatedAt = Date.now();
-      await this.saveSyncPayload(cur);
-    }
-    async saveSyncPayload(payload) {
-      if (this.isBlockedByRateLimit()) {
-        const waitMin = Math.max(1, Math.ceil((this.rateLimit.rateLimitReset - Date.now()) / 6e4));
-        throw new Error(`GitHub API rate limit exceeded. Reset in ${waitMin}m. Please use local LAN / Live connection.`);
-      }
-      const jsonStr = JSON.stringify(payload);
-      const compressed = await compressPayload(jsonStr);
-      const content = encryptSyncData(compressed, this.config.password);
-      const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
-        method: "PATCH",
-        headers: buildGistHeaders(this.config.token),
-        body: JSON.stringify({ files: { "agent-sync.json": { content } } })
-      });
-      this.updateRateLimit(res);
-      if (!res.ok) {
-        const err = await parseGistError(res, "Failed to update Gist");
-        throw new Error(`Failed to update Gist: ${err}`);
-      }
-      this.cachedPayload = payload;
-    }
-  };
-
-  // src/ui/syncStateMachine.ts
-  var SyncStateMachine = class {
-    constructor(callbacks) {
-      this.callbacks = callbacks;
-      __publicField(this, "mode", "live-sse");
-      __publicField(this, "gistConfig");
-      __publicField(this, "gistClient");
-      __publicField(this, "isAwaitingResponse", false);
-      __publicField(this, "pollTimer");
-      __publicField(this, "lastEtag");
-      if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-        document.addEventListener("visibilitychange", () => {
-          if (!document.hidden && this.mode === "git-backup") this.restartGitPolling();
-        });
-      }
-    }
-    getMode() {
-      return this.mode;
-    }
-    getPollInterval() {
-      if (typeof document !== "undefined" && document.hidden) {
-        return this.isAwaitingResponse ? 1e4 : 3e4;
-      }
-      return this.isAwaitingResponse ? 2500 : 15e3;
-    }
-    setAwaitingResponse(awaiting) {
-      this.isAwaitingResponse = awaiting;
-      if (this.mode === "git-backup") {
-        this.restartGitPolling();
-      }
-    }
-    setGistConfig(config) {
-      this.gistConfig = config;
-      this.gistClient = config ? new GistClient(config) : void 0;
-    }
-    forceGitBackupMode() {
-      if (this.gistConfig) {
-        this.mode = "git-backup";
-        this.callbacks.onModeChange("git-backup");
-        this.callbacks.onStatusChange("connected");
-        this.callbacks.onError?.("");
-        this.restartGitPolling();
-      } else {
-        this.callbacks.onError?.("Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.");
-      }
-    }
-    handlePrimarySseFailure() {
-      if (this.gistConfig) {
-        this.mode = "git-backup";
-        this.callbacks.onModeChange("git-backup");
-        this.callbacks.onStatusChange("syncing");
-        this.restartGitPolling();
-      } else {
-        this.mode = "offline";
-        this.callbacks.onModeChange("offline");
-        this.callbacks.onStatusChange("disconnected");
-      }
-    }
-    restorePrimaryLive() {
-      this.stopGitPolling();
-      this.mode = "live-sse";
-      this.callbacks.onModeChange("live-sse");
-      this.callbacks.onStatusChange("connected");
-      this.callbacks.onError?.("");
-    }
-    async pushInboxMessage(msg) {
-      if (this.gistClient && this.mode === "git-backup") {
-        await this.gistClient.pushInboxMessage(msg);
-        await this.pollOnce();
-      } else {
-        throw new Error("Gist client is not configured or transport mode is not git-backup");
-      }
-    }
-    restartGitPolling() {
-      this.stopGitPolling();
-      void this.pollOnce();
-      const timer = setInterval(() => {
-        void this.pollOnce();
-      }, this.getPollInterval());
-      if (typeof timer?.unref === "function") {
-        timer.unref();
-      }
-      this.pollTimer = timer;
-    }
-    async pollOnce() {
-      if (!this.gistClient || this.mode !== "git-backup") return;
-      if (typeof this.gistClient.isBlockedByRateLimit === "function" && this.gistClient.isBlockedByRateLimit()) {
-        this.callbacks.onStatusChange("syncing");
-        return;
-      }
-      try {
-        const res = await this.gistClient.fetchSyncState(this.lastEtag);
-        if (res.etag) this.lastEtag = res.etag;
-        if (res.notModified) {
-          this.callbacks.onStatusChange("connected");
-          this.callbacks.onError?.("");
-        } else if (res.data) {
-          this.callbacks.onStatusChange("connected");
-          this.callbacks.onError?.("");
-          this.callbacks.onDataUpdate(res.data);
-        }
-      } catch (err) {
-        this.callbacks.onStatusChange("disconnected");
-        this.callbacks.onError?.(err?.message || "Gist sync connection failed");
-      }
-    }
-    stopGitPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = void 0;
-      }
-    }
-    stop() {
-      this.stopGitPolling();
-    }
-  };
 
   // src/utils/planMeta.ts
   function isPlanFilePath(filePath, content) {
@@ -7841,7 +7460,458 @@ input:checked + .slider:before {
     }
   }
 
+  // src/sync/syncCrypto.ts
+  function xorTransform(data, key) {
+    const out = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      out[i] = data[i] ^ key[i % key.length];
+    }
+    return out;
+  }
+  function stringToBytes(str) {
+    if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(str);
+    return Uint8Array.from(Buffer.from(str, "utf8"));
+  }
+  function bytesToString(bytes) {
+    if (typeof TextDecoder !== "undefined") return new TextDecoder().decode(bytes);
+    return Buffer.from(bytes).toString("utf8");
+  }
+  function bytesToBase64(bytes) {
+    if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+  function base64ToBytes(base64) {
+    if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+  function computeChecksum(data, key) {
+    let hash = 5381;
+    const combined = `${key}:${data}`;
+    for (let i = 0; i < combined.length; i++) {
+      hash = (hash << 5) + hash + combined.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return hash;
+  }
+  function encryptSyncData(plaintext, password) {
+    if (!password) return plaintext;
+    const chk = computeChecksum(plaintext, password);
+    const payload = `v1:${chk}:${plaintext}`;
+    const data = stringToBytes(payload);
+    const key = stringToBytes(password);
+    const encrypted = xorTransform(data, key);
+    return `enc:${bytesToBase64(encrypted)}`;
+  }
+  function decryptSyncData(encoded, password) {
+    if (!password || !encoded.startsWith("enc:")) return encoded;
+    const raw = base64ToBytes(encoded.slice(4));
+    const key = stringToBytes(password);
+    const decrypted = xorTransform(raw, key);
+    const text = bytesToString(decrypted);
+    if (!text.startsWith("v1:")) throw new Error("Invalid encryption payload header");
+    const parts = text.split(":");
+    if (parts.length < 3) throw new Error("Malformed payload");
+    const chk = Number(parts[1]);
+    const plaintext = parts.slice(2).join(":");
+    if (computeChecksum(plaintext, password) !== chk) throw new Error("Decryption checksum mismatch");
+    return plaintext;
+  }
+
+  // src/sync/payloadCompressor.ts
+  var COMPRESSED_PREFIX = "cz:";
+  function getNodeZlib() {
+    try {
+      if (typeof process !== "undefined" && process.versions?.node) {
+        const dynamicRequire = typeof module !== "undefined" && module.require || globalThis.require || new Function("name", "try { return require(name); } catch { return null; }");
+        return dynamicRequire("zlib");
+      }
+    } catch {
+    }
+    return null;
+  }
+  function isCompressedPayload(payload) {
+    return typeof payload === "string" && payload.startsWith(COMPRESSED_PREFIX);
+  }
+  async function compressPayload(plaintext) {
+    if (!plaintext) return plaintext;
+    try {
+      const zlib = getNodeZlib();
+      if (zlib && typeof zlib.deflateSync === "function") {
+        const buffer = zlib.deflateSync(Buffer.from(plaintext, "utf8"), { level: 6 });
+        return `${COMPRESSED_PREFIX}${buffer.toString("base64")}`;
+      }
+      if (typeof CompressionStream !== "undefined") {
+        const stream = new Blob([plaintext]).stream().pipeThrough(new CompressionStream("deflate"));
+        const buffer = await new Response(stream).arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return `${COMPRESSED_PREFIX}${btoa(binary)}`;
+      }
+    } catch {
+    }
+    return plaintext;
+  }
+  async function decompressPayload(raw) {
+    if (!isCompressedPayload(raw)) return raw;
+    try {
+      const base64Data = raw.slice(COMPRESSED_PREFIX.length);
+      const zlib = getNodeZlib();
+      if (zlib && typeof zlib.inflateSync === "function") {
+        const buffer = zlib.inflateSync(Buffer.from(base64Data, "base64"));
+        return buffer.toString("utf8");
+      }
+      if (typeof DecompressionStream !== "undefined") {
+        const binary = atob(base64Data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
+        return await new Response(stream).text();
+      }
+    } catch {
+    }
+    return raw;
+  }
+
+  // src/sync/gistHttp.ts
+  function createRateLimitState() {
+    return { rateLimitReset: 0, isRateLimited: false, remaining: 5e3, limit: 5e3, consecutiveFailures: 0 };
+  }
+  function updateRateLimitFromResponse(state2, res) {
+    const retryAfter = res.headers.get("retry-after");
+    const remaining = res.headers.get("x-ratelimit-remaining");
+    const reset = res.headers.get("x-ratelimit-reset");
+    const limit = res.headers.get("x-ratelimit-limit");
+    if (limit) state2.limit = parseInt(limit, 10) || 5e3;
+    if (remaining) state2.remaining = parseInt(remaining, 10) || 0;
+    if (retryAfter) {
+      const seconds = parseInt(retryAfter, 10) || 60;
+      state2.rateLimitReset = Date.now() + seconds * 1e3;
+      state2.isRateLimited = true;
+      state2.consecutiveFailures++;
+      return;
+    }
+    if (res.status === 403 || res.status === 429 || res.status === 409) {
+      state2.consecutiveFailures++;
+      const backoffSeconds = Math.min(120, 30 * Math.pow(2, Math.min(state2.consecutiveFailures - 1, 3)));
+      if (remaining && parseInt(remaining, 10) === 0 && reset) {
+        state2.rateLimitReset = parseInt(reset, 10) * 1e3;
+      } else {
+        state2.rateLimitReset = Date.now() + backoffSeconds * 1e3;
+      }
+      state2.isRateLimited = true;
+    } else if (remaining && parseInt(remaining, 10) === 0 && reset) {
+      state2.rateLimitReset = parseInt(reset, 10) * 1e3;
+      state2.isRateLimited = true;
+    } else if (res.ok && remaining && parseInt(remaining, 10) > 0) {
+      state2.isRateLimited = false;
+      state2.consecutiveFailures = 0;
+    }
+  }
+  function buildGistHeaders(token, etag) {
+    const h = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json"
+    };
+    if (typeof window === "undefined") {
+      h["User-Agent"] = "AgentMonitor-Sync";
+    }
+    if (etag) h["If-None-Match"] = etag;
+    return h;
+  }
+  async function parseGistError(res, fallback) {
+    try {
+      const body = await res.json();
+      if (body?.message) return `${res.status} (${body.message})`;
+    } catch {
+    }
+    return `${res.status} ${res.statusText}`.trim() || fallback;
+  }
+
+  // src/sync/gistClient.ts
+  var GistClient = class {
+    constructor(config, baseUrl = "https://api.github.com") {
+      this.config = config;
+      __publicField(this, "baseUrl");
+      __publicField(this, "rateLimit", createRateLimitState());
+      __publicField(this, "cachedPayload", null);
+      this.baseUrl = baseUrl.replace(/\/+$/, "");
+    }
+    get rateLimitReset() {
+      return this.rateLimit.rateLimitReset;
+    }
+    set rateLimitReset(val) {
+      this.rateLimit.rateLimitReset = val;
+    }
+    get isRateLimited() {
+      return this.rateLimit.isRateLimited;
+    }
+    set isRateLimited(val) {
+      this.rateLimit.isRateLimited = val;
+    }
+    updateRateLimit(res) {
+      updateRateLimitFromResponse(this.rateLimit, res);
+    }
+    isBlockedByRateLimit() {
+      if (this.rateLimit.isRateLimited && Date.now() < this.rateLimit.rateLimitReset) return true;
+      this.rateLimit.isRateLimited = false;
+      return false;
+    }
+    getRateLimitInfo() {
+      return {
+        remaining: this.rateLimit.remaining,
+        limit: this.rateLimit.limit,
+        resetTime: this.rateLimit.rateLimitReset,
+        isBlocked: this.isBlockedByRateLimit()
+      };
+    }
+    async fetchSyncState(etag) {
+      if (this.isBlockedByRateLimit()) return { data: null, etag, notModified: true };
+      const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag) });
+      this.updateRateLimit(res);
+      if (res.status === 304) return { data: null, etag, notModified: true };
+      if (!res.ok) throw new Error(`GitHub Gist API error: ${await parseGistError(res, "Gist error")}`);
+      const newEtag = res.headers.get("etag") || void 0;
+      const json = await res.json();
+      const fileObj = json.files?.["agent-sync.json"];
+      let raw = fileObj?.content;
+      if (fileObj?.truncated && fileObj?.raw_url) {
+        try {
+          const rawRes = await fetch(fileObj.raw_url, { headers: { Authorization: `Bearer ${this.config.token}`, "User-Agent": "AgentMonitor-Sync" } });
+          if (rawRes.ok) raw = await rawRes.text();
+        } catch {
+        }
+      }
+      if (!raw) return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now() }, etag: newEtag, notModified: false };
+      try {
+        const decrypted = decryptSyncData(raw, this.config.password);
+        const decompressed = await decompressPayload(decrypted);
+        const p = JSON.parse(decompressed);
+        const data = {
+          inbox: Array.isArray(p?.inbox) ? p.inbox : [],
+          sessions: Array.isArray(p?.sessions) ? p.sessions : [],
+          version: typeof p?.version === "number" ? p.version : 1,
+          updatedAt: typeof p?.updatedAt === "number" ? p.updatedAt : Date.now(),
+          sessionDetails: p?.sessionDetails && typeof p.sessionDetails === "object" ? p.sessionDetails : {},
+          activeSession: p?.activeSession,
+          appVersion: typeof p?.appVersion === "string" ? p.appVersion : void 0
+        };
+        this.cachedPayload = data;
+        return { data, etag: newEtag, notModified: false };
+      } catch (err) {
+        if (raw.startsWith("enc:") || raw.startsWith("cz:")) {
+          throw new Error(`Failed to decrypt/parse Gist payload: ${err?.message || "Invalid password or format"}`);
+        }
+        return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now(), sessionDetails: {} }, etag: newEtag, notModified: false };
+      }
+    }
+    async pushInboxMessage(msg) {
+      const cur = this.cachedPayload || (await this.fetchSyncState()).data || { inbox: [], sessions: [], version: 1, updatedAt: Date.now() };
+      if (!Array.isArray(cur.inbox)) cur.inbox = [];
+      if (!cur.inbox.some((m) => m.id === msg.id)) cur.inbox.push(msg);
+      cur.updatedAt = Date.now();
+      await this.saveSyncPayload(cur);
+    }
+    async updateOutboxAndDrainInbox(outbox, processedInboxIds, sessions, sessionDetails, existingPayload, appVersion) {
+      const cur = existingPayload || this.cachedPayload || (await this.fetchSyncState()).data || { inbox: [], sessions: [], version: 1, updatedAt: Date.now() };
+      cur.inbox = (cur.inbox || []).filter((m) => !processedInboxIds.includes(m.id));
+      cur.activeSession = outbox;
+      cur.sessions = sessions;
+      if (sessionDetails) cur.sessionDetails = sessionDetails;
+      if (appVersion) cur.appVersion = appVersion;
+      cur.updatedAt = Date.now();
+      await this.saveSyncPayload(cur);
+    }
+    async saveSyncPayload(payload) {
+      if (this.isBlockedByRateLimit()) {
+        const waitMin = Math.max(1, Math.ceil((this.rateLimit.rateLimitReset - Date.now()) / 6e4));
+        throw new Error(`GitHub API rate limit exceeded. Reset in ${waitMin}m. Please use local LAN / Live connection.`);
+      }
+      const jsonStr = JSON.stringify(payload);
+      const compressed = await compressPayload(jsonStr);
+      const content = encryptSyncData(compressed, this.config.password);
+      const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
+        method: "PATCH",
+        headers: buildGistHeaders(this.config.token),
+        body: JSON.stringify({ files: { "agent-sync.json": { content } } })
+      });
+      this.updateRateLimit(res);
+      if (!res.ok) {
+        const err = await parseGistError(res, "Failed to update Gist");
+        throw new Error(`Failed to update Gist: ${err}`);
+      }
+      this.cachedPayload = payload;
+    }
+  };
+
+  // src/ui/syncStateMachine.ts
+  var SyncStateMachine = class {
+    constructor(callbacks) {
+      this.callbacks = callbacks;
+      __publicField(this, "mode", "live-sse");
+      __publicField(this, "gistConfig");
+      __publicField(this, "gistClient");
+      __publicField(this, "isAwaitingResponse", false);
+      __publicField(this, "pollTimer");
+      __publicField(this, "lastEtag");
+      if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden && this.mode === "git-backup") this.restartGitPolling();
+        });
+      }
+    }
+    getMode() {
+      return this.mode;
+    }
+    getPollInterval() {
+      if (typeof document !== "undefined" && document.hidden) {
+        return this.isAwaitingResponse ? 1e4 : 3e4;
+      }
+      return this.isAwaitingResponse ? 2500 : 15e3;
+    }
+    setAwaitingResponse(awaiting) {
+      this.isAwaitingResponse = awaiting;
+      if (this.mode === "git-backup") {
+        this.restartGitPolling();
+      }
+    }
+    setGistConfig(config) {
+      this.gistConfig = config;
+      this.gistClient = config ? new GistClient(config) : void 0;
+    }
+    forceGitBackupMode() {
+      if (this.gistConfig) {
+        this.mode = "git-backup";
+        this.callbacks.onModeChange("git-backup");
+        this.callbacks.onStatusChange("connected");
+        this.callbacks.onError?.("");
+        this.restartGitPolling();
+      } else {
+        this.callbacks.onError?.("Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.");
+      }
+    }
+    handlePrimarySseFailure() {
+      if (this.gistConfig) {
+        this.mode = "git-backup";
+        this.callbacks.onModeChange("git-backup");
+        this.callbacks.onStatusChange("syncing");
+        this.restartGitPolling();
+      } else {
+        this.mode = "offline";
+        this.callbacks.onModeChange("offline");
+        this.callbacks.onStatusChange("disconnected");
+      }
+    }
+    restorePrimaryLive() {
+      this.stopGitPolling();
+      this.mode = "live-sse";
+      this.callbacks.onModeChange("live-sse");
+      this.callbacks.onStatusChange("connected");
+      this.callbacks.onError?.("");
+    }
+    async pushInboxMessage(msg) {
+      if (this.gistClient && this.mode === "git-backup") {
+        await this.gistClient.pushInboxMessage(msg);
+        await this.pollOnce();
+      } else {
+        throw new Error("Gist client is not configured or transport mode is not git-backup");
+      }
+    }
+    restartGitPolling() {
+      this.stopGitPolling();
+      void this.pollOnce();
+      const timer = setInterval(() => {
+        void this.pollOnce();
+      }, this.getPollInterval());
+      if (typeof timer?.unref === "function") {
+        timer.unref();
+      }
+      this.pollTimer = timer;
+    }
+    async pollOnce() {
+      if (!this.gistClient || this.mode !== "git-backup") return;
+      if (typeof this.gistClient.isBlockedByRateLimit === "function" && this.gistClient.isBlockedByRateLimit()) {
+        this.callbacks.onStatusChange("syncing");
+        return;
+      }
+      try {
+        const res = await this.gistClient.fetchSyncState(this.lastEtag);
+        if (res.etag) this.lastEtag = res.etag;
+        if (res.notModified) {
+          this.callbacks.onStatusChange("connected");
+          this.callbacks.onError?.("");
+        } else if (res.data) {
+          this.callbacks.onStatusChange("connected");
+          this.callbacks.onError?.("");
+          this.callbacks.onDataUpdate(res.data);
+        }
+      } catch (err) {
+        this.callbacks.onStatusChange("disconnected");
+        this.callbacks.onError?.(err?.message || "Gist sync connection failed");
+      }
+    }
+    stopGitPolling() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = void 0;
+      }
+    }
+    stop() {
+      this.stopGitPolling();
+    }
+  };
+
   // src/ui/appSyncMode.ts
+  function createAppSyncMachine(state2, render2) {
+    let machine;
+    machine = new SyncStateMachine({
+      onModeChange: (m) => {
+        if (state2.syncMode !== m) {
+          state2.syncMode = m;
+          render2();
+        }
+      },
+      onStatusChange: (s) => {
+        if (state2.syncStatus !== s) {
+          state2.syncStatus = s;
+          render2();
+        }
+      },
+      onDataUpdate: (p) => {
+        if (applyGistSyncPayload(state2, p)) machine.setAwaitingResponse(false);
+        render2();
+      },
+      onError: (err) => {
+        const msg = err || void 0;
+        if (state2.errorMessage !== msg) {
+          state2.errorMessage = msg;
+          render2();
+        }
+      }
+    });
+    return machine;
+  }
+  function applyPersistedSyncMode(syncMachine, startSse) {
+    const cfg = loadCachedGistConfig();
+    if (cfg) syncMachine.setGistConfig(cfg);
+    const isStatic = typeof window !== "undefined" && (window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev"));
+    const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
+    const mode = saved || (isStatic && cfg ? "git-backup" : "live-sse");
+    if (mode === "git-backup" && cfg) {
+      syncMachine.forceGitBackupMode();
+    } else if (isStatic && cfg) {
+      syncMachine.forceGitBackupMode();
+    } else {
+      startSse();
+    }
+  }
   function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
     const isGit = state2.syncMode === "git-backup";
     try {
@@ -8006,18 +8076,23 @@ input:checked + .slider:before {
         if (sid) state2.activeSessionId = sid;
       }
       if (!state2.sessions || state2.sessions.length === 0) state2.isLoadingSessions = true;
-      const [sessions, catalog] = await Promise.all([fetchSessions().catch(() => []), fetchModels().catch(() => ({ models: [], groups: [] }))]);
-      if (state2.lastAbortedAt) {
-        for (const s of sessions) {
-          if (s.id === state2.lastAbortedSessionId || s.id === state2.activeSessionId) s.isGenerating = false;
+      const [sessions, catalog] = await Promise.all([
+        fetchSessions().catch(() => null),
+        fetchModels().catch(() => ({ models: [], groups: [] }))
+      ]);
+      if (sessions !== null) {
+        if (state2.lastAbortedAt) {
+          for (const s of sessions) {
+            if (s.id === state2.lastAbortedSessionId || s.id === state2.activeSessionId) s.isGenerating = false;
+          }
         }
+        state2.sessions = sessions;
       }
-      state2.sessions = sessions;
       state2.isLoadingSessions = false;
       if (catalog.models?.length) state2.availableModels = catalog.models;
       if (catalog.groups?.length) state2.modelGroups = catalog.groups;
-      if (isInitial && !state2.activeSessionId && sessions.length > 0) {
-        state2.activeSessionId = (sessions.find((s) => s.messageCount > 0) || sessions[0])?.id;
+      if (isInitial && !state2.activeSessionId && state2.sessions.length > 0) {
+        state2.activeSessionId = (state2.sessions.find((s) => s.messageCount > 0) || state2.sessions[0])?.id;
         if (!getSavedTab()) Object.assign(state2, { activeTab: "chat", activePlan: void 0, activePlanName: void 0 });
       }
       if (state2.activeSessionId) {
@@ -8050,24 +8125,7 @@ input:checked + .slider:before {
       this.render = render2;
       __publicField(this, "sseCleanup", null);
       __publicField(this, "syncMachine");
-      this.syncMachine = new SyncStateMachine({
-        onModeChange: (m) => {
-          this.state.syncMode = m;
-          this.render();
-        },
-        onStatusChange: (s) => {
-          this.state.syncStatus = s;
-          this.render();
-        },
-        onDataUpdate: (p) => {
-          if (applyGistSyncPayload(this.state, p)) this.syncMachine.setAwaitingResponse(false);
-          this.render();
-        },
-        onError: (err) => {
-          this.state.errorMessage = err || void 0;
-          this.render();
-        }
-      });
+      this.syncMachine = createAppSyncMachine(this.state, this.render);
     }
     async selectSession(id) {
       const s = this.state.sessions.find((sess) => sess.id === id), cached = this.state.cachedSessionDetails?.[id];
@@ -8130,7 +8188,7 @@ input:checked + .slider:before {
     }
     handleLoginSuccess() {
       void this.reloadData(true);
-      this.applyPersistedSyncMode();
+      applyPersistedSyncMode(this.syncMachine, () => this.startSse());
     }
     handleSelectModel(modelId) {
       this.state.selectedModel = modelId;
@@ -8177,29 +8235,28 @@ input:checked + .slider:before {
       this.sseCleanup?.();
       this.sseCleanup = initSseClient({
         onStatusChange: (s) => {
+          const changed = this.state.syncStatus !== s;
           this.state.syncStatus = s;
-          if (s === "disconnected") this.syncMachine.handlePrimarySseFailure();
-          else if (s === "connected") this.syncMachine.restorePrimaryLive();
-          this.render();
+          if (s === "disconnected") {
+            this.sseCleanup?.();
+            this.sseCleanup = null;
+            this.syncMachine.handlePrimarySseFailure();
+          } else if (s === "connected") {
+            this.syncMachine.restorePrimaryLive();
+          }
+          if (changed) this.render();
         },
         onChange: () => {
           void this.reloadData(false);
         }
       });
     }
-    applyPersistedSyncMode() {
-      const cfg = loadCachedGistConfig();
-      if (cfg) this.syncMachine.setGistConfig(cfg);
-      const mode = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || "live-sse";
-      if (mode === "git-backup" && cfg) this.syncMachine.forceGitBackupMode();
-      else this.startSse();
-    }
     async init() {
       const urlConfig = checkAndApplyUrlConfig(), auth = await verifyAuthStatus();
       this.state.isAuthenticated = urlConfig.imported || !auth.required || auth.authorized;
       this.render();
       if (this.state.isAuthenticated) {
-        this.applyPersistedSyncMode();
+        applyPersistedSyncMode(this.syncMachine, () => this.startSse());
         await this.reloadData(true);
         void checkForUpdates(this.state, this.render);
       }
@@ -8849,66 +8906,6 @@ input:checked + .slider:before {
     flushP();
     closeList();
     return out.join("\n");
-  }
-
-  // src/ui/components/navHeader.ts
-  function renderNavHeader(state2) {
-    const isGit = state2.syncMode === "git-backup";
-    const isConnected = state2.syncStatus === "connected";
-    const isSyncing = state2.syncStatus === "syncing";
-    const host = state2.hostPresence;
-    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
-    const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
-    const statusLabel = isGit ? isHostOnline ? "P2P / Gist (Online)" : "P2P / Gist" : isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
-    const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
-    const sessionTitle = state2.activeSession?.title?.trim();
-    const sessionId = state2.activeSession?.id || state2.activeSessionId;
-    const chatTabLabel = sessionTitle && sessionId ? `${sessionTitle} (${sessionId})` : sessionTitle || sessionId || "Chat";
-    const chatMsgCount = state2.activeSession ? state2.activeSession.messages.length : 0;
-    return `
-    <header class="app-header">
-      <div class="header-top">
-        <div class="brand">
-          <span class="brand-icon">\u26A1</span>
-          <span class="brand-name">Agent Monitor</span>
-          <span class="brand-version">v${escapeHtml2(CLIENT_VERSION)}</span>
-        </div>
-        <div class="header-actions">
-          <button type="button" id="btn-open-settings" class="btn-settings-pill" title="Settings & Device Connect">
-            <span class="btn-settings-icon">\u2699\uFE0F</span>
-            <span class="btn-settings-text">Settings</span>
-          </button>
-          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / P2P Gist mode">
-            <span class="status-dot" style="background-color: ${statusColor}"></span>
-            <span class="status-text">${statusLabel}</span>
-          </button>
-          ${state2.isAuthenticated ? `<button type="button" id="btn-logout" class="btn-logout" title="Lock session">\u{1F512}</button>` : ""}
-        </div>
-      </div>
-      <nav class="header-tabs" role="tablist">
-        <button
-          type="button"
-          data-tab="sidebar"
-          class="tab-btn ${state2.activeTab === "sidebar" ? "active" : ""}"
-          role="tab"
-          aria-selected="${state2.activeTab === "sidebar"}"
-        >
-          <span>Sessions</span>
-          <span class="tab-badge">${state2.sessions.length}</span>
-        </button>
-        <button
-          type="button"
-          data-tab="chat"
-          class="tab-btn ${state2.activeTab === "chat" ? "active" : ""}"
-          role="tab"
-          aria-selected="${state2.activeTab === "chat"}"
-        >
-          <span>${escapeHtml2(chatTabLabel)}</span>
-          ${chatMsgCount > 0 ? `<span class="tab-badge">${chatMsgCount}</span>` : ""}
-        </button>
-      </nav>
-    </header>
-  `;
   }
 
   // src/ui/sidebar/sidebarDom.ts
@@ -10172,418 +10169,6 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
-  // src/ui/components/mentionDropdown.ts
-  function getMentionIcon(type) {
-    switch (type) {
-      case "folder":
-        return "\u{1F4C1}";
-      case "file":
-        return "\u{1F4C4}";
-      case "git":
-        return "\u{1F33F}";
-      case "problems":
-        return "\u26A0\uFE0F";
-      default:
-        return "\u{1F4C4}";
-    }
-  }
-  function renderMentionDropdown(items, activeIndex = 0) {
-    return `
-    <div class="mention-dropdown" id="mention-suggestions-menu">
-      <div class="mention-items-list" role="listbox">
-        ${items.length === 0 ? `<div class="mention-empty-hint">No matching files or symbols</div>` : items.map((item, index) => {
-      const icon = getMentionIcon(item.type);
-      const isActive = index === activeIndex;
-      const showDetail = Boolean(item.detail && item.detail !== item.label);
-      return `
-                    <div
-                      class="mention-item ${isActive ? "active" : ""}"
-                      role="option"
-                      data-mention-index="${index}"
-                      data-mention-type="${escapeHtml2(item.type)}"
-                      data-mention-label="${escapeHtml2(item.label)}"
-                      data-mention-detail="${escapeHtml2(item.detail || "")}"
-                    >
-                      <span class="mention-item-icon">${icon}</span>
-                      <div class="mention-item-body">
-                        <span class="mention-item-label">${escapeHtml2(item.label)}</span>
-                        ${showDetail ? `<span class="mention-item-detail">${escapeHtml2(item.detail)}</span>` : ""}
-                      </div>
-                    </div>
-                  `;
-    }).join("")}
-      </div>
-    </div>
-  `;
-  }
-
-  // src/utils/modelCatalogPresets.ts
-  var ANTIGRAVITY_PRESET_MODELS = [
-    { id: "antigravity|gemini-3.7-flash-high|model", label: "Gemini 3.7 Flash", provider: "antigravity", hint: "Fast / High Quality", isDefault: true, capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-3.6-flash|model", label: "Gemini 3.6 Flash", provider: "antigravity", hint: "Medium Latency", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-3.5-flash|model", label: "Gemini 3.5 Flash", provider: "antigravity", hint: "Medium Latency", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-3.1-pro|model", label: "Gemini 3.1 Pro", provider: "antigravity", hint: "Low Latency", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-2.5-pro|model", label: "Gemini 2.5 Pro", provider: "antigravity", hint: "Deep Reasoning", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-2.5-flash|model", label: "Gemini 2.5 Flash", provider: "antigravity", hint: "Ultra Fast", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-3.7-flash-low|model", label: "Gemini 3.7 Flash (Low Thinking)", provider: "antigravity", hint: "Low Latency", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-2.5-flash-thinking|model", label: "Gemini 2.5 Flash Thinking", provider: "antigravity", hint: "Thinking", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "antigravity|gemini-3.7-flash-high|sdk", label: "Google Antigravity SDK Agent", provider: "antigravity", hint: "Autonomous SDK", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } }
-  ];
-  var CURSOR_PRESET_MODELS = [
-    { id: "cursor|auto|model", label: "Cursor Auto", provider: "cursor", hint: "Auto Routing", isDefault: true, capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
-    { id: "cursor|composer-2.5|model", label: "Cursor Composer 2.5", provider: "cursor", hint: "Cursor Bridge", capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
-    { id: "cursor|composer-1|model", label: "Cursor Composer 1", provider: "cursor", hint: "Cursor Bridge", capabilities: { vision: true, tools: true, contextWindow: 2e5 } }
-  ];
-  var ANTHROPIC_PRESET_MODELS = [
-    { id: "anthropic|claude-3-7-sonnet|model", label: "Claude 3.7 Sonnet", provider: "anthropic", hint: "Hybrid Thinking", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 2e5 } },
-    { id: "anthropic|claude-3-5-sonnet|model", label: "Claude 3.5 Sonnet", provider: "anthropic", hint: "Coding Leader", capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
-    { id: "anthropic|claude-3-5-haiku|model", label: "Claude 3.5 Haiku", provider: "anthropic", hint: "Fast & Precise", capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
-    { id: "anthropic|claude-3-opus|model", label: "Claude 3 Opus", provider: "anthropic", hint: "Deep Analysis", capabilities: { vision: true, tools: true, contextWindow: 2e5 } }
-  ];
-  var OPENAI_PRESET_MODELS = [
-    { id: "openai|gpt-4o|model", label: "OpenAI: GPT-4o", provider: "openai", hint: "Omni Multimodal", capabilities: { vision: true, tools: true, contextWindow: 128e3 } },
-    { id: "openai|gpt-4o-mini|model", label: "OpenAI: GPT-4o Mini", provider: "openai", hint: "Fast & Light", capabilities: { vision: true, tools: true, contextWindow: 128e3 } },
-    { id: "openai|o3-mini|model", label: "OpenAI: o3-mini", provider: "openai", hint: "Reasoning", capabilities: { thinking: true, tools: true, contextWindow: 2e5 } },
-    { id: "openai|o1|model", label: "OpenAI: o1", provider: "openai", hint: "Deep Reasoning", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 2e5 } },
-    { id: "openai|gpt-4.5-preview|model", label: "OpenAI: GPT-4.5 Preview", provider: "openai", hint: "Frontier", capabilities: { vision: true, tools: true, contextWindow: 128e3 } }
-  ];
-  var GEMINI_PRESET_MODELS = [
-    { id: "gemini|gemini-3.7-flash|model", label: "Gemini 3.7 Flash", provider: "gemini", hint: "Best Free Tier / Hybrid Thinking", isDefault: true, capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "gemini|gemini-3.6-flash|model", label: "Gemini 3.6 Flash", provider: "gemini", hint: "Fast / High Quality", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "gemini|gemini-2.5-pro|model", label: "Gemini 2.5 Pro", provider: "gemini", hint: "Deep Reasoning", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
-    { id: "gemini|gemini-2.0-flash|model", label: "Gemini 2.0 Flash", provider: "gemini", hint: "Google AI", capabilities: { vision: true, tools: true, contextWindow: 1e6 } }
-  ];
-  var PUTER_PRESET_MODELS = [
-    { id: "puter|claude-3-7-sonnet|model", label: "Puter: Claude 3.7 Sonnet", provider: "puter", hint: "Puter Free", capabilities: { thinking: true, vision: true, contextWindow: 2e5 } },
-    { id: "puter|claude-3.5-sonnet|model", label: "Puter: Claude 3.5 Sonnet", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 2e5 } },
-    { id: "puter|gpt-4o|model", label: "Puter: GPT-4o", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 128e3 } },
-    { id: "puter|gpt-4o-mini|model", label: "Puter: GPT-4o Mini", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 128e3 } },
-    { id: "puter|gemini-2.5-flash|model", label: "Puter: Gemini 2.5 Flash", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 1e6 } },
-    { id: "puter|gemini-2.0-flash|model", label: "Puter: Gemini 2.0 Flash", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 1e6 } }
-  ];
-  var OLLAMA_DEFAULT_PRESETS = [
-    { id: "ollama|mannix/qwen3.6-27b-a3b-coderx:latest|model", label: "Ollama: Qwen 3.6 27B CoderX (Champion)", provider: "ollama", hint: "MoE Champion / 16GB", isDefault: true, capabilities: { tools: true, contextWindow: 32e3 } },
-    { id: "ollama|ornith-1.5:9b-aligned|model", label: "Ollama: Ornith 1.5 9B (Efficiency Champion)", provider: "ollama", hint: "Fast Dense / 6.6GB / 100% Industry Parity", capabilities: { thinking: true, tools: true, contextWindow: 32e3 } },
-    { id: "ollama|qwen2.5-coder:7b-aligned|model", label: "Ollama: Qwen 2.5 Coder 7B (Subagent Explorer)", provider: "ollama", hint: "Ultra-Fast Subagent / 4.7GB", capabilities: { tools: true, contextWindow: 32e3 } },
-    { id: "ollama|qwen2.5-coder:14b|model", label: "Ollama: Qwen 2.5 Coder 14B", provider: "ollama", hint: "Fast Dense / 9GB / 32k ctx", capabilities: { tools: true, contextWindow: 32e3 } },
-    { id: "ollama|qwen2.5-coder:32b|model", label: "Ollama: Qwen 2.5 Coder 32B", provider: "ollama", hint: "Dense Specialist / 17GB", capabilities: { tools: true, contextWindow: 32e3 } },
-    { id: "ollama|qwq:32b|model", label: "Ollama: QwQ 32B Reasoning", provider: "ollama", hint: "Deep Reasoning / 19GB", capabilities: { thinking: true, tools: true, contextWindow: 32e3 } },
-    { id: "ollama|deepseek-r1:14b|model", label: "Ollama: DeepSeek R1 14B", provider: "ollama", hint: "Fast Reasoning / 9GB", capabilities: { thinking: true, contextWindow: 8192 } },
-    { id: "ollama|devstral-small-2:24b|model", label: "Ollama: Devstral 24B", provider: "ollama", hint: "Mistral Coder / 15GB", capabilities: { tools: true, contextWindow: 32e3 } }
-  ];
-  var LMSTUDIO_DEFAULT_PRESETS = [
-    { id: "lmstudio|local-model|model", label: "LM Studio: local-model", provider: "lmstudio", hint: "Local (1234)", capabilities: { tools: true, contextWindow: 8192 } },
-    { id: "lmstudio|deepseek-r1-distill-qwen-14b|model", label: "LM Studio: DeepSeek R1 14B", provider: "lmstudio", hint: "Local", capabilities: { thinking: true, contextWindow: 8192 } },
-    { id: "lmstudio|qwen2.5-coder-7b-instruct|model", label: "LM Studio: Qwen 2.5 Coder 7B", provider: "lmstudio", hint: "Local", capabilities: { tools: true, contextWindow: 8192 } }
-  ];
-  function formatModelLabel(modelId, availableModels) {
-    if (!modelId) return "Gemini 3.7 Flash";
-    const match = availableModels?.find((m) => m.id === modelId || m.value === modelId);
-    if (match?.label) return match.label;
-    const parts = modelId.split("|");
-    const provider = parts[0];
-    const modelName = parts[1] || modelId;
-    if (provider === "antigravity") {
-      if (modelName.includes("3.7")) return "Gemini 3.7 Flash";
-      if (modelName.includes("pro")) return "Gemini 2.5 Pro";
-      if (modelName.includes("flash")) return "Gemini 2.5 Flash";
-      return modelName;
-    }
-    if (provider === "cursor") {
-      if (modelName === "auto" || modelName === "default") return "Cursor Auto";
-      if (modelName === "composer-2.5") return "Cursor Composer 2.5";
-      if (modelName === "composer-1") return "Cursor Composer 1";
-      return `Cursor: ${modelName}`;
-    }
-    if (provider === "anthropic") {
-      if (modelName.includes("3-7") || modelName.includes("3.7")) return "Claude 3.7 Sonnet";
-      if (modelName.includes("3-5-sonnet") || modelName.includes("3.5-sonnet")) return "Claude 3.5 Sonnet";
-      if (modelName.includes("haiku")) return "Claude 3.5 Haiku";
-      if (modelName.includes("opus")) return "Claude Opus";
-      return modelName;
-    }
-    if (provider === "openai") {
-      if (modelName.includes("4o-mini")) return "OpenAI: GPT-4o Mini";
-      if (modelName.includes("4o")) return "OpenAI: GPT-4o";
-      if (modelName.includes("o3-mini")) return "OpenAI: o3-mini";
-      if (modelName.includes("o1")) return "OpenAI: o1";
-      return `OpenAI: ${modelName}`;
-    }
-    if (["gemini", "puter", "ollama", "lmstudio"].includes(provider)) {
-      return `${provider.charAt(0).toUpperCase() + provider.slice(1)}: ${modelName}`;
-    }
-    return modelName;
-  }
-
-  // src/server/modelsCatalog.ts
-  var MONITOR_MODEL_GROUPS = [
-    { label: "Google Antigravity", category: "antigravity", options: ANTIGRAVITY_PRESET_MODELS },
-    { label: "Cursor (IDE Bridge)", category: "cursor", options: CURSOR_PRESET_MODELS },
-    { label: "Anthropic (Claude)", category: "anthropic", options: ANTHROPIC_PRESET_MODELS },
-    { label: "OpenAI", category: "openai", options: OPENAI_PRESET_MODELS },
-    { label: "Google Gemini (API)", category: "gemini", options: GEMINI_PRESET_MODELS },
-    { label: "Puter.js (Free)", category: "puter", options: PUTER_PRESET_MODELS },
-    { label: "Local (Ollama)", category: "ollama", options: OLLAMA_DEFAULT_PRESETS },
-    { label: "Local (LM Studio)", category: "lmstudio", options: LMSTUDIO_DEFAULT_PRESETS }
-  ];
-  var MONITOR_MODEL_PRESETS = MONITOR_MODEL_GROUPS.flatMap((g) => g.options);
-
-  // src/ui/panelDom.ts
-  function escapeHtml4(text) {
-    return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-  }
-
-  // src/utils/visionModels.ts
-  var PREFERRED_VISION_MODEL_RE = /gpt-4o|gpt-4-turbo|gpt-4-vision|o1-|o3-|o4-|claude-3|claude-sonnet-4|claude-opus-4|gemini-.*-vision|gemini-1\.5|gemini-2|llava|bakllava|moondream|vision|bonsai|minicpm-v|qwen2[\s.-]?vl|qwen[\w.-]*-vl|pixtral|llama3\.2-vision|gemma3|gemma-3|qwen2\.5vl|mmproj/i;
-  function modelSupportsImages(options) {
-    if (!options) return false;
-    const provider = options.provider?.toLowerCase();
-    const model = options.model?.toLowerCase() ?? "";
-    if (provider === "puter" || provider === "cursor" || provider === "vscode" || provider === "gemini") {
-      return true;
-    }
-    if (provider === "ollama") {
-      return PREFERRED_VISION_MODEL_RE.test(model);
-    }
-    if (provider === "openai" || provider === "auto") return true;
-    return PREFERRED_VISION_MODEL_RE.test(model);
-  }
-  function openAiCompatibleModelLikelyThinks(model) {
-    const m = model.toLowerCase();
-    if (m.includes("qwen3-coder") || m.includes("qwen3.8") || m.includes("qwen3.5")) return false;
-    return m.includes("reasoner") || m.includes("deepseek-r1") || m.includes("o1") || m.includes("o3") || m.includes("gemma-4") || m.includes("qwen3.6") || m.includes("bonsai");
-  }
-
-  // src/ui/modelPills.ts
-  function formatContextWindow(tokens) {
-    if (!tokens || tokens <= 0) return void 0;
-    if (tokens >= 1e6) {
-      const m = Math.round(tokens / 1e6 * 10) / 10;
-      return `${m % 1 === 0 ? m.toFixed(0) : m}M`;
-    }
-    if (tokens % 1e3 === 0) {
-      return `${tokens / 1e3}k`;
-    }
-    if (tokens % 1024 === 0) {
-      return `${tokens / 1024}k`;
-    }
-    if (tokens >= 1e3) {
-      const k = Math.round(tokens / 1e3);
-      return `${k}k`;
-    }
-    return `${tokens}`;
-  }
-  function resolveModelPills(option) {
-    if (Array.isArray(option.pills) && option.pills.length > 0) {
-      return option.pills.map((label) => ({ label, kind: "custom" }));
-    }
-    const pills = [];
-    const modelId = (option.value || option.id || "").toLowerCase();
-    const hintLower = (option.hint || "").toLowerCase();
-    const isAgent = modelId.endsWith("|sdk") || hintLower.includes("sdk");
-    if (isAgent) {
-      pills.push({ label: "Agent", kind: "agent", title: "Autonomous SDK Agent" });
-    }
-    const isThinking = option.capabilities?.thinking ?? (openAiCompatibleModelLikelyThinks(modelId) || modelId.includes("3.7") || modelId.includes("3-7") || modelId.includes("r1") || modelId.includes("qwq") || hintLower.includes("thinking") || hintLower.includes("reasoning"));
-    if (isThinking) {
-      pills.push({ label: "Reasoning", kind: "reasoning", title: "Thinking & Deep Reasoning" });
-    }
-    const isVision = option.capabilities?.vision ?? modelSupportsImages({ provider: option.provider, model: modelId });
-    if (isVision) {
-      pills.push({ label: "Vision", kind: "vision", title: "Multimodal Vision Support" });
-    }
-    const isTools = option.capabilities?.tools ?? (option.provider !== "puter" && option.provider !== "vscode" && !modelId.includes("r1"));
-    if (isTools) {
-      pills.push({ label: "Tools", kind: "tools", title: "Native Tool Calling" });
-    }
-    const ctxLabel = formatContextWindow(option.capabilities?.contextWindow);
-    if (ctxLabel) {
-      pills.push({ label: ctxLabel, kind: "context", title: `${ctxLabel} context window` });
-    }
-    return pills;
-  }
-  function renderModelPillsHtml(pills) {
-    if (!pills || pills.length === 0) return "";
-    const badges = pills.map((p) => {
-      const titleAttr = p.title ? ` title="${escapeHtml4(p.title)}"` : "";
-      return `<span class="model-pill model-pill-${escapeHtml4(p.kind)}"${titleAttr}>${escapeHtml4(p.label)}</span>`;
-    }).join("");
-    return `<div class="model-item-pills">${badges}</div>`;
-  }
-
-  // src/ui/components/modelPickerDropdown.ts
-  function isModelSelected(modelId, currentModel) {
-    if (!modelId || !currentModel) return false;
-    return modelId.toLowerCase() === currentModel.toLowerCase();
-  }
-  function renderGroupItems(group, selectedModel, filter) {
-    const options = group.options || [];
-    const matchingItems = options.filter((item) => {
-      const lbl = (item.label || "").toLowerCase();
-      const val = (item.id || item.value || "").toLowerCase();
-      const hint = (item.hint || item.provider || "").toLowerCase();
-      const pills = resolveModelPills(item);
-      const pillsText = pills.map((p) => p.label).join(" ").toLowerCase();
-      return !filter || lbl.includes(filter) || val.includes(filter) || hint.includes(filter) || pillsText.includes(filter);
-    });
-    if (matchingItems.length === 0) return { groupHeaderHtml: "", itemsHtml: "" };
-    const groupHeaderHtml = `<div class="model-menu-group">${escapeHtml2(group.label)}</div>`;
-    const itemsHtml = matchingItems.map((item) => {
-      const modelId = item.id || item.value || "";
-      const modelLabel = item.label || modelId;
-      const badge = item.hint || item.provider;
-      const isSelected = isModelSelected(modelId, selectedModel);
-      const pills = resolveModelPills(item);
-      const pillsHtml = renderModelPillsHtml(pills);
-      return `
-        <button
-          type="button"
-          class="model-picker-item ${isSelected ? "selected" : ""}"
-          data-model-id="${escapeHtml2(modelId)}"
-          title="${escapeHtml2(modelLabel)}"
-          aria-selected="${isSelected ? "true" : "false"}"
-        >
-          <div class="model-item-left">
-            <span class="model-item-check">${isSelected ? "\u2713" : ""}</span>
-            <span class="model-item-name">${escapeHtml2(modelLabel)}</span>
-            ${pillsHtml}
-          </div>
-          ${badge ? `<span class="model-item-badge">${escapeHtml2(badge)}</span>` : ""}
-        </button>
-      `;
-    }).join("");
-    return { groupHeaderHtml, itemsHtml };
-  }
-  function renderModelMenuItemsHtml(state2) {
-    const filter = (state2.modelSearchQuery || "").toLowerCase().trim();
-    const groups = state2.modelGroups?.length ? state2.modelGroups : MONITOR_MODEL_GROUPS;
-    let totalItemsRendered = 0;
-    const groupsHtml = groups.map((g) => {
-      const { groupHeaderHtml, itemsHtml } = renderGroupItems(g, state2.selectedModel, filter);
-      if (itemsHtml) {
-        totalItemsRendered++;
-        return `${groupHeaderHtml}${itemsHtml}`;
-      }
-      return "";
-    }).join("");
-    const emptyHtml = totalItemsRendered === 0 ? `<div class="model-menu-empty" style="padding: 12px 16px; font-size: 12px; color: var(--cursor-muted, #888); text-align: center;">${filter ? "No matching models found" : "No models available"}</div>` : "";
-    return `${groupsHtml}${emptyHtml}`;
-  }
-  function renderModelPickerDropdown(state2) {
-    return `
-    <div class="model-picker-menu model-picker-dropdown" id="model-picker-menu">
-      <div class="model-menu-search-row">
-        <input
-          type="text"
-          id="model-search-input"
-          class="model-menu-search-input"
-          placeholder="Search models..."
-          value="${escapeHtml2(state2.modelSearchQuery || "")}"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </div>
-      <div class="model-menu-list model-picker-list" id="model-menu-list">
-        ${renderModelMenuItemsHtml(state2)}
-      </div>
-    </div>
-  `;
-  }
-
-  // src/ui/composerButton.ts
-  function isComposerStopMode(state2, currentText) {
-    const isRunning = Boolean(
-      state2.activeSession?.isGenerating || state2.isSending || state2.isAwaitingResponse
-    );
-    const text = currentText !== void 0 ? currentText : state2.composerDraft || "";
-    const hasContent = Boolean(text.trim().length > 0 || state2.attachments && state2.attachments.length > 0);
-    return isRunning && !hasContent;
-  }
-  function updateComposerButton(state2, root) {
-    const doc = root || (typeof document !== "undefined" ? document : void 0);
-    if (!doc) return;
-    const btn = doc.querySelector(".composer-actions .send-btn, #btn-send, #btn-stop");
-    if (!btn) return;
-    const composer = typeof doc.getElementById === "function" ? doc.getElementById("composer-input") : doc.querySelector("#composer-input");
-    const currentText = composer ? composer.value : state2.composerDraft;
-    const stopMode = isComposerStopMode(state2, currentText);
-    btn.id = stopMode ? "btn-stop" : "btn-send";
-    btn.className = stopMode ? "send-btn btn-stop stop-mode" : "send-btn btn-send";
-    btn.title = stopMode ? "Stop (Immediate stop)" : "Send (Enter)";
-    btn.setAttribute("aria-label", stopMode ? "Stop agent" : "Send message");
-    const sendIcon = btn.querySelector(".send-icon");
-    const stopIcon = btn.querySelector(".stop-icon");
-    if (sendIcon?.classList) sendIcon.classList.toggle("hidden", stopMode);
-    if (stopIcon?.classList) stopIcon.classList.toggle("hidden", !stopMode);
-  }
-
-  // src/ui/components/composerView.ts
-  function renderComposerView(state2) {
-    if (state2.activeTab === "plans") return "";
-    const modeLabel = state2.composerMode === "agent" ? "Agent" : state2.composerMode === "plan" ? "Plan" : "Ask";
-    const modelLabel = formatModelLabel(state2.selectedModel, state2.availableModels);
-    const stopMode = isComposerStopMode(state2);
-    const attachments = state2.attachments || [];
-    return `
-    <footer class="app-composer composer">
-      <input type="file" id="attach-file-input" style="display:none" multiple>
-      <div class="composer-card composer-inner">
-        <div id="mention-dropdown-container">
-          ${state2.isMentionOpen ? renderMentionDropdown(state2.mentionSuggestions || [], state2.activeMentionIndex || 0) : ""}
-        </div>
-        ${attachments.length > 0 ? `<div class="composer-attachments attachment-list" id="composer-attachments">${attachments.map((a) => renderAttachmentPill(a, true)).join("")}</div>` : ""}
-        <textarea
-          id="composer-input"
-          class="composer-textarea composer-input"
-          placeholder="Message or instruction... (@ for context)"
-          rows="1"
-        >${escapeHtml2(state2.composerDraft || "")}</textarea>
-        <div class="composer-toolbar">
-          <div class="composer-toolbar-left mode-selectors">
-            <button type="button" class="icon-btn composer-icon-btn" id="btn-mention-trigger" title="Attach files or context (@)" aria-label="Attach files or context">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <path d="M4.5 3a2.5 2.5 0 0 1 5 0v6.5a1.5 1.5 0 0 1-3 0V4a.5.5 0 0 1 1 0v5.5a.5.5 0 0 0 1 0V3a1.5 1.5 0 0 0-3 0v6.5a2.5 2.5 0 0 0 5 0V3a.5.5 0 0 1 1 0v6.5a3.5 3.5 0 0 1-7 0V3z"/>
-              </svg>
-            </button>
-            <button type="button" class="composer-pill mode-picker-btn mode-pill mode-pill--${state2.composerMode}" id="btn-mode-toggle" title="Switch Mode">
-              <span class="mode-dot"></span>
-              <span class="mode-text" id="composer-mode-text">${modeLabel}</span>
-              <svg class="mode-picker-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <div class="model-picker-wrapper mode-select">
-              <button type="button" class="composer-pill model-picker-btn" id="btn-model-toggle" title="Select Model" aria-expanded="${state2.isModelPickerOpen ? "true" : "false"}">
-                <span class="model-text" id="composer-model-text">${escapeHtml2(modelLabel)}</span>
-                <svg class="mode-picker-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                  <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-              ${state2.isModelPickerOpen ? renderModelPickerDropdown(state2) : ""}
-            </div>
-          </div>
-          <div class="composer-toolbar-right composer-actions">
-            <button
-              type="button"
-              class="send-btn ${stopMode ? "btn-stop stop-mode" : "btn-send"}"
-              id="${stopMode ? "btn-stop" : "btn-send"}"
-              title="${stopMode ? "Stop (Immediate stop)" : "Send (Enter)"}"
-              aria-label="${stopMode ? "Stop agent" : "Send message"}"
-            >
-              <svg class="submit-icon send-icon ${stopMode ? "hidden" : ""}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M8 12V4M8 4L5 7M8 4l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <svg class="submit-icon stop-icon ${stopMode ? "" : "hidden"}" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <rect x="4.5" y="4.5" width="7" height="7" rx="1.5"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </footer>
-  `;
-  }
-
   // src/ui/components/loginView.ts
   function renderLoginView(state2) {
     let cachedGistId = "", cachedToken = "";
@@ -11094,6 +10679,625 @@ ${thought.trim()}` : thought.trim();
       </div>
     </div>
   `;
+  }
+
+  // src/ui/components/navHeader.ts
+  function renderNavHeader(state2) {
+    const isGit = state2.syncMode === "git-backup";
+    const isConnected = state2.syncStatus === "connected";
+    const isSyncing = state2.syncStatus === "syncing";
+    const host = state2.hostPresence;
+    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
+    const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
+    const statusLabel = isGit ? isHostOnline ? "P2P / Gist (Online)" : "P2P / Gist" : isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
+    const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
+    const sessionTitle = state2.activeSession?.title?.trim();
+    const sessionId = state2.activeSession?.id || state2.activeSessionId;
+    const chatTabLabel = sessionTitle && sessionId ? `${sessionTitle} (${sessionId})` : sessionTitle || sessionId || "Chat";
+    const chatMsgCount = state2.activeSession ? state2.activeSession.messages.length : 0;
+    return `
+    <header class="app-header">
+      <div class="header-top">
+        <div class="brand">
+          <span class="brand-icon">\u26A1</span>
+          <span class="brand-name">Agent Monitor</span>
+          <span class="brand-version">v${escapeHtml2(CLIENT_VERSION)}</span>
+        </div>
+        <div class="header-actions">
+          <button type="button" id="btn-open-settings" class="btn-settings-pill" title="Settings & Device Connect">
+            <span class="btn-settings-icon">\u2699\uFE0F</span>
+            <span class="btn-settings-text">Settings</span>
+          </button>
+          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / P2P Gist mode">
+            <span class="status-dot" style="background-color: ${statusColor}"></span>
+            <span class="status-text">${statusLabel}</span>
+          </button>
+          ${state2.isAuthenticated ? `<button type="button" id="btn-logout" class="btn-logout" title="Lock session">\u{1F512}</button>` : ""}
+        </div>
+      </div>
+      <nav class="header-tabs" role="tablist">
+        <button
+          type="button"
+          data-tab="sidebar"
+          class="tab-btn ${state2.activeTab === "sidebar" ? "active" : ""}"
+          role="tab"
+          aria-selected="${state2.activeTab === "sidebar"}"
+        >
+          <span>Sessions</span>
+          <span class="tab-badge">${state2.sessions.length}</span>
+        </button>
+        <button
+          type="button"
+          data-tab="chat"
+          class="tab-btn ${state2.activeTab === "chat" ? "active" : ""}"
+          role="tab"
+          aria-selected="${state2.activeTab === "chat"}"
+        >
+          <span>${escapeHtml2(chatTabLabel)}</span>
+          ${chatMsgCount > 0 ? `<span class="tab-badge">${chatMsgCount}</span>` : ""}
+        </button>
+      </nav>
+    </header>
+  `;
+  }
+
+  // src/ui/components/mentionDropdown.ts
+  function getMentionIcon(type) {
+    switch (type) {
+      case "folder":
+        return "\u{1F4C1}";
+      case "file":
+        return "\u{1F4C4}";
+      case "git":
+        return "\u{1F33F}";
+      case "problems":
+        return "\u26A0\uFE0F";
+      default:
+        return "\u{1F4C4}";
+    }
+  }
+  function renderMentionDropdown(items, activeIndex = 0) {
+    return `
+    <div class="mention-dropdown" id="mention-suggestions-menu">
+      <div class="mention-items-list" role="listbox">
+        ${items.length === 0 ? `<div class="mention-empty-hint">No matching files or symbols</div>` : items.map((item, index) => {
+      const icon = getMentionIcon(item.type);
+      const isActive = index === activeIndex;
+      const showDetail = Boolean(item.detail && item.detail !== item.label);
+      return `
+                    <div
+                      class="mention-item ${isActive ? "active" : ""}"
+                      role="option"
+                      data-mention-index="${index}"
+                      data-mention-type="${escapeHtml2(item.type)}"
+                      data-mention-label="${escapeHtml2(item.label)}"
+                      data-mention-detail="${escapeHtml2(item.detail || "")}"
+                    >
+                      <span class="mention-item-icon">${icon}</span>
+                      <div class="mention-item-body">
+                        <span class="mention-item-label">${escapeHtml2(item.label)}</span>
+                        ${showDetail ? `<span class="mention-item-detail">${escapeHtml2(item.detail)}</span>` : ""}
+                      </div>
+                    </div>
+                  `;
+    }).join("")}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/utils/modelCatalogPresets.ts
+  var ANTIGRAVITY_PRESET_MODELS = [
+    { id: "antigravity|gemini-3.7-flash-high|model", label: "Gemini 3.7 Flash", provider: "antigravity", hint: "Fast / High Quality", isDefault: true, capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-3.6-flash|model", label: "Gemini 3.6 Flash", provider: "antigravity", hint: "Medium Latency", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-3.5-flash|model", label: "Gemini 3.5 Flash", provider: "antigravity", hint: "Medium Latency", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-3.1-pro|model", label: "Gemini 3.1 Pro", provider: "antigravity", hint: "Low Latency", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-2.5-pro|model", label: "Gemini 2.5 Pro", provider: "antigravity", hint: "Deep Reasoning", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-2.5-flash|model", label: "Gemini 2.5 Flash", provider: "antigravity", hint: "Ultra Fast", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-3.7-flash-low|model", label: "Gemini 3.7 Flash (Low Thinking)", provider: "antigravity", hint: "Low Latency", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-2.5-flash-thinking|model", label: "Gemini 2.5 Flash Thinking", provider: "antigravity", hint: "Thinking", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "antigravity|gemini-3.7-flash-high|sdk", label: "Google Antigravity SDK Agent", provider: "antigravity", hint: "Autonomous SDK", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } }
+  ];
+  var CURSOR_PRESET_MODELS = [
+    { id: "cursor|auto|model", label: "Cursor Auto", provider: "cursor", hint: "Auto Routing", isDefault: true, capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
+    { id: "cursor|composer-2.5|model", label: "Cursor Composer 2.5", provider: "cursor", hint: "Cursor Bridge", capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
+    { id: "cursor|composer-1|model", label: "Cursor Composer 1", provider: "cursor", hint: "Cursor Bridge", capabilities: { vision: true, tools: true, contextWindow: 2e5 } }
+  ];
+  var ANTHROPIC_PRESET_MODELS = [
+    { id: "anthropic|claude-3-7-sonnet|model", label: "Claude 3.7 Sonnet", provider: "anthropic", hint: "Hybrid Thinking", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 2e5 } },
+    { id: "anthropic|claude-3-5-sonnet|model", label: "Claude 3.5 Sonnet", provider: "anthropic", hint: "Coding Leader", capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
+    { id: "anthropic|claude-3-5-haiku|model", label: "Claude 3.5 Haiku", provider: "anthropic", hint: "Fast & Precise", capabilities: { vision: true, tools: true, contextWindow: 2e5 } },
+    { id: "anthropic|claude-3-opus|model", label: "Claude 3 Opus", provider: "anthropic", hint: "Deep Analysis", capabilities: { vision: true, tools: true, contextWindow: 2e5 } }
+  ];
+  var OPENAI_PRESET_MODELS = [
+    { id: "openai|gpt-4o|model", label: "OpenAI: GPT-4o", provider: "openai", hint: "Omni Multimodal", capabilities: { vision: true, tools: true, contextWindow: 128e3 } },
+    { id: "openai|gpt-4o-mini|model", label: "OpenAI: GPT-4o Mini", provider: "openai", hint: "Fast & Light", capabilities: { vision: true, tools: true, contextWindow: 128e3 } },
+    { id: "openai|o3-mini|model", label: "OpenAI: o3-mini", provider: "openai", hint: "Reasoning", capabilities: { thinking: true, tools: true, contextWindow: 2e5 } },
+    { id: "openai|o1|model", label: "OpenAI: o1", provider: "openai", hint: "Deep Reasoning", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 2e5 } },
+    { id: "openai|gpt-4.5-preview|model", label: "OpenAI: GPT-4.5 Preview", provider: "openai", hint: "Frontier", capabilities: { vision: true, tools: true, contextWindow: 128e3 } }
+  ];
+  var GEMINI_PRESET_MODELS = [
+    { id: "gemini|gemini-3.7-flash|model", label: "Gemini 3.7 Flash", provider: "gemini", hint: "Best Free Tier / Hybrid Thinking", isDefault: true, capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "gemini|gemini-3.6-flash|model", label: "Gemini 3.6 Flash", provider: "gemini", hint: "Fast / High Quality", capabilities: { vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "gemini|gemini-2.5-pro|model", label: "Gemini 2.5 Pro", provider: "gemini", hint: "Deep Reasoning", capabilities: { thinking: true, vision: true, tools: true, contextWindow: 1e6 } },
+    { id: "gemini|gemini-2.0-flash|model", label: "Gemini 2.0 Flash", provider: "gemini", hint: "Google AI", capabilities: { vision: true, tools: true, contextWindow: 1e6 } }
+  ];
+  var PUTER_PRESET_MODELS = [
+    { id: "puter|claude-3-7-sonnet|model", label: "Puter: Claude 3.7 Sonnet", provider: "puter", hint: "Puter Free", capabilities: { thinking: true, vision: true, contextWindow: 2e5 } },
+    { id: "puter|claude-3.5-sonnet|model", label: "Puter: Claude 3.5 Sonnet", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 2e5 } },
+    { id: "puter|gpt-4o|model", label: "Puter: GPT-4o", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 128e3 } },
+    { id: "puter|gpt-4o-mini|model", label: "Puter: GPT-4o Mini", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 128e3 } },
+    { id: "puter|gemini-2.5-flash|model", label: "Puter: Gemini 2.5 Flash", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 1e6 } },
+    { id: "puter|gemini-2.0-flash|model", label: "Puter: Gemini 2.0 Flash", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 1e6 } }
+  ];
+  var OLLAMA_DEFAULT_PRESETS = [
+    { id: "ollama|mannix/qwen3.6-27b-a3b-coderx:latest|model", label: "Ollama: Qwen 3.6 27B CoderX (Champion)", provider: "ollama", hint: "MoE Champion / 16GB", isDefault: true, capabilities: { tools: true, contextWindow: 32e3 } },
+    { id: "ollama|ornith-1.5:9b-aligned|model", label: "Ollama: Ornith 1.5 9B (Efficiency Champion)", provider: "ollama", hint: "Fast Dense / 6.6GB / 100% Industry Parity", capabilities: { thinking: true, tools: true, contextWindow: 32e3 } },
+    { id: "ollama|qwen2.5-coder:7b-aligned|model", label: "Ollama: Qwen 2.5 Coder 7B (Subagent Explorer)", provider: "ollama", hint: "Ultra-Fast Subagent / 4.7GB", capabilities: { tools: true, contextWindow: 32e3 } },
+    { id: "ollama|qwen2.5-coder:14b|model", label: "Ollama: Qwen 2.5 Coder 14B", provider: "ollama", hint: "Fast Dense / 9GB / 32k ctx", capabilities: { tools: true, contextWindow: 32e3 } },
+    { id: "ollama|qwen2.5-coder:32b|model", label: "Ollama: Qwen 2.5 Coder 32B", provider: "ollama", hint: "Dense Specialist / 17GB", capabilities: { tools: true, contextWindow: 32e3 } },
+    { id: "ollama|qwq:32b|model", label: "Ollama: QwQ 32B Reasoning", provider: "ollama", hint: "Deep Reasoning / 19GB", capabilities: { thinking: true, tools: true, contextWindow: 32e3 } },
+    { id: "ollama|deepseek-r1:14b|model", label: "Ollama: DeepSeek R1 14B", provider: "ollama", hint: "Fast Reasoning / 9GB", capabilities: { thinking: true, contextWindow: 8192 } },
+    { id: "ollama|devstral-small-2:24b|model", label: "Ollama: Devstral 24B", provider: "ollama", hint: "Mistral Coder / 15GB", capabilities: { tools: true, contextWindow: 32e3 } }
+  ];
+  var LMSTUDIO_DEFAULT_PRESETS = [
+    { id: "lmstudio|local-model|model", label: "LM Studio: local-model", provider: "lmstudio", hint: "Local (1234)", capabilities: { tools: true, contextWindow: 8192 } },
+    { id: "lmstudio|deepseek-r1-distill-qwen-14b|model", label: "LM Studio: DeepSeek R1 14B", provider: "lmstudio", hint: "Local", capabilities: { thinking: true, contextWindow: 8192 } },
+    { id: "lmstudio|qwen2.5-coder-7b-instruct|model", label: "LM Studio: Qwen 2.5 Coder 7B", provider: "lmstudio", hint: "Local", capabilities: { tools: true, contextWindow: 8192 } }
+  ];
+  function formatModelLabel(modelId, availableModels) {
+    if (!modelId) return "Gemini 3.7 Flash";
+    const match = availableModels?.find((m) => m.id === modelId || m.value === modelId);
+    if (match?.label) return match.label;
+    const parts = modelId.split("|");
+    const provider = parts[0];
+    const modelName = parts[1] || modelId;
+    if (provider === "antigravity") {
+      if (modelName.includes("3.7")) return "Gemini 3.7 Flash";
+      if (modelName.includes("pro")) return "Gemini 2.5 Pro";
+      if (modelName.includes("flash")) return "Gemini 2.5 Flash";
+      return modelName;
+    }
+    if (provider === "cursor") {
+      if (modelName === "auto" || modelName === "default") return "Cursor Auto";
+      if (modelName === "composer-2.5") return "Cursor Composer 2.5";
+      if (modelName === "composer-1") return "Cursor Composer 1";
+      return `Cursor: ${modelName}`;
+    }
+    if (provider === "anthropic") {
+      if (modelName.includes("3-7") || modelName.includes("3.7")) return "Claude 3.7 Sonnet";
+      if (modelName.includes("3-5-sonnet") || modelName.includes("3.5-sonnet")) return "Claude 3.5 Sonnet";
+      if (modelName.includes("haiku")) return "Claude 3.5 Haiku";
+      if (modelName.includes("opus")) return "Claude Opus";
+      return modelName;
+    }
+    if (provider === "openai") {
+      if (modelName.includes("4o-mini")) return "OpenAI: GPT-4o Mini";
+      if (modelName.includes("4o")) return "OpenAI: GPT-4o";
+      if (modelName.includes("o3-mini")) return "OpenAI: o3-mini";
+      if (modelName.includes("o1")) return "OpenAI: o1";
+      return `OpenAI: ${modelName}`;
+    }
+    if (["gemini", "puter", "ollama", "lmstudio"].includes(provider)) {
+      return `${provider.charAt(0).toUpperCase() + provider.slice(1)}: ${modelName}`;
+    }
+    return modelName;
+  }
+
+  // src/server/modelsCatalog.ts
+  var MONITOR_MODEL_GROUPS = [
+    { label: "Google Antigravity", category: "antigravity", options: ANTIGRAVITY_PRESET_MODELS },
+    { label: "Cursor (IDE Bridge)", category: "cursor", options: CURSOR_PRESET_MODELS },
+    { label: "Anthropic (Claude)", category: "anthropic", options: ANTHROPIC_PRESET_MODELS },
+    { label: "OpenAI", category: "openai", options: OPENAI_PRESET_MODELS },
+    { label: "Google Gemini (API)", category: "gemini", options: GEMINI_PRESET_MODELS },
+    { label: "Puter.js (Free)", category: "puter", options: PUTER_PRESET_MODELS },
+    { label: "Local (Ollama)", category: "ollama", options: OLLAMA_DEFAULT_PRESETS },
+    { label: "Local (LM Studio)", category: "lmstudio", options: LMSTUDIO_DEFAULT_PRESETS }
+  ];
+  var MONITOR_MODEL_PRESETS = MONITOR_MODEL_GROUPS.flatMap((g) => g.options);
+
+  // src/ui/panelDom.ts
+  function escapeHtml4(text) {
+    return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  // src/utils/visionModels.ts
+  var PREFERRED_VISION_MODEL_RE = /gpt-4o|gpt-4-turbo|gpt-4-vision|o1-|o3-|o4-|claude-3|claude-sonnet-4|claude-opus-4|gemini-.*-vision|gemini-1\.5|gemini-2|llava|bakllava|moondream|vision|bonsai|minicpm-v|qwen2[\s.-]?vl|qwen[\w.-]*-vl|pixtral|llama3\.2-vision|gemma3|gemma-3|qwen2\.5vl|mmproj/i;
+  function modelSupportsImages(options) {
+    if (!options) return false;
+    const provider = options.provider?.toLowerCase();
+    const model = options.model?.toLowerCase() ?? "";
+    if (provider === "puter" || provider === "cursor" || provider === "vscode" || provider === "gemini") {
+      return true;
+    }
+    if (provider === "ollama") {
+      return PREFERRED_VISION_MODEL_RE.test(model);
+    }
+    if (provider === "openai" || provider === "auto") return true;
+    return PREFERRED_VISION_MODEL_RE.test(model);
+  }
+  function openAiCompatibleModelLikelyThinks(model) {
+    const m = model.toLowerCase();
+    if (m.includes("qwen3-coder") || m.includes("qwen3.8") || m.includes("qwen3.5")) return false;
+    return m.includes("reasoner") || m.includes("deepseek-r1") || m.includes("o1") || m.includes("o3") || m.includes("gemma-4") || m.includes("qwen3.6") || m.includes("bonsai");
+  }
+
+  // src/ui/modelPills.ts
+  function formatContextWindow(tokens) {
+    if (!tokens || tokens <= 0) return void 0;
+    if (tokens >= 1e6) {
+      const m = Math.round(tokens / 1e6 * 10) / 10;
+      return `${m % 1 === 0 ? m.toFixed(0) : m}M`;
+    }
+    if (tokens % 1e3 === 0) {
+      return `${tokens / 1e3}k`;
+    }
+    if (tokens % 1024 === 0) {
+      return `${tokens / 1024}k`;
+    }
+    if (tokens >= 1e3) {
+      const k = Math.round(tokens / 1e3);
+      return `${k}k`;
+    }
+    return `${tokens}`;
+  }
+  function resolveModelPills(option) {
+    if (Array.isArray(option.pills) && option.pills.length > 0) {
+      return option.pills.map((label) => ({ label, kind: "custom" }));
+    }
+    const pills = [];
+    const modelId = (option.value || option.id || "").toLowerCase();
+    const hintLower = (option.hint || "").toLowerCase();
+    const isAgent = modelId.endsWith("|sdk") || hintLower.includes("sdk");
+    if (isAgent) {
+      pills.push({ label: "Agent", kind: "agent", title: "Autonomous SDK Agent" });
+    }
+    const isThinking = option.capabilities?.thinking ?? (openAiCompatibleModelLikelyThinks(modelId) || modelId.includes("3.7") || modelId.includes("3-7") || modelId.includes("r1") || modelId.includes("qwq") || hintLower.includes("thinking") || hintLower.includes("reasoning"));
+    if (isThinking) {
+      pills.push({ label: "Reasoning", kind: "reasoning", title: "Thinking & Deep Reasoning" });
+    }
+    const isVision = option.capabilities?.vision ?? modelSupportsImages({ provider: option.provider, model: modelId });
+    if (isVision) {
+      pills.push({ label: "Vision", kind: "vision", title: "Multimodal Vision Support" });
+    }
+    const isTools = option.capabilities?.tools ?? (option.provider !== "puter" && option.provider !== "vscode" && !modelId.includes("r1"));
+    if (isTools) {
+      pills.push({ label: "Tools", kind: "tools", title: "Native Tool Calling" });
+    }
+    const ctxLabel = formatContextWindow(option.capabilities?.contextWindow);
+    if (ctxLabel) {
+      pills.push({ label: ctxLabel, kind: "context", title: `${ctxLabel} context window` });
+    }
+    return pills;
+  }
+  function renderModelPillsHtml(pills) {
+    if (!pills || pills.length === 0) return "";
+    const badges = pills.map((p) => {
+      const titleAttr = p.title ? ` title="${escapeHtml4(p.title)}"` : "";
+      return `<span class="model-pill model-pill-${escapeHtml4(p.kind)}"${titleAttr}>${escapeHtml4(p.label)}</span>`;
+    }).join("");
+    return `<div class="model-item-pills">${badges}</div>`;
+  }
+
+  // src/ui/components/modelPickerDropdown.ts
+  function isModelSelected(modelId, currentModel) {
+    if (!modelId || !currentModel) return false;
+    return modelId.toLowerCase() === currentModel.toLowerCase();
+  }
+  function renderGroupItems(group, selectedModel, filter) {
+    const options = group.options || [];
+    const matchingItems = options.filter((item) => {
+      const lbl = (item.label || "").toLowerCase();
+      const val = (item.id || item.value || "").toLowerCase();
+      const hint = (item.hint || item.provider || "").toLowerCase();
+      const pills = resolveModelPills(item);
+      const pillsText = pills.map((p) => p.label).join(" ").toLowerCase();
+      return !filter || lbl.includes(filter) || val.includes(filter) || hint.includes(filter) || pillsText.includes(filter);
+    });
+    if (matchingItems.length === 0) return { groupHeaderHtml: "", itemsHtml: "" };
+    const groupHeaderHtml = `<div class="model-menu-group">${escapeHtml2(group.label)}</div>`;
+    const itemsHtml = matchingItems.map((item) => {
+      const modelId = item.id || item.value || "";
+      const modelLabel = item.label || modelId;
+      const badge = item.hint || item.provider;
+      const isSelected = isModelSelected(modelId, selectedModel);
+      const pills = resolveModelPills(item);
+      const pillsHtml = renderModelPillsHtml(pills);
+      return `
+        <button
+          type="button"
+          class="model-picker-item ${isSelected ? "selected" : ""}"
+          data-model-id="${escapeHtml2(modelId)}"
+          title="${escapeHtml2(modelLabel)}"
+          aria-selected="${isSelected ? "true" : "false"}"
+        >
+          <div class="model-item-left">
+            <span class="model-item-check">${isSelected ? "\u2713" : ""}</span>
+            <span class="model-item-name">${escapeHtml2(modelLabel)}</span>
+            ${pillsHtml}
+          </div>
+          ${badge ? `<span class="model-item-badge">${escapeHtml2(badge)}</span>` : ""}
+        </button>
+      `;
+    }).join("");
+    return { groupHeaderHtml, itemsHtml };
+  }
+  function renderModelMenuItemsHtml(state2) {
+    const filter = (state2.modelSearchQuery || "").toLowerCase().trim();
+    const groups = state2.modelGroups?.length ? state2.modelGroups : MONITOR_MODEL_GROUPS;
+    let totalItemsRendered = 0;
+    const groupsHtml = groups.map((g) => {
+      const { groupHeaderHtml, itemsHtml } = renderGroupItems(g, state2.selectedModel, filter);
+      if (itemsHtml) {
+        totalItemsRendered++;
+        return `${groupHeaderHtml}${itemsHtml}`;
+      }
+      return "";
+    }).join("");
+    const emptyHtml = totalItemsRendered === 0 ? `<div class="model-menu-empty" style="padding: 12px 16px; font-size: 12px; color: var(--cursor-muted, #888); text-align: center;">${filter ? "No matching models found" : "No models available"}</div>` : "";
+    return `${groupsHtml}${emptyHtml}`;
+  }
+  function renderModelPickerDropdown(state2) {
+    return `
+    <div class="model-picker-menu model-picker-dropdown" id="model-picker-menu">
+      <div class="model-menu-search-row">
+        <input
+          type="text"
+          id="model-search-input"
+          class="model-menu-search-input"
+          placeholder="Search models..."
+          value="${escapeHtml2(state2.modelSearchQuery || "")}"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+      <div class="model-menu-list model-picker-list" id="model-menu-list">
+        ${renderModelMenuItemsHtml(state2)}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/composerButton.ts
+  function isComposerStopMode(state2, currentText) {
+    const isRunning = Boolean(
+      state2.activeSession?.isGenerating || state2.isSending || state2.isAwaitingResponse
+    );
+    const text = currentText !== void 0 ? currentText : state2.composerDraft || "";
+    const hasContent = Boolean(text.trim().length > 0 || state2.attachments && state2.attachments.length > 0);
+    return isRunning && !hasContent;
+  }
+  function updateComposerButton(state2, root) {
+    const doc = root || (typeof document !== "undefined" ? document : void 0);
+    if (!doc) return;
+    const btn = doc.querySelector(".composer-actions .send-btn, #btn-send, #btn-stop");
+    if (!btn) return;
+    const composer = typeof doc.getElementById === "function" ? doc.getElementById("composer-input") : doc.querySelector("#composer-input");
+    const currentText = composer ? composer.value : state2.composerDraft;
+    const stopMode = isComposerStopMode(state2, currentText);
+    btn.id = stopMode ? "btn-stop" : "btn-send";
+    btn.className = stopMode ? "send-btn btn-stop stop-mode" : "send-btn btn-send";
+    btn.title = stopMode ? "Stop (Immediate stop)" : "Send (Enter)";
+    btn.setAttribute("aria-label", stopMode ? "Stop agent" : "Send message");
+    const sendIcon = btn.querySelector(".send-icon");
+    const stopIcon = btn.querySelector(".stop-icon");
+    if (sendIcon?.classList) sendIcon.classList.toggle("hidden", stopMode);
+    if (stopIcon?.classList) stopIcon.classList.toggle("hidden", !stopMode);
+  }
+
+  // src/ui/components/composerView.ts
+  function renderComposerView(state2) {
+    if (state2.activeTab === "plans") return "";
+    const modeLabel = state2.composerMode === "agent" ? "Agent" : state2.composerMode === "plan" ? "Plan" : "Ask";
+    const modelLabel = formatModelLabel(state2.selectedModel, state2.availableModels);
+    const stopMode = isComposerStopMode(state2);
+    const attachments = state2.attachments || [];
+    return `
+    <footer class="app-composer composer">
+      <input type="file" id="attach-file-input" style="display:none" multiple>
+      <div class="composer-card composer-inner">
+        <div id="mention-dropdown-container">
+          ${state2.isMentionOpen ? renderMentionDropdown(state2.mentionSuggestions || [], state2.activeMentionIndex || 0) : ""}
+        </div>
+        ${attachments.length > 0 ? `<div class="composer-attachments attachment-list" id="composer-attachments">${attachments.map((a) => renderAttachmentPill(a, true)).join("")}</div>` : ""}
+        <textarea
+          id="composer-input"
+          class="composer-textarea composer-input"
+          placeholder="Message or instruction... (@ for context)"
+          rows="1"
+        >${escapeHtml2(state2.composerDraft || "")}</textarea>
+        <div class="composer-toolbar">
+          <div class="composer-toolbar-left mode-selectors">
+            <button type="button" class="icon-btn composer-icon-btn" id="btn-mention-trigger" title="Attach files or context (@)" aria-label="Attach files or context">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M4.5 3a2.5 2.5 0 0 1 5 0v6.5a1.5 1.5 0 0 1-3 0V4a.5.5 0 0 1 1 0v5.5a.5.5 0 0 0 1 0V3a1.5 1.5 0 0 0-3 0v6.5a2.5 2.5 0 0 0 5 0V3a.5.5 0 0 1 1 0v6.5a3.5 3.5 0 0 1-7 0V3z"/>
+              </svg>
+            </button>
+            <button type="button" class="composer-pill mode-picker-btn mode-pill mode-pill--${state2.composerMode}" id="btn-mode-toggle" title="Switch Mode">
+              <span class="mode-dot"></span>
+              <span class="mode-text" id="composer-mode-text">${modeLabel}</span>
+              <svg class="mode-picker-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+                <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="model-picker-wrapper mode-select">
+              <button type="button" class="composer-pill model-picker-btn" id="btn-model-toggle" title="Select Model" aria-expanded="${state2.isModelPickerOpen ? "true" : "false"}">
+                <span class="model-text" id="composer-model-text">${escapeHtml2(modelLabel)}</span>
+                <svg class="mode-picker-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+                  <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              ${state2.isModelPickerOpen ? renderModelPickerDropdown(state2) : ""}
+            </div>
+          </div>
+          <div class="composer-toolbar-right composer-actions">
+            <button
+              type="button"
+              class="send-btn ${stopMode ? "btn-stop stop-mode" : "btn-send"}"
+              id="${stopMode ? "btn-stop" : "btn-send"}"
+              title="${stopMode ? "Stop (Immediate stop)" : "Send (Enter)"}"
+              aria-label="${stopMode ? "Stop agent" : "Send message"}"
+            >
+              <svg class="submit-icon send-icon ${stopMode ? "hidden" : ""}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 12V4M8 4L5 7M8 4l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <svg class="submit-icon stop-icon ${stopMode ? "" : "hidden"}" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <rect x="4.5" y="4.5" width="7" height="7" rx="1.5"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </footer>
+  `;
+  }
+
+  // src/ui/composerDomUpdater.ts
+  function updateComposerDOM(state2, composerEl) {
+    const modeLabel = state2.composerMode === "agent" ? "Agent" : state2.composerMode === "plan" ? "Plan" : "Ask";
+    const modelLabel = formatModelLabel(state2.selectedModel, state2.availableModels);
+    const mentionContainer = composerEl.querySelector("#mention-dropdown-container");
+    if (mentionContainer) {
+      const nextMentionHtml = state2.isMentionOpen ? renderMentionDropdown(state2.mentionSuggestions || [], state2.activeMentionIndex || 0) : "";
+      if (mentionContainer.innerHTML !== nextMentionHtml) {
+        mentionContainer.innerHTML = nextMentionHtml;
+      }
+    }
+    const attachments = state2.attachments || [];
+    const attContainer = composerEl.querySelector("#composer-attachments");
+    if (attachments.length > 0) {
+      const nextAttHtml = attachments.map((a) => renderAttachmentPill(a, true)).join("");
+      if (!attContainer) {
+        const input = composerEl.querySelector("#composer-input");
+        if (input && typeof input.insertAdjacentHTML === "function") {
+          input.insertAdjacentHTML(
+            "beforebegin",
+            `<div class="composer-attachments attachment-list" id="composer-attachments">${nextAttHtml}</div>`
+          );
+        }
+      } else if (attContainer.innerHTML !== nextAttHtml) {
+        attContainer.innerHTML = nextAttHtml;
+      }
+    } else if (attContainer && typeof attContainer.remove === "function") {
+      attContainer.remove();
+    }
+    const modeBtn = composerEl.querySelector("#btn-mode-toggle");
+    if (modeBtn) {
+      modeBtn.className = `composer-pill mode-picker-btn mode-pill mode-pill--${state2.composerMode}`;
+      const modeText = modeBtn.querySelector("#composer-mode-text");
+      if (modeText && modeText.textContent !== modeLabel) {
+        modeText.textContent = modeLabel;
+      }
+    }
+    const modelWrapper = composerEl.querySelector(".model-picker-wrapper");
+    if (modelWrapper) {
+      const modelText = modelWrapper.querySelector("#composer-model-text");
+      if (modelText && modelText.textContent !== modelLabel) {
+        modelText.textContent = modelLabel;
+      }
+      const modelBtn = modelWrapper.querySelector("#btn-model-toggle");
+      if (modelBtn && typeof modelBtn.setAttribute === "function") {
+        modelBtn.setAttribute("aria-expanded", state2.isModelPickerOpen ? "true" : "false");
+      }
+      const existingDropdown = modelWrapper.querySelector(".model-picker-dropdown");
+      if (state2.isModelPickerOpen) {
+        const dropdownHtml = renderModelPickerDropdown(state2);
+        if (existingDropdown) {
+          existingDropdown.outerHTML = dropdownHtml;
+        } else if (typeof modelWrapper.insertAdjacentHTML === "function") {
+          modelWrapper.insertAdjacentHTML("beforeend", dropdownHtml);
+        }
+      } else if (existingDropdown && typeof existingDropdown.remove === "function") {
+        existingDropdown.remove();
+      }
+    }
+    const composerInput = composerEl.querySelector("#composer-input");
+    if (composerInput && typeof document !== "undefined" && document.activeElement !== composerInput) {
+      const expected = state2.composerDraft || "";
+      if (composerInput.value !== expected) {
+        composerInput.value = expected;
+      }
+    }
+    updateComposerButton(state2, composerEl);
+  }
+
+  // src/ui/layoutDomUpdater.ts
+  function updateLayoutDOM(app, state2, mainHtml, settingsModalHtml) {
+    const existingLayout = app.querySelector(".app-layout");
+    let mainUpdated = false;
+    if (!existingLayout) {
+      app.innerHTML = `
+      <div class="app-layout">
+        <div id="nav-container">${renderNavHeader(state2)}</div>
+        <main class="app-main">${mainHtml}</main>
+        ${renderComposerView(state2)}
+        <div id="modal-container">${settingsModalHtml}</div>
+      </div>
+    `;
+      const navEl = app.querySelector("#nav-container");
+      if (navEl) navEl.dataset.renderedHtml = renderNavHeader(state2);
+      const mainEl2 = app.querySelector(".app-main");
+      if (mainEl2) mainEl2.dataset.renderedHtml = mainHtml;
+      const modalEl = app.querySelector("#modal-container");
+      if (modalEl) modalEl.dataset.renderedHtml = settingsModalHtml;
+      return true;
+    }
+    const navContainer = existingLayout.querySelector("#nav-container");
+    const newNavHtml = renderNavHeader(state2);
+    if (navContainer) {
+      if (navContainer.dataset.renderedHtml !== newNavHtml) {
+        navContainer.innerHTML = newNavHtml;
+        navContainer.dataset.renderedHtml = newNavHtml;
+      }
+    } else {
+      const navEl = existingLayout.querySelector(".app-header, .app-nav-header");
+      if (navEl && navEl.dataset.renderedHtml !== newNavHtml) {
+        navEl.outerHTML = newNavHtml;
+        const newNav = existingLayout.querySelector(".app-header, .app-nav-header");
+        if (newNav) newNav.dataset.renderedHtml = newNavHtml;
+      }
+    }
+    const mainEl = existingLayout.querySelector(".app-main");
+    if (mainEl && mainEl.dataset.renderedHtml !== mainHtml) {
+      mainEl.innerHTML = mainHtml;
+      mainEl.dataset.renderedHtml = mainHtml;
+      mainUpdated = true;
+    }
+    const composerEl = existingLayout.querySelector(".app-composer");
+    const newComposerHtml = renderComposerView(state2);
+    if (composerEl && newComposerHtml) {
+      updateComposerDOM(state2, composerEl);
+    } else if (composerEl && !newComposerHtml) {
+      composerEl.remove();
+    } else if (!composerEl && newComposerHtml) {
+      existingLayout.insertAdjacentHTML("beforeend", newComposerHtml);
+    }
+    const modalContainer = existingLayout.querySelector("#modal-container");
+    if (modalContainer) {
+      if (modalContainer.dataset.renderedHtml !== settingsModalHtml) {
+        modalContainer.innerHTML = settingsModalHtml;
+        modalContainer.dataset.renderedHtml = settingsModalHtml;
+      }
+    } else {
+      const modalEl = existingLayout.querySelector("#settings-modal, #qr-modal");
+      if (settingsModalHtml) {
+        if (modalEl) {
+          if (modalEl.dataset.renderedHtml !== settingsModalHtml) {
+            modalEl.outerHTML = settingsModalHtml;
+            const newModal = existingLayout.querySelector("#settings-modal, #qr-modal");
+            if (newModal) newModal.dataset.renderedHtml = settingsModalHtml;
+          }
+        } else {
+          existingLayout.insertAdjacentHTML("beforeend", settingsModalHtml);
+          const newModal = existingLayout.querySelector("#settings-modal, #qr-modal");
+          if (newModal) newModal.dataset.renderedHtml = settingsModalHtml;
+        }
+      } else if (modalEl) {
+        modalEl.remove();
+      }
+    }
+    return mainUpdated;
   }
 
   // src/ui/modelPickerEvents.ts
@@ -12066,75 +12270,6 @@ ${thought.trim()}` : thought.trim();
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // src/ui/composerDomUpdater.ts
-  function updateComposerDOM(state2, composerEl) {
-    const modeLabel = state2.composerMode === "agent" ? "Agent" : state2.composerMode === "plan" ? "Plan" : "Ask";
-    const modelLabel = formatModelLabel(state2.selectedModel, state2.availableModels);
-    const mentionContainer = composerEl.querySelector("#mention-dropdown-container");
-    if (mentionContainer) {
-      const nextMentionHtml = state2.isMentionOpen ? renderMentionDropdown(state2.mentionSuggestions || [], state2.activeMentionIndex || 0) : "";
-      if (mentionContainer.innerHTML !== nextMentionHtml) {
-        mentionContainer.innerHTML = nextMentionHtml;
-      }
-    }
-    const attachments = state2.attachments || [];
-    const attContainer = composerEl.querySelector("#composer-attachments");
-    if (attachments.length > 0) {
-      const nextAttHtml = attachments.map((a) => renderAttachmentPill(a, true)).join("");
-      if (!attContainer) {
-        const input = composerEl.querySelector("#composer-input");
-        if (input && typeof input.insertAdjacentHTML === "function") {
-          input.insertAdjacentHTML(
-            "beforebegin",
-            `<div class="composer-attachments attachment-list" id="composer-attachments">${nextAttHtml}</div>`
-          );
-        }
-      } else if (attContainer.innerHTML !== nextAttHtml) {
-        attContainer.innerHTML = nextAttHtml;
-      }
-    } else if (attContainer && typeof attContainer.remove === "function") {
-      attContainer.remove();
-    }
-    const modeBtn = composerEl.querySelector("#btn-mode-toggle");
-    if (modeBtn) {
-      modeBtn.className = `composer-pill mode-picker-btn mode-pill mode-pill--${state2.composerMode}`;
-      const modeText = modeBtn.querySelector("#composer-mode-text");
-      if (modeText && modeText.textContent !== modeLabel) {
-        modeText.textContent = modeLabel;
-      }
-    }
-    const modelWrapper = composerEl.querySelector(".model-picker-wrapper");
-    if (modelWrapper) {
-      const modelText = modelWrapper.querySelector("#composer-model-text");
-      if (modelText && modelText.textContent !== modelLabel) {
-        modelText.textContent = modelLabel;
-      }
-      const modelBtn = modelWrapper.querySelector("#btn-model-toggle");
-      if (modelBtn && typeof modelBtn.setAttribute === "function") {
-        modelBtn.setAttribute("aria-expanded", state2.isModelPickerOpen ? "true" : "false");
-      }
-      const existingDropdown = modelWrapper.querySelector(".model-picker-dropdown");
-      if (state2.isModelPickerOpen) {
-        const dropdownHtml = renderModelPickerDropdown(state2);
-        if (existingDropdown) {
-          existingDropdown.outerHTML = dropdownHtml;
-        } else if (typeof modelWrapper.insertAdjacentHTML === "function") {
-          modelWrapper.insertAdjacentHTML("beforeend", dropdownHtml);
-        }
-      } else if (existingDropdown && typeof existingDropdown.remove === "function") {
-        existingDropdown.remove();
-      }
-    }
-    const composerInput = composerEl.querySelector("#composer-input");
-    if (composerInput && typeof document !== "undefined" && document.activeElement !== composerInput) {
-      const expected = state2.composerDraft || "";
-      if (composerInput.value !== expected) {
-        composerInput.value = expected;
-      }
-    }
-    updateComposerButton(state2, composerEl);
-  }
-
   // src/ui/entry.ts
   initViewportManager();
   var state = {
@@ -12187,50 +12322,7 @@ ${thought.trim()}` : thought.trim();
     else if (state.activeTab === "chat") mainHtml = renderChatView(state);
     else if (state.activeTab === "plans") mainHtml = renderPlanView(state);
     const settingsModalHtml = renderSettingsModal(state);
-    const existingLayout = app.querySelector(".app-layout");
-    let mainUpdated = false;
-    if (!existingLayout) {
-      app.innerHTML = `
-      <div class="app-layout">
-        ${renderNavHeader(state)}
-        <main class="app-main">${mainHtml}</main>
-        ${renderComposerView(state)}
-        ${settingsModalHtml}
-      </div>
-    `;
-      mainUpdated = true;
-    } else {
-      const navEl = existingLayout.querySelector(".app-header, .app-nav-header");
-      const newNavHtml = renderNavHeader(state);
-      if (navEl && navEl.outerHTML !== newNavHtml) {
-        navEl.outerHTML = newNavHtml;
-      }
-      const mainEl = existingLayout.querySelector(".app-main");
-      if (mainEl && mainEl.dataset.renderedHtml !== mainHtml) {
-        mainEl.innerHTML = mainHtml;
-        mainEl.dataset.renderedHtml = mainHtml;
-        mainUpdated = true;
-      }
-      const composerEl = existingLayout.querySelector(".app-composer");
-      const newComposerHtml = renderComposerView(state);
-      if (composerEl && newComposerHtml) {
-        updateComposerDOM(state, composerEl);
-      } else if (composerEl && !newComposerHtml) {
-        composerEl.remove();
-      } else if (!composerEl && newComposerHtml) {
-        existingLayout.insertAdjacentHTML("beforeend", newComposerHtml);
-      }
-      const modalEl = existingLayout.querySelector("#settings-modal, #qr-modal");
-      if (settingsModalHtml) {
-        if (modalEl) {
-          modalEl.outerHTML = settingsModalHtml;
-        } else {
-          existingLayout.insertAdjacentHTML("beforeend", settingsModalHtml);
-        }
-      } else if (modalEl) {
-        modalEl.remove();
-      }
-    }
+    const mainUpdated = updateLayoutDOM(app, state, mainHtml, settingsModalHtml);
     bindAppEvents(state, {
       onSelectSession: (id) => controller.selectSession(id),
       onNewSession: () => controller.handleNewSession(),

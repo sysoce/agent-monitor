@@ -12,18 +12,23 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       if (sid) state.activeSessionId = sid;
     }
     if (!state.sessions || state.sessions.length === 0) state.isLoadingSessions = true;
-    const [sessions, catalog] = await Promise.all([fetchSessions().catch(() => []), fetchModels().catch(() => ({ models: [], groups: [] }))]);
-    if (state.lastAbortedAt) {
-      for (const s of sessions) {
-        if (s.id === state.lastAbortedSessionId || s.id === state.activeSessionId) s.isGenerating = false;
+    const [sessions, catalog] = await Promise.all([
+      fetchSessions().catch(() => null),
+      fetchModels().catch(() => ({ models: [], groups: [] })),
+    ]);
+    if (sessions !== null) {
+      if (state.lastAbortedAt) {
+        for (const s of sessions) {
+          if (s.id === state.lastAbortedSessionId || s.id === state.activeSessionId) s.isGenerating = false;
+        }
       }
+      state.sessions = sessions;
     }
-    state.sessions = sessions;
     state.isLoadingSessions = false;
     if (catalog.models?.length) state.availableModels = catalog.models;
     if (catalog.groups?.length) state.modelGroups = catalog.groups;
-    if (isInitial && !state.activeSessionId && sessions.length > 0) {
-      state.activeSessionId = (sessions.find((s) => s.messageCount > 0) || sessions[0])?.id;
+    if (isInitial && !state.activeSessionId && state.sessions.length > 0) {
+      state.activeSessionId = (state.sessions.find((s) => s.messageCount > 0) || state.sessions[0])?.id;
       if (!getSavedTab()) Object.assign(state, { activeTab: 'chat', activePlan: undefined, activePlanName: undefined });
     }
     if (state.activeSessionId) {

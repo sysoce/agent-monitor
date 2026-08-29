@@ -6,7 +6,7 @@ import { initSseClient } from './sseClient';
 import { SyncStateMachine } from './syncStateMachine';
 import { syncSessionPlans, selectPlanDetail, applyGistSyncPayload, loadCachedGistConfig } from './sessionPlanSync';
 import { stopCurrentSession, buildPlanHandoffPrompt, submitMessageFlow } from './messageSender';
-import { toggleSyncModeAction } from './appSyncMode';
+import { createAppSyncMachine, applyPersistedSyncMode, toggleSyncModeAction } from './appSyncMode';
 import { mergeSessionDetail } from './sessionMerge';
 import { saveActiveTab, saveActiveSessionId } from './tabStore';
 import { checkAndApplyUrlConfig } from './urlConfigLoader';
@@ -18,12 +18,7 @@ export class AppController {
   private syncMachine: SyncStateMachine;
 
   constructor(private state: AppState, private render: () => void) {
-    this.syncMachine = new SyncStateMachine({
-      onModeChange: (m) => { this.state.syncMode = m; this.render(); },
-      onStatusChange: (s) => { this.state.syncStatus = s; this.render(); },
-      onDataUpdate: (p) => { if (applyGistSyncPayload(this.state, p)) this.syncMachine.setAwaitingResponse(false); this.render(); },
-      onError: (err) => { this.state.errorMessage = err || undefined; this.render(); },
-    });
+    this.syncMachine = createAppSyncMachine(this.state, this.render);
   }
 
   async selectSession(id: string): Promise<void> {
@@ -62,7 +57,7 @@ export class AppController {
     Object.assign(this.state, { isAuthenticated: false, activeSession: undefined, activeSessionId: undefined, isLoadingSession: false, isLoadingSessions: false, plans: [], activePlanName: undefined, activePlan: undefined, attachments: [] });
     this.sseCleanup?.(); this.syncMachine.stop(); this.render();
   }
-  handleLoginSuccess(): void { void this.reloadData(true); this.applyPersistedSyncMode(); }
+  handleLoginSuccess(): void { void this.reloadData(true); applyPersistedSyncMode(this.syncMachine, () => this.startSse()); }
   handleSelectModel(modelId: string): void { this.state.selectedModel = modelId; this.render(); }
   toggleSyncMode(): void { toggleSyncModeAction(this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || undefined); this.render(); }
   handleStopSession(): void {
@@ -103,20 +98,19 @@ export class AppController {
     this.sseCleanup?.();
     this.sseCleanup = initSseClient({
       onStatusChange: (s) => {
+        const changed = this.state.syncStatus !== s;
         this.state.syncStatus = s;
-        if (s === 'disconnected') this.syncMachine.handlePrimarySseFailure();
-        else if (s === 'connected') this.syncMachine.restorePrimaryLive();
-        this.render();
+        if (s === 'disconnected') {
+          this.sseCleanup?.();
+          this.sseCleanup = null;
+          this.syncMachine.handlePrimarySseFailure();
+        } else if (s === 'connected') {
+          this.syncMachine.restorePrimaryLive();
+        }
+        if (changed) this.render();
       },
       onChange: () => { void this.reloadData(false); },
     });
-  }
-
-  private applyPersistedSyncMode(): void {
-    const cfg = loadCachedGistConfig();
-    if (cfg) this.syncMachine.setGistConfig(cfg);
-    const mode = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) || 'live-sse';
-    if (mode === 'git-backup' && cfg) this.syncMachine.forceGitBackupMode(); else this.startSse();
   }
 
   async init(): Promise<void> {
@@ -124,7 +118,7 @@ export class AppController {
     this.state.isAuthenticated = urlConfig.imported || !auth.required || auth.authorized;
     this.render();
     if (this.state.isAuthenticated) {
-      this.applyPersistedSyncMode();
+      applyPersistedSyncMode(this.syncMachine, () => this.startSse());
       await this.reloadData(true);
       void checkForUpdates(this.state, this.render);
     }
