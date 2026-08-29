@@ -1,11 +1,13 @@
 import type { GistSyncConfig, SyncGistPayload, SyncInboxMessage, SyncOutboxState } from './types';
 import { encryptSyncData, decryptSyncData } from './syncCrypto';
+import { compressPayload, decompressPayload } from './payloadCompressor';
 import type { SessionSummary } from '../server/types';
 
 export class GistClient {
   private readonly baseUrl: string;
   private rateLimitReset = 0;
   private isRateLimited = false;
+  private consecutiveFailures = 0;
   private cachedPayload: SyncGistPayload | null = null;
 
   constructor(private readonly config: GistSyncConfig, baseUrl = 'https://api.github.com') {
@@ -27,21 +29,25 @@ export class GistClient {
       const seconds = parseInt(retryAfter, 10) || 60;
       this.rateLimitReset = Date.now() + seconds * 1000;
       this.isRateLimited = true;
+      this.consecutiveFailures++;
       return;
     }
 
-    if (res.status === 403 || res.status === 429) {
+    if (res.status === 403 || res.status === 429 || res.status === 409) {
+      this.consecutiveFailures++;
+      const backoffSeconds = Math.min(120, 30 * Math.pow(2, Math.min(this.consecutiveFailures - 1, 3)));
       if (remaining && parseInt(remaining, 10) === 0 && reset) {
         this.rateLimitReset = parseInt(reset, 10) * 1000;
       } else {
-        this.rateLimitReset = Date.now() + 30_000;
+        this.rateLimitReset = Date.now() + backoffSeconds * 1000;
       }
       this.isRateLimited = true;
     } else if (remaining && parseInt(remaining, 10) === 0 && reset) {
       this.rateLimitReset = parseInt(reset, 10) * 1000;
       this.isRateLimited = true;
-    } else if (remaining && parseInt(remaining, 10) > 0) {
+    } else if (res.ok && remaining && parseInt(remaining, 10) > 0) {
       this.isRateLimited = false;
+      this.consecutiveFailures = 0;
     }
   }
 
@@ -88,7 +94,9 @@ export class GistClient {
     if (!raw) return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now() }, etag: newEtag, notModified: false };
 
     try {
-      const p = JSON.parse(decryptSyncData(raw, this.config.password)) as SyncGistPayload;
+      const decrypted = decryptSyncData(raw, this.config.password);
+      const decompressed = decompressPayload(decrypted);
+      const p = JSON.parse(decompressed) as SyncGistPayload;
       const data: SyncGistPayload = {
         inbox: Array.isArray(p?.inbox) ? p.inbox : [], sessions: Array.isArray(p?.sessions) ? p.sessions : [],
         version: typeof p?.version === 'number' ? p.version : 1, updatedAt: typeof p?.updatedAt === 'number' ? p.updatedAt : Date.now(),
@@ -130,7 +138,9 @@ export class GistClient {
 
   private async saveSyncPayload(payload: SyncGistPayload): Promise<void> {
     if (this.isBlockedByRateLimit()) return;
-    const content = encryptSyncData(JSON.stringify(payload), this.config.password);
+    const jsonStr = JSON.stringify(payload);
+    const compressed = compressPayload(jsonStr);
+    const content = encryptSyncData(compressed, this.config.password);
     const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
       method: 'PATCH',
       headers: this.headers(),

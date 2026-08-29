@@ -6756,6 +6756,47 @@ input:checked + .slider:before {
     return plaintext;
   }
 
+  // src/sync/payloadCompressor.ts
+  var COMPRESSED_PREFIX = "cz:";
+  function getNodeZlib() {
+    try {
+      if (typeof process !== "undefined" && process.versions?.node) {
+        const dynamicRequire = typeof module !== "undefined" && module.require || globalThis.require || new Function("name", "try { return require(name); } catch { return null; }");
+        return dynamicRequire("zlib");
+      }
+    } catch {
+    }
+    return null;
+  }
+  function isCompressedPayload(payload) {
+    return typeof payload === "string" && payload.startsWith(COMPRESSED_PREFIX);
+  }
+  function compressPayload(plaintext) {
+    if (!plaintext) return plaintext;
+    try {
+      const zlib = getNodeZlib();
+      if (zlib && typeof zlib.deflateSync === "function") {
+        const buffer = zlib.deflateSync(Buffer.from(plaintext, "utf8"), { level: 6 });
+        return `${COMPRESSED_PREFIX}${buffer.toString("base64")}`;
+      }
+    } catch {
+    }
+    return plaintext;
+  }
+  function decompressPayload(raw) {
+    if (!isCompressedPayload(raw)) return raw;
+    try {
+      const zlib = getNodeZlib();
+      const base64Data = raw.slice(COMPRESSED_PREFIX.length);
+      if (zlib && typeof zlib.inflateSync === "function") {
+        const buffer = zlib.inflateSync(Buffer.from(base64Data, "base64"));
+        return buffer.toString("utf8");
+      }
+    } catch {
+    }
+    return raw;
+  }
+
   // src/sync/gistClient.ts
   var GistClient = class {
     constructor(config, baseUrl = "https://api.github.com") {
@@ -6763,6 +6804,7 @@ input:checked + .slider:before {
       __publicField(this, "baseUrl");
       __publicField(this, "rateLimitReset", 0);
       __publicField(this, "isRateLimited", false);
+      __publicField(this, "consecutiveFailures", 0);
       __publicField(this, "cachedPayload", null);
       this.baseUrl = baseUrl.replace(/\/+$/, "");
     }
@@ -6779,20 +6821,24 @@ input:checked + .slider:before {
         const seconds = parseInt(retryAfter, 10) || 60;
         this.rateLimitReset = Date.now() + seconds * 1e3;
         this.isRateLimited = true;
+        this.consecutiveFailures++;
         return;
       }
-      if (res.status === 403 || res.status === 429) {
+      if (res.status === 403 || res.status === 429 || res.status === 409) {
+        this.consecutiveFailures++;
+        const backoffSeconds = Math.min(120, 30 * Math.pow(2, Math.min(this.consecutiveFailures - 1, 3)));
         if (remaining && parseInt(remaining, 10) === 0 && reset) {
           this.rateLimitReset = parseInt(reset, 10) * 1e3;
         } else {
-          this.rateLimitReset = Date.now() + 3e4;
+          this.rateLimitReset = Date.now() + backoffSeconds * 1e3;
         }
         this.isRateLimited = true;
       } else if (remaining && parseInt(remaining, 10) === 0 && reset) {
         this.rateLimitReset = parseInt(reset, 10) * 1e3;
         this.isRateLimited = true;
-      } else if (remaining && parseInt(remaining, 10) > 0) {
+      } else if (res.ok && remaining && parseInt(remaining, 10) > 0) {
         this.isRateLimited = false;
+        this.consecutiveFailures = 0;
       }
     }
     headers(etag) {
@@ -6835,7 +6881,9 @@ input:checked + .slider:before {
       }
       if (!raw) return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now() }, etag: newEtag, notModified: false };
       try {
-        const p = JSON.parse(decryptSyncData(raw, this.config.password));
+        const decrypted = decryptSyncData(raw, this.config.password);
+        const decompressed = decompressPayload(decrypted);
+        const p = JSON.parse(decompressed);
         const data = {
           inbox: Array.isArray(p?.inbox) ? p.inbox : [],
           sessions: Array.isArray(p?.sessions) ? p.sessions : [],
@@ -6870,7 +6918,9 @@ input:checked + .slider:before {
     }
     async saveSyncPayload(payload) {
       if (this.isBlockedByRateLimit()) return;
-      const content = encryptSyncData(JSON.stringify(payload), this.config.password);
+      const jsonStr = JSON.stringify(payload);
+      const compressed = compressPayload(jsonStr);
+      const content = encryptSyncData(compressed, this.config.password);
       const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
         method: "PATCH",
         headers: this.headers(),
@@ -7119,7 +7169,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.3" : "1.0.3";
+  var CLIENT_VERSION = true ? "1.0.5" : "1.0.3";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
