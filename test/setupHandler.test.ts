@@ -1,5 +1,8 @@
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { handleSetupRoute } from '../src/server/setupHandler';
 
 test('handleSetupRoute serves /setup HTML page with QR code and instructions', async () => {
@@ -97,4 +100,47 @@ test('handleSetupRoute serves /download with Content-Disposition attachment', as
   assert.equal(headers['Content-Type'], 'text/html; charset=utf-8');
   assert.equal(headers['Content-Disposition'], 'attachment; filename="agent-monitor.html"');
   assert.ok(body.includes('<!DOCTYPE html>'));
+});
+
+test('handleSetupRoute serves /api/version with agent-monitor package version, ignoring workspaceRoot version', async () => {
+  const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mock-workspace-'));
+  await fs.promises.writeFile(
+    path.join(tmpDir, 'package.json'),
+    JSON.stringify({ name: 'other-app', version: '9.9.9' })
+  );
+
+  try {
+    let statusCode = 0;
+    let headers: Record<string, string> = {};
+    let body = '';
+
+    const mockRes: any = {
+      writeHead: (code: number, h: Record<string, string>) => {
+        statusCode = code;
+        headers = h;
+      },
+      end: (content: string) => {
+        body = content;
+      },
+    };
+
+    const handled = await handleSetupRoute(
+      mockRes,
+      '/api/version',
+      new URL('http://localhost:4200/api/version'),
+      tmpDir,
+      'dist',
+      'pass123'
+    );
+
+    assert.equal(handled, true);
+    assert.equal(statusCode, 200);
+    assert.equal(headers['Content-Type'], 'application/json');
+
+    const data = JSON.parse(body);
+    assert.equal(data.version, '1.0.12');
+    assert.equal(data.downloadUrl, '/download');
+  } finally {
+    await fs.promises.rm(tmpDir, { recursive: true, force: true });
+  }
 });

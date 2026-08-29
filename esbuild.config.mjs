@@ -29,6 +29,9 @@ const serverConfig = {
   target: 'node18',
   sourcemap: true,
   banner: { js: '#!/usr/bin/env node' },
+  define: {
+    __MONITOR_VERSION__: JSON.stringify(pkg.version),
+  },
 };
 
 const serverLibConfig = {
@@ -39,6 +42,9 @@ const serverLibConfig = {
   platform: 'node',
   target: 'node18',
   sourcemap: true,
+  define: {
+    __MONITOR_VERSION__: JSON.stringify(pkg.version),
+  },
 };
 
 const uiConfig = {

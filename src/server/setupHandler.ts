@@ -7,6 +7,7 @@ import { generateQrMatrix } from '../qr/qrEncoder';
 import { renderQrToSvg } from '../qr/qrRenderer';
 
 import { getLocalNetworkAddresses } from './networkAddress';
+import { getMonitorVersion } from './version';
 
 export async function handleSetupRoute(
   res: ServerResponse,
@@ -57,19 +58,14 @@ export async function handleSetupRoute(
       setupPayload: payload,
       hasSyncConfig: Boolean(syncConfig?.gistId),
       gistId: syncConfig?.gistId || '',
-      version: '1.0.0',
+      version: getMonitorVersion(),
       networks,
     }));
     return true;
   }
 
   if (pathname === '/api/version') {
-    let version = '2.3.198';
-    try {
-      const pkgPath = path.join(workspaceRoot, 'package.json');
-      const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8')) as { version?: string };
-      if (pkg.version) version = pkg.version;
-    } catch {}
+    const version = getMonitorVersion();
     const body = JSON.stringify({ version, downloadUrl: '/download' });
     res.writeHead(200, {
       'Content-Type': 'application/json',

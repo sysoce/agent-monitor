@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { startMonitorServer } from './server/server';
 import { runSetupWizard } from './setup/setupWizard';
 import { exportStandaloneBundle } from './setup/standaloneExporter';
+import { getMonitorVersion } from './server/version';
 
 function printHelp(): void {
   console.log(`
@@ -47,7 +48,7 @@ async function main() {
     else if (a === 'tunnel' || a === '--tunnel' || a === '-t') tunnel = true;
     else if (a === '--help') { printHelp(); return; }
     else if (a === '--version' || a === '-v') {
-      console.log('agent-monitor v1.0.0');
+      console.log(`agent-monitor v${getMonitorVersion()}`);
       return;
     }
     else if ((a === '--port' || a === '-p') && args[i + 1]) port = Number(args[++i]);

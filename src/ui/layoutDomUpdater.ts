@@ -1,8 +1,38 @@
 import type { AppState } from './types';
 import { renderNavHeader } from './components/navHeader';
 import { renderComposerView } from './components/composerView';
+import { updateNavHeaderDOM } from './navHeaderDomUpdater';
+import { updateSidebarDOM } from './sidebarDomUpdater';
+import { updateChatDOM } from './chatDomUpdater';
 import { updateComposerDOM } from './composerDomUpdater';
 import { updateSettingsModalDOM, initModalSectionsCache } from './settingsModalDomUpdater';
+
+function updateMainViewDOM(state: AppState, mainEl: HTMLElement, mainHtml: string): boolean {
+  if (mainEl.dataset.activeTab !== state.activeTab) {
+    mainEl.innerHTML = mainHtml;
+    mainEl.dataset.activeTab = state.activeTab;
+    mainEl.dataset.renderedHtml = mainHtml;
+    return true;
+  }
+
+  if (state.activeTab === 'chat' && !state.activePlan) {
+    updateChatDOM(state, mainEl);
+    return false;
+  }
+
+  if (state.activeTab === 'sidebar') {
+    updateSidebarDOM(state, mainEl);
+    return false;
+  }
+
+  if (mainEl.dataset.renderedHtml !== mainHtml) {
+    mainEl.innerHTML = mainHtml;
+    mainEl.dataset.renderedHtml = mainHtml;
+    return true;
+  }
+
+  return false;
+}
 
 export function updateLayoutDOM(
   app: HTMLElement,
@@ -11,13 +41,12 @@ export function updateLayoutDOM(
   settingsModalHtml: string
 ): boolean {
   const existingLayout = app.querySelector('.app-layout');
-  let mainUpdated = false;
 
   if (!existingLayout) {
     app.innerHTML = `
       <div class="app-layout">
         <div id="nav-container">${renderNavHeader(state)}</div>
-        <main class="app-main">${mainHtml}</main>
+        <main class="app-main" data-active-tab="${state.activeTab}">${mainHtml}</main>
         ${renderComposerView(state)}
         <div id="modal-container">${settingsModalHtml}</div>
       </div>
@@ -35,27 +64,12 @@ export function updateLayoutDOM(
   }
 
   const navContainer = existingLayout.querySelector<HTMLElement>('#nav-container');
-  const newNavHtml = renderNavHeader(state);
   if (navContainer) {
-    if (navContainer.dataset.renderedHtml !== newNavHtml) {
-      navContainer.innerHTML = newNavHtml;
-      navContainer.dataset.renderedHtml = newNavHtml;
-    }
-  } else {
-    const navEl = existingLayout.querySelector<HTMLElement>('.app-header, .app-nav-header');
-    if (navEl && navEl.dataset.renderedHtml !== newNavHtml) {
-      navEl.outerHTML = newNavHtml;
-      const newNav = existingLayout.querySelector<HTMLElement>('.app-header, .app-nav-header');
-      if (newNav) newNav.dataset.renderedHtml = newNavHtml;
-    }
+    updateNavHeaderDOM(state, navContainer);
   }
 
   const mainEl = existingLayout.querySelector<HTMLElement>('.app-main');
-  if (mainEl && mainEl.dataset.renderedHtml !== mainHtml) {
-    mainEl.innerHTML = mainHtml;
-    mainEl.dataset.renderedHtml = mainHtml;
-    mainUpdated = true;
-  }
+  const mainUpdated = mainEl ? updateMainViewDOM(state, mainEl, mainHtml) : false;
 
   const composerEl = existingLayout.querySelector<HTMLElement>('.app-composer');
   const newComposerHtml = renderComposerView(state);
@@ -79,25 +93,6 @@ export function updateLayoutDOM(
         modalContainer.dataset.renderedHtml = settingsModalHtml;
         if (settingsModalHtml) initModalSectionsCache(modalContainer, state);
       }
-    }
-  } else {
-    const modalEl = existingLayout.querySelector<HTMLElement>('#settings-modal, #qr-modal');
-    if (settingsModalHtml) {
-      if (modalEl) {
-        if (modalEl.dataset.renderedHtml !== settingsModalHtml) {
-          updateSettingsModalDOM(state, modalEl);
-          modalEl.dataset.renderedHtml = settingsModalHtml;
-        }
-      } else {
-        existingLayout.insertAdjacentHTML('beforeend', settingsModalHtml);
-        const newModal = existingLayout.querySelector<HTMLElement>('#settings-modal, #qr-modal');
-        if (newModal) {
-          newModal.dataset.renderedHtml = settingsModalHtml;
-          initModalSectionsCache(newModal, state);
-        }
-      }
-    } else if (modalEl) {
-      modalEl.remove();
     }
   }
 

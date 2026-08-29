@@ -5,7 +5,7 @@ import type { AppState } from '../src/ui/types';
 
 function createMockState(overrides: Partial<AppState> = {}): AppState {
   return {
-    activeTab: 'sidebar',
+    activeTab: 'plans',
     sessions: [],
     plans: [],
     syncStatus: 'connected',
@@ -24,12 +24,8 @@ test('updateLayoutDOM initializes layout on first render with containers and dat
   let appInnerHtml = '';
   const app: any = {
     querySelector: () => null,
-    set innerHTML(val: string) {
-      appInnerHtml = val;
-    },
-    get innerHTML() {
-      return appInnerHtml;
-    },
+    set innerHTML(val: string) { appInnerHtml = val; },
+    get innerHTML() { return appInnerHtml; },
   };
 
   const state = createMockState();
@@ -46,21 +42,18 @@ test('updateLayoutDOM avoids re-rendering main and modal when renderedHtml match
   let modalInnerHtmlSetCount = 0;
 
   const mainEl: any = {
-    dataset: { renderedHtml: '<div class="test-main">Main Content</div>' },
-    set innerHTML(_val: string) {
-      mainInnerHtmlSetCount++;
-    },
+    dataset: { renderedHtml: '<div class="test-main">Main Content</div>', activeTab: 'plans' },
+    set innerHTML(_val: string) { mainInnerHtmlSetCount++; },
   };
 
   const modalContainer: any = {
     dataset: { renderedHtml: '<div id="settings-modal">Settings Content</div>' },
-    set innerHTML(_val: string) {
-      modalInnerHtmlSetCount++;
-    },
+    set innerHTML(_val: string) { modalInnerHtmlSetCount++; },
   };
 
   const navContainer: any = {
     dataset: { renderedHtml: '' },
+    querySelector: () => null,
     set innerHTML(_val: string) {},
   };
 
@@ -69,23 +62,14 @@ test('updateLayoutDOM avoids re-rendering main and modal when renderedHtml match
       if (sel === '#nav-container') return navContainer;
       if (sel === '.app-main') return mainEl;
       if (sel === '#modal-container') return modalContainer;
-      if (sel === '.app-composer') return null;
       return null;
     },
     insertAdjacentHTML: () => {},
   };
 
-  const app: any = {
-    querySelector: (sel: string) => (sel === '.app-layout' ? layoutEl : null),
-  };
-
+  const app: any = { querySelector: (sel: string) => (sel === '.app-layout' ? layoutEl : null) };
   const state = createMockState();
-  const updated = updateLayoutDOM(
-    app,
-    state,
-    '<div class="test-main">Main Content</div>',
-    '<div id="settings-modal">Settings Content</div>'
-  );
+  const updated = updateLayoutDOM(app, state, '<div class="test-main">Main Content</div>', '<div id="settings-modal">Settings Content</div>');
 
   assert.equal(updated, false, 'mainUpdated should be false when main content unchanged');
   assert.equal(mainInnerHtmlSetCount, 0, 'Should not rewrite mainEl innerHTML');
@@ -103,9 +87,7 @@ test('updateLayoutDOM updates existing modal in-place without rewriting modalCon
       qrSectionReplaced = true;
       qrMock.dataset.renderedHtml = val;
     },
-    get outerHTML() {
-      return qrMock.dataset.renderedHtml;
-    },
+    get outerHTML() { return qrMock.dataset.renderedHtml; },
   };
 
   const existingSettingsModal: any = {
@@ -122,9 +104,7 @@ test('updateLayoutDOM updates existing modal in-place without rewriting modalCon
       if (sel.includes('#settings-modal')) return existingSettingsModal;
       return null;
     },
-    set innerHTML(_val: string) {
-      modalInnerHtmlSetCount++;
-    },
+    set innerHTML(_val: string) { modalInnerHtmlSetCount++; },
   };
 
   const layoutEl: any = {
@@ -132,13 +112,10 @@ test('updateLayoutDOM updates existing modal in-place without rewriting modalCon
       if (sel === '#modal-container') return modalContainer;
       return null;
     },
-    insertAdjacentHTML() {},
+    insertAdjacentHTML: () => {},
   };
 
-  const app: any = {
-    querySelector: (sel: string) => (sel === '.app-layout' ? layoutEl : null),
-  };
-
+  const app: any = { querySelector: (sel: string) => (sel === '.app-layout' ? layoutEl : null) };
   const state = createMockState({ isSettingsModalOpen: true, qrModalTarget: 'lan' });
   const newModalHtml = '<div id="settings-modal">New Content</div>';
 
@@ -148,4 +125,3 @@ test('updateLayoutDOM updates existing modal in-place without rewriting modalCon
   assert.equal(qrSectionReplaced, true, 'Should update QR section in-place');
   assert.equal(modalContainer.dataset.renderedHtml, newModalHtml);
 });
-

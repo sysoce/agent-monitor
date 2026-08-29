@@ -74,7 +74,7 @@ export const PUTER_PRESET_MODELS: ModelCatalogOption[] = [
 ];
 
 export const OLLAMA_DEFAULT_PRESETS: ModelCatalogOption[] = [
-  { id: 'ollama|mannix/qwen3.6-27b-a3b-coderx:latest|model', label: 'Ollama: Qwen 3.6 27B CoderX (Champion)', provider: 'ollama', hint: 'MoE Champion / 16GB', isDefault: true, capabilities: { tools: true, contextWindow: 32_000 } },
+  { id: 'ollama|mannix/qwen3.6-27b-a3b-coderx:vision-Q4_K_M|model', label: 'Ollama: Qwen 3.6 27B CoderX Vision (Champion)', provider: 'ollama', hint: 'MoE Champion / 17GB / Multimodal', isDefault: true, capabilities: { tools: true, vision: true, contextWindow: 32_000 } },
   { id: 'ollama|ornith-1.5:9b-aligned|model', label: 'Ollama: Ornith 1.5 9B (Efficiency Champion)', provider: 'ollama', hint: 'Fast Dense / 6.6GB / 100% Industry Parity', capabilities: { thinking: true, tools: true, contextWindow: 32_000 } },
   { id: 'ollama|qwen2.5-coder:7b-aligned|model', label: 'Ollama: Qwen 2.5 Coder 7B (Subagent Explorer)', provider: 'ollama', hint: 'Ultra-Fast Subagent / 4.7GB', capabilities: { tools: true, contextWindow: 32_000 } },
   { id: 'ollama|qwen2.5-coder:14b|model', label: 'Ollama: Qwen 2.5 Coder 14B', provider: 'ollama', hint: 'Fast Dense / 9GB / 32k ctx', capabilities: { tools: true, contextWindow: 32_000 } },

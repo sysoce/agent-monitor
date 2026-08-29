@@ -7088,7 +7088,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.11" : "1.0.3";
+  var CLIENT_VERSION = true ? "1.0.12" : "1.0.12";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -9421,6 +9421,248 @@ input:checked + .slider:before {
   `;
   }
 
+  // src/ui/components/planView.ts
+  function renderPlanView(state2) {
+    const plans = state2.plans || [];
+    const currentPlan = state2.activePlan || (plans.length > 0 ? plans.find((p) => p.name === state2.activePlanName && p.content) || (plans[0]?.content ? plans[0] : void 0) : void 0);
+    const sessionTitle = state2.activeSession?.title ? ` for "${escapeHtml2(state2.activeSession.title)}"` : "";
+    return `
+    <div class="plan-view-container">
+      <div class="plan-content-scroll">
+        ${!currentPlan ? `
+              <div class="empty-state plan-empty-state">
+                <div class="empty-icon">\u{1F4CB}</div>
+                <div class="empty-title">No plans in this session</div>
+                <div class="empty-hint">Plans generated or referenced${sessionTitle} will show up here.</div>
+              </div>
+            ` : `
+              <div class="plan-card-view">
+                <div class="plan-meta-header">
+                  <div class="plan-path">\u{1F4C4} ${escapeHtml2(currentPlan.path)}</div>
+                  <button type="button" class="plan-build-btn" data-plan-path="${escapeHtml2(currentPlan.path)}" data-plan-title="${escapeHtml2(currentPlan.title || currentPlan.name)}">\u26A1 Build with Agent</button>
+                </div>
+                <div class="plan-body">
+                  ${renderMarkdownDocument(currentPlan.content)}
+                </div>
+              </div>
+            `}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/backgroundTasksCard.ts
+  var SPINNER_SVG = `<svg class="task-spinner" viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg>`;
+  var CHECK_SVG = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  var FAIL_SVG = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  function renderBackgroundTasksCard(tasks, options) {
+    if (!tasks || tasks.length === 0) return "";
+    const isCollapsed = Boolean(options?.collapsed);
+    const runningCount = tasks.filter((t) => t.status === "running" || !t.status).length;
+    const taskItemsHtml = tasks.map((t) => {
+      const isRunning = t.status === "running" || !t.status;
+      const isDone = t.status === "completed" || t.status === "done";
+      const iconClass = isRunning ? "task-icon--running task-spinner-icon" : isDone ? "task-icon--completed task-check-icon" : "task-icon--failed";
+      const iconSvg = isRunning ? SPINNER_SVG : isDone ? CHECK_SVG : FAIL_SVG;
+      const name = escapeHtml2(t.name || t.command || t.id);
+      return `
+      <li class="task-item" data-task-id="${escapeHtml2(t.id)}">
+        <span class="task-icon ${iconClass}">${iconSvg}</span>
+        <span class="task-text">${name}</span>
+      </li>
+    `;
+    }).join("");
+    return `
+    <div class="background-tasks-card ${isCollapsed ? "tasks-card--collapsed" : ""}" id="background-tasks-card">
+      <div class="tasks-header">
+        <button type="button" class="tasks-toggle-btn" id="btn-toggle-background-tasks" aria-expanded="${!isCollapsed}">
+          <span class="tasks-chevron-wrapper">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="tasks-title">Background Tasks</span>
+          <span class="tasks-badge">${runningCount}</span>
+        </button>
+        <button type="button" class="tasks-stop-btn" id="btn-stop-background-tasks" title="Stop all background tasks" aria-label="Stop all background tasks">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+            <rect x="3" y="3" width="10" height="10" rx="2"/>
+          </svg>
+        </button>
+      </div>
+      <ul class="background-tasks-list ${isCollapsed ? "hidden" : ""}" id="background-tasks-list">
+        ${taskItemsHtml}
+      </ul>
+    </div>
+  `;
+  }
+
+  // src/ui/components/shellApprovalCard.ts
+  function renderShellApprovalCard(opts) {
+    const isDecided = typeof opts.allowed === "boolean";
+    const commandId = escapeHtml2(opts.commandId);
+    const command = escapeHtml2(opts.command);
+    let actionsHtml = "";
+    if (!isDecided) {
+      actionsHtml = `
+      <div class="shell-approval-actions">
+        <button type="button" class="shell-btn shell-btn--allow" data-command-id="${commandId}" data-decision="allow">Allow</button>
+        <button type="button" class="shell-btn shell-btn--reject" data-command-id="${commandId}" data-decision="reject">Reject</button>
+      </div>
+    `;
+    } else {
+      actionsHtml = `
+      <div class="shell-approval-actions">
+        <span class="shell-decision ${opts.allowed ? "is-allowed" : "is-rejected"}">
+          ${opts.allowed ? "\u2713 Allowed" : "\u2717 Rejected"}
+        </span>
+      </div>
+    `;
+    }
+    return `
+    <div class="activity-toggle activity-toggle--shell activity-toggle--live shell-approval-card expanded" data-command-id="${commandId}">
+      <button type="button" class="activity-toggle-header">
+        <div class="activity-toggle-left">
+          <span class="tool-prompt-icon">&gt;_</span>
+          <span class="activity-toggle-label">Execute command with approval</span>
+        </div>
+        <div class="activity-toggle-right">
+          <span class="activity-toggle-chevron">\u203A</span>
+        </div>
+      </button>
+      <div class="activity-toggle-body">
+        <pre class="activity-toggle-output"><code>${command}</code></pre>
+        ${actionsHtml}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/telemetryCard.ts
+  function formatTelemetrySpeed(tps) {
+    if (tps == null || !Number.isFinite(tps) || tps <= 0) return null;
+    return `${tps >= 100 ? Math.round(tps) : tps.toFixed(1)} tok/s`;
+  }
+  function formatTelemetryTokens(count) {
+    if (count == null || !Number.isFinite(count) || count <= 0) return "0";
+    if (count < 1e3) return String(count);
+    return `${(count / 1e3).toFixed(1)}k`;
+  }
+  function renderTelemetryCard(data) {
+    const speed = formatTelemetrySpeed(data.tokensPerSecond);
+    const inputSpeed = formatTelemetrySpeed(data.inputTokensPerSecond);
+    const used = formatTelemetryTokens(data.contextUsed);
+    const max = formatTelemetryTokens(data.contextMax);
+    const isStreaming = Boolean(data.streaming);
+    const badges = [];
+    if (speed) {
+      badges.push(`<span class="telemetry-badge telemetry-speed">\u26A1 ${escapeHtml2(speed)}</span>`);
+    }
+    if (inputSpeed) {
+      badges.push(`<span class="telemetry-badge telemetry-eval">\u{1F4E5} ${escapeHtml2(inputSpeed)} eval</span>`);
+    }
+    if (data.contextUsed != null && data.contextMax != null) {
+      badges.push(`<span class="telemetry-badge telemetry-context">\u{1F9E0} ${used} / ${max} tokens</span>`);
+    }
+    if (data.activePhase) {
+      badges.push(`<span class="telemetry-badge telemetry-phase">\u2699\uFE0F ${escapeHtml2(data.activePhase)}</span>`);
+    }
+    if (badges.length === 0) return "";
+    return `
+    <div class="telemetry-card ${isStreaming ? "telemetry-card--streaming" : ""}">
+      <div class="telemetry-badges">
+        ${badges.join("")}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/turnGrouper.ts
+  function extractRawText(msg) {
+    if (typeof msg.content === "string") return msg.content;
+    if (Array.isArray(msg.content)) {
+      return msg.content.map((p) => typeof p === "string" ? p : p?.text || "").filter(Boolean).join("\n");
+    }
+    return typeof msg.text === "string" ? msg.text : "";
+  }
+  function groupMessagesIntoTurns(messages, toolResults, isGenerating = false) {
+    const result = [];
+    let currentAssistant = null;
+    const flushAssistant = (isLast = false) => {
+      if (!currentAssistant) return;
+      if (isGenerating && isLast) {
+        currentAssistant.isLive = true;
+      }
+      const hasText = Boolean(currentAssistant.content && currentAssistant.content.trim());
+      const hasThought = Boolean(currentAssistant.thought && currentAssistant.thought.trim());
+      const hasTools = currentAssistant.tool_calls.length > 0;
+      const hasMeta = Boolean(currentAssistant.planMeta || currentAssistant.walkthroughMeta || currentAssistant.todos?.length);
+      if (hasText || hasThought || hasTools || hasMeta || currentAssistant.isLive) {
+        result.push(currentAssistant);
+      }
+      currentAssistant = null;
+    };
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (m.role === "tool") continue;
+      if (m.role === "user") {
+        flushAssistant();
+        result.push(m);
+        continue;
+      }
+      if (m.role === "assistant") {
+        const text = extractRawText(m);
+        const thought = m.thought ?? m.thinking;
+        const rawTools = m.tool_calls || m.toolCalls || [];
+        const mappedTools = rawTools.map((tc) => ({
+          ...tc,
+          result: tc.result ?? (tc.id ? toolResults.get(tc.id) : void 0)
+        }));
+        if (!currentAssistant) {
+          currentAssistant = {
+            role: "assistant",
+            content: text,
+            thought: thought?.trim() || void 0,
+            thinking: thought?.trim() || void 0,
+            tool_calls: [...mappedTools],
+            planMeta: m.planMeta,
+            walkthroughMeta: m.walkthroughMeta,
+            todos: m.todos,
+            isError: Boolean(m.isError),
+            timestamp: m.timestamp ?? m.time
+          };
+        } else {
+          if (text) {
+            currentAssistant.content = currentAssistant.content ? `${currentAssistant.content}
+
+${text}` : text;
+          }
+          if (thought?.trim()) {
+            currentAssistant.thought = currentAssistant.thought ? `${currentAssistant.thought}
+
+${thought.trim()}` : thought.trim();
+            currentAssistant.thinking = currentAssistant.thought;
+          }
+          if (mappedTools.length > 0) {
+            currentAssistant.tool_calls.push(...mappedTools);
+          }
+          if (m.planMeta) currentAssistant.planMeta = m.planMeta;
+          if (m.walkthroughMeta) currentAssistant.walkthroughMeta = m.walkthroughMeta;
+          if (m.todos) currentAssistant.todos = m.todos;
+          if (m.isError) currentAssistant.isError = true;
+        }
+      }
+    }
+    flushAssistant(true);
+    if (isGenerating && result.length > 0) {
+      const last = result[result.length - 1];
+      if (last && last.role === "assistant") {
+        last.isLive = true;
+      }
+    }
+    return result;
+  }
+
   // src/utils/toolFormatting.ts
   function cleanPath(p) {
     if (!p) return "";
@@ -9597,9 +9839,9 @@ input:checked + .slider:before {
   }
 
   // src/ui/components/subagentCard.ts
-  var SPINNER_SVG = `<svg class="task-spinner subagent-spinner" viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg>`;
-  var CHECK_SVG = `<svg class="task-icon--completed subagent-completed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  var FAIL_SVG = `<svg class="task-icon--failed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  var SPINNER_SVG2 = `<svg class="task-spinner subagent-spinner" viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg>`;
+  var CHECK_SVG2 = `<svg class="task-icon--completed subagent-completed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  var FAIL_SVG2 = `<svg class="task-icon--failed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
   function renderSubagentCard(opts) {
     const isRunning = opts.status === "running";
     const isCompleted = opts.status === "completed" || opts.status === "idle";
@@ -9608,7 +9850,7 @@ input:checked + .slider:before {
     const role = escapeHtml2(opts.role || "Subagent");
     const prompt = opts.prompt ? escapeHtml2(opts.prompt) : "";
     const idAttr = opts.id ? ` data-subagent-id="${escapeHtml2(opts.id)}"` : "";
-    const statusIcon = isRunning ? SPINNER_SVG : isCompleted ? CHECK_SVG : isFailed ? FAIL_SVG : "";
+    const statusIcon = isRunning ? SPINNER_SVG2 : isCompleted ? CHECK_SVG2 : isFailed ? FAIL_SVG2 : "";
     let bodyContent = "";
     if (prompt) {
       bodyContent += `<div class="subagent-prompt-block"><span class="subagent-prompt-label">Goal:</span> <span class="subagent-prompt-text">${prompt}</span></div>`;
@@ -9867,162 +10109,6 @@ input:checked + .slider:before {
   `;
   }
 
-  // src/ui/components/planView.ts
-  function renderPlanView(state2) {
-    const plans = state2.plans || [];
-    const currentPlan = state2.activePlan || (plans.length > 0 ? plans.find((p) => p.name === state2.activePlanName && p.content) || (plans[0]?.content ? plans[0] : void 0) : void 0);
-    const sessionTitle = state2.activeSession?.title ? ` for "${escapeHtml2(state2.activeSession.title)}"` : "";
-    return `
-    <div class="plan-view-container">
-      <div class="plan-content-scroll">
-        ${!currentPlan ? `
-              <div class="empty-state plan-empty-state">
-                <div class="empty-icon">\u{1F4CB}</div>
-                <div class="empty-title">No plans in this session</div>
-                <div class="empty-hint">Plans generated or referenced${sessionTitle} will show up here.</div>
-              </div>
-            ` : `
-              <div class="plan-card-view">
-                <div class="plan-meta-header">
-                  <div class="plan-path">\u{1F4C4} ${escapeHtml2(currentPlan.path)}</div>
-                  <button type="button" class="plan-build-btn" data-plan-path="${escapeHtml2(currentPlan.path)}" data-plan-title="${escapeHtml2(currentPlan.title || currentPlan.name)}">\u26A1 Build with Agent</button>
-                </div>
-                <div class="plan-body">
-                  ${renderMarkdownDocument(currentPlan.content)}
-                </div>
-              </div>
-            `}
-      </div>
-    </div>
-  `;
-  }
-
-  // src/ui/components/backgroundTasksCard.ts
-  var SPINNER_SVG2 = `<svg class="task-spinner" viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg>`;
-  var CHECK_SVG2 = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  var FAIL_SVG2 = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-  function renderBackgroundTasksCard(tasks, options) {
-    if (!tasks || tasks.length === 0) return "";
-    const isCollapsed = Boolean(options?.collapsed);
-    const runningCount = tasks.filter((t) => t.status === "running" || !t.status).length;
-    const taskItemsHtml = tasks.map((t) => {
-      const isRunning = t.status === "running" || !t.status;
-      const isDone = t.status === "completed" || t.status === "done";
-      const iconClass = isRunning ? "task-icon--running task-spinner-icon" : isDone ? "task-icon--completed task-check-icon" : "task-icon--failed";
-      const iconSvg = isRunning ? SPINNER_SVG2 : isDone ? CHECK_SVG2 : FAIL_SVG2;
-      const name = escapeHtml2(t.name || t.command || t.id);
-      return `
-      <li class="task-item" data-task-id="${escapeHtml2(t.id)}">
-        <span class="task-icon ${iconClass}">${iconSvg}</span>
-        <span class="task-text">${name}</span>
-      </li>
-    `;
-    }).join("");
-    return `
-    <div class="background-tasks-card ${isCollapsed ? "tasks-card--collapsed" : ""}" id="background-tasks-card">
-      <div class="tasks-header">
-        <button type="button" class="tasks-toggle-btn" id="btn-toggle-background-tasks" aria-expanded="${!isCollapsed}">
-          <span class="tasks-chevron-wrapper">
-            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span class="tasks-title">Background Tasks</span>
-          <span class="tasks-badge">${runningCount}</span>
-        </button>
-        <button type="button" class="tasks-stop-btn" id="btn-stop-background-tasks" title="Stop all background tasks" aria-label="Stop all background tasks">
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
-            <rect x="3" y="3" width="10" height="10" rx="2"/>
-          </svg>
-        </button>
-      </div>
-      <ul class="background-tasks-list ${isCollapsed ? "hidden" : ""}" id="background-tasks-list">
-        ${taskItemsHtml}
-      </ul>
-    </div>
-  `;
-  }
-
-  // src/ui/components/shellApprovalCard.ts
-  function renderShellApprovalCard(opts) {
-    const isDecided = typeof opts.allowed === "boolean";
-    const commandId = escapeHtml2(opts.commandId);
-    const command = escapeHtml2(opts.command);
-    let actionsHtml = "";
-    if (!isDecided) {
-      actionsHtml = `
-      <div class="shell-approval-actions">
-        <button type="button" class="shell-btn shell-btn--allow" data-command-id="${commandId}" data-decision="allow">Allow</button>
-        <button type="button" class="shell-btn shell-btn--reject" data-command-id="${commandId}" data-decision="reject">Reject</button>
-      </div>
-    `;
-    } else {
-      actionsHtml = `
-      <div class="shell-approval-actions">
-        <span class="shell-decision ${opts.allowed ? "is-allowed" : "is-rejected"}">
-          ${opts.allowed ? "\u2713 Allowed" : "\u2717 Rejected"}
-        </span>
-      </div>
-    `;
-    }
-    return `
-    <div class="activity-toggle activity-toggle--shell activity-toggle--live shell-approval-card expanded" data-command-id="${commandId}">
-      <button type="button" class="activity-toggle-header">
-        <div class="activity-toggle-left">
-          <span class="tool-prompt-icon">&gt;_</span>
-          <span class="activity-toggle-label">Execute command with approval</span>
-        </div>
-        <div class="activity-toggle-right">
-          <span class="activity-toggle-chevron">\u203A</span>
-        </div>
-      </button>
-      <div class="activity-toggle-body">
-        <pre class="activity-toggle-output"><code>${command}</code></pre>
-        ${actionsHtml}
-      </div>
-    </div>
-  `;
-  }
-
-  // src/ui/components/telemetryCard.ts
-  function formatTelemetrySpeed(tps) {
-    if (tps == null || !Number.isFinite(tps) || tps <= 0) return null;
-    return `${tps >= 100 ? Math.round(tps) : tps.toFixed(1)} tok/s`;
-  }
-  function formatTelemetryTokens(count) {
-    if (count == null || !Number.isFinite(count) || count <= 0) return "0";
-    if (count < 1e3) return String(count);
-    return `${(count / 1e3).toFixed(1)}k`;
-  }
-  function renderTelemetryCard(data) {
-    const speed = formatTelemetrySpeed(data.tokensPerSecond);
-    const inputSpeed = formatTelemetrySpeed(data.inputTokensPerSecond);
-    const used = formatTelemetryTokens(data.contextUsed);
-    const max = formatTelemetryTokens(data.contextMax);
-    const isStreaming = Boolean(data.streaming);
-    const badges = [];
-    if (speed) {
-      badges.push(`<span class="telemetry-badge telemetry-speed">\u26A1 ${escapeHtml2(speed)}</span>`);
-    }
-    if (inputSpeed) {
-      badges.push(`<span class="telemetry-badge telemetry-eval">\u{1F4E5} ${escapeHtml2(inputSpeed)} eval</span>`);
-    }
-    if (data.contextUsed != null && data.contextMax != null) {
-      badges.push(`<span class="telemetry-badge telemetry-context">\u{1F9E0} ${used} / ${max} tokens</span>`);
-    }
-    if (data.activePhase) {
-      badges.push(`<span class="telemetry-badge telemetry-phase">\u2699\uFE0F ${escapeHtml2(data.activePhase)}</span>`);
-    }
-    if (badges.length === 0) return "";
-    return `
-    <div class="telemetry-card ${isStreaming ? "telemetry-card--streaming" : ""}">
-      <div class="telemetry-badges">
-        ${badges.join("")}
-      </div>
-    </div>
-  `;
-  }
-
   // src/ui/copyActions.ts
   var COPY_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--copy" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="1.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/><rect x="1.5" y="4.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/></svg>';
   var COPY_CHECK_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -10100,96 +10186,12 @@ input:checked + .slider:before {
     }, 1500);
   }
 
-  // src/ui/components/turnGrouper.ts
-  function extractRawText(msg) {
+  // src/ui/components/chatTurnRenderer.ts
+  function extractText(msg) {
     if (typeof msg.content === "string") return msg.content;
     if (Array.isArray(msg.content)) {
       return msg.content.map((p) => typeof p === "string" ? p : p?.text || "").filter(Boolean).join("\n");
     }
-    return typeof msg.text === "string" ? msg.text : "";
-  }
-  function groupMessagesIntoTurns(messages, toolResults, isGenerating = false) {
-    const result = [];
-    let currentAssistant = null;
-    const flushAssistant = (isLast = false) => {
-      if (!currentAssistant) return;
-      if (isGenerating && isLast) {
-        currentAssistant.isLive = true;
-      }
-      const hasText = Boolean(currentAssistant.content && currentAssistant.content.trim());
-      const hasThought = Boolean(currentAssistant.thought && currentAssistant.thought.trim());
-      const hasTools = currentAssistant.tool_calls.length > 0;
-      const hasMeta = Boolean(currentAssistant.planMeta || currentAssistant.walkthroughMeta || currentAssistant.todos?.length);
-      if (hasText || hasThought || hasTools || hasMeta || currentAssistant.isLive) {
-        result.push(currentAssistant);
-      }
-      currentAssistant = null;
-    };
-    for (let i = 0; i < messages.length; i++) {
-      const m = messages[i];
-      if (m.role === "tool") continue;
-      if (m.role === "user") {
-        flushAssistant();
-        result.push(m);
-        continue;
-      }
-      if (m.role === "assistant") {
-        const text = extractRawText(m);
-        const thought = m.thought ?? m.thinking;
-        const rawTools = m.tool_calls || m.toolCalls || [];
-        const mappedTools = rawTools.map((tc) => ({
-          ...tc,
-          result: tc.result ?? (tc.id ? toolResults.get(tc.id) : void 0)
-        }));
-        if (!currentAssistant) {
-          currentAssistant = {
-            role: "assistant",
-            content: text,
-            thought: thought?.trim() || void 0,
-            thinking: thought?.trim() || void 0,
-            tool_calls: [...mappedTools],
-            planMeta: m.planMeta,
-            walkthroughMeta: m.walkthroughMeta,
-            todos: m.todos,
-            isError: Boolean(m.isError),
-            timestamp: m.timestamp ?? m.time
-          };
-        } else {
-          if (text) {
-            currentAssistant.content = currentAssistant.content ? `${currentAssistant.content}
-
-${text}` : text;
-          }
-          if (thought?.trim()) {
-            currentAssistant.thought = currentAssistant.thought ? `${currentAssistant.thought}
-
-${thought.trim()}` : thought.trim();
-            currentAssistant.thinking = currentAssistant.thought;
-          }
-          if (mappedTools.length > 0) {
-            currentAssistant.tool_calls.push(...mappedTools);
-          }
-          if (m.planMeta) currentAssistant.planMeta = m.planMeta;
-          if (m.walkthroughMeta) currentAssistant.walkthroughMeta = m.walkthroughMeta;
-          if (m.todos) currentAssistant.todos = m.todos;
-          if (m.isError) currentAssistant.isError = true;
-        }
-      }
-    }
-    flushAssistant(true);
-    if (isGenerating && result.length > 0) {
-      const last = result[result.length - 1];
-      if (last && last.role === "assistant") {
-        last.isLive = true;
-      }
-    }
-    return result;
-  }
-
-  // src/ui/components/chatView.ts
-  function extractText(msg) {
-    if (typeof msg.content === "string") return msg.content;
-    if (Array.isArray(msg.content)) return msg.content.map((p) => typeof p === "string" ? p : p?.text || "").filter(Boolean).join("\n");
     return typeof msg.text === "string" ? msg.text : "";
   }
   function renderAssistantTurn(msg, isBuildMode = false) {
@@ -10241,6 +10243,8 @@ ${thought.trim()}` : thought.trim();
   function renderSessionLoadingIndicator() {
     return `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading session...</div></div>`;
   }
+
+  // src/ui/components/chatView.ts
   function renderChatView(state2) {
     if (state2.activePlan) {
       const planPath = escapeHtml2(state2.activePlan.path || state2.activePlan.name);
@@ -10980,7 +10984,7 @@ ${thought.trim()}` : thought.trim();
     { id: "puter|gemini-2.0-flash|model", label: "Puter: Gemini 2.0 Flash", provider: "puter", hint: "Puter Free", capabilities: { vision: true, contextWindow: 1e6 } }
   ];
   var OLLAMA_DEFAULT_PRESETS = [
-    { id: "ollama|mannix/qwen3.6-27b-a3b-coderx:latest|model", label: "Ollama: Qwen 3.6 27B CoderX (Champion)", provider: "ollama", hint: "MoE Champion / 16GB", isDefault: true, capabilities: { tools: true, contextWindow: 32e3 } },
+    { id: "ollama|mannix/qwen3.6-27b-a3b-coderx:vision-Q4_K_M|model", label: "Ollama: Qwen 3.6 27B CoderX Vision (Champion)", provider: "ollama", hint: "MoE Champion / 17GB / Multimodal", isDefault: true, capabilities: { tools: true, vision: true, contextWindow: 32e3 } },
     { id: "ollama|ornith-1.5:9b-aligned|model", label: "Ollama: Ornith 1.5 9B (Efficiency Champion)", provider: "ollama", hint: "Fast Dense / 6.6GB / 100% Industry Parity", capabilities: { thinking: true, tools: true, contextWindow: 32e3 } },
     { id: "ollama|qwen2.5-coder:7b-aligned|model", label: "Ollama: Qwen 2.5 Coder 7B (Subagent Explorer)", provider: "ollama", hint: "Ultra-Fast Subagent / 4.7GB", capabilities: { tools: true, contextWindow: 32e3 } },
     { id: "ollama|qwen2.5-coder:14b|model", label: "Ollama: Qwen 2.5 Coder 14B", provider: "ollama", hint: "Fast Dense / 9GB / 32k ctx", capabilities: { tools: true, contextWindow: 32e3 } },
@@ -11302,6 +11306,346 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
+  // src/ui/navHeaderDomUpdater.ts
+  function updateNavHeaderDOM(state2, container) {
+    const headerEl = container.querySelector(".app-header");
+    if (!headerEl) {
+      const nextHtml = renderNavHeader(state2);
+      container.innerHTML = nextHtml;
+      if (container.dataset) container.dataset.renderedHtml = nextHtml;
+      return;
+    }
+    const isGit = state2.syncMode === "git-backup";
+    const isConnected = state2.syncStatus === "connected";
+    const isSyncing = state2.syncStatus === "syncing";
+    const host = state2.hostPresence;
+    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
+    const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
+    const statusLabel = isGit ? isHostOnline ? "P2P / Gist (Online)" : "P2P / Gist" : isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
+    const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
+    const syncBtn = headerEl.querySelector("#btn-toggle-sync");
+    if (syncBtn) {
+      const expectedClass = `status-pill ${statusClass}`;
+      if (syncBtn.className !== expectedClass) syncBtn.className = expectedClass;
+      const dot = syncBtn.querySelector(".status-dot");
+      if (dot && dot.style.backgroundColor !== statusColor) dot.style.backgroundColor = statusColor;
+      const text = syncBtn.querySelector(".status-text");
+      if (text && text.textContent !== statusLabel) text.textContent = statusLabel;
+    }
+    const sessionTitle = state2.activeSession?.title?.trim();
+    const sessionId = state2.activeSession?.id || state2.activeSessionId;
+    const chatTabLabel = sessionTitle && sessionId ? `${sessionTitle} (${sessionId})` : sessionTitle || sessionId || "Chat";
+    const chatMsgCount = state2.activeSession ? state2.activeSession.messages.length : 0;
+    const sidebarBtn = headerEl.querySelector('button[data-tab="sidebar"]');
+    if (sidebarBtn) {
+      sidebarBtn.classList.toggle("active", state2.activeTab === "sidebar");
+      sidebarBtn.setAttribute("aria-selected", state2.activeTab === "sidebar" ? "true" : "false");
+      const badge = sidebarBtn.querySelector(".tab-badge");
+      const expectedCount = String(state2.sessions.length);
+      if (badge && badge.textContent !== expectedCount) badge.textContent = expectedCount;
+    }
+    const chatBtn = headerEl.querySelector('button[data-tab="chat"]');
+    if (chatBtn) {
+      chatBtn.classList.toggle("active", state2.activeTab === "chat");
+      chatBtn.setAttribute("aria-selected", state2.activeTab === "chat" ? "true" : "false");
+      const labelSpan = chatBtn.firstElementChild;
+      if (labelSpan && labelSpan.textContent !== chatTabLabel) labelSpan.textContent = chatTabLabel;
+      const chatBadge = chatBtn.querySelector(".tab-badge");
+      if (chatMsgCount > 0) {
+        const expectedMsgCount = String(chatMsgCount);
+        if (chatBadge) {
+          if (chatBadge.textContent !== expectedMsgCount) chatBadge.textContent = expectedMsgCount;
+        } else if (typeof chatBtn.insertAdjacentHTML === "function") {
+          chatBtn.insertAdjacentHTML("beforeend", `<span class="tab-badge">${chatMsgCount}</span>`);
+        }
+      } else if (chatBadge && typeof chatBadge.remove === "function") {
+        chatBadge.remove();
+      }
+    }
+    if (container.dataset) container.dataset.renderedHtml = renderNavHeader(state2);
+  }
+
+  // src/ui/sidebarDomUpdater.ts
+  function formatRelativeTime2(ts) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
+    if (diffSec < 60) return "just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return `${Math.floor(diffSec / 86400)}d ago`;
+  }
+  function renderCardPlans2(plans) {
+    if (!plans || plans.length === 0) return "";
+    return `
+    <div class="session-card-plans">
+      ${plans.map(
+      (p) => `
+        <button type="button" class="session-plan-chip md-plan-link" data-plan-path="${escapeHtml2(p.path)}">
+          <span class="plan-chip-icon">\u{1F4CB}</span>
+          <span class="plan-chip-title">${escapeHtml2(p.title || p.name || "Plan")}</span>
+        </button>
+      `
+    ).join("")}
+    </div>
+  `;
+  }
+  function renderSessionListHtml(state2) {
+    const q = state2.searchQuery.toLowerCase().trim();
+    const filtered = state2.sessions.filter((s) => {
+      if (!q) return true;
+      if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
+      if (s.plans?.some((p) => p.name.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
+      if (s.artifacts?.some((a) => a.name.toLowerCase().includes(q) || a.path.toLowerCase().includes(q))) return true;
+      return false;
+    });
+    const displaySessions = q ? filtered : filtered.slice(0, 8);
+    if (displaySessions.length === 0) {
+      return state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>`;
+    }
+    return displaySessions.map(
+      (s) => `
+      <div
+        class="session-card ${s.id === state2.activeSessionId ? "active" : ""}"
+        data-session-id="${s.id}"
+      >
+        <div class="session-card-header">
+          <span class="session-card-title">${escapeHtml2(s.title)}</span>
+          <span class="session-card-time">${formatRelativeTime2(s.updatedAt)}</span>
+        </div>
+        <div class="session-card-preview">${escapeHtml2(s.preview || "No messages yet")}</div>
+        ${renderCardPlans2(s.plans || [])}
+        <div class="session-card-footer">
+          <span class="session-badge">${s.messageCount} msgs</span>
+          <span class="session-card-id">${s.id}</span>
+        </div>
+      </div>
+    `
+    ).join("");
+  }
+  function updateSidebarDOM(state2, container) {
+    const sidebarEl = container.querySelector(".sidebar-view");
+    if (!sidebarEl) {
+      const nextHtml = renderSidebarView(state2);
+      container.innerHTML = nextHtml;
+      if (container.dataset) container.dataset.renderedHtml = nextHtml;
+      return;
+    }
+    const searchInput = sidebarEl.querySelector("#session-search");
+    if (searchInput && typeof document !== "undefined" && document.activeElement !== searchInput) {
+      if (searchInput.value !== state2.searchQuery) {
+        searchInput.value = state2.searchQuery;
+      }
+    }
+    const searchBar = sidebarEl.querySelector(".search-bar");
+    const clearBtn = sidebarEl.querySelector("#btn-clear-search");
+    if (searchBar) {
+      if (state2.searchQuery && !clearBtn) {
+        if (typeof searchBar.insertAdjacentHTML === "function") {
+          searchBar.insertAdjacentHTML("beforeend", '<button type="button" id="btn-clear-search" class="clear-btn">\u2715</button>');
+        }
+      } else if (!state2.searchQuery && clearBtn) {
+        clearBtn.remove();
+      }
+    }
+    const statsEl = sidebarEl.querySelector(".monitor-stats-container");
+    const nextStatsHtml = renderMonitorSidebarStats(state2);
+    if (statsEl) {
+      if (statsEl.dataset.renderedHtml !== nextStatsHtml) {
+        statsEl.outerHTML = nextStatsHtml;
+      }
+    }
+    const listEl = sidebarEl.querySelector(".session-list");
+    if (listEl) {
+      const nextListHtml = renderSessionListHtml(state2);
+      if (listEl.dataset.renderedHtml !== nextListHtml) {
+        listEl.innerHTML = nextListHtml;
+        listEl.dataset.renderedHtml = nextListHtml;
+      }
+    }
+    const detailEl = sidebarEl.querySelector(".session-detail-view");
+    if (state2.activeSession) {
+      const nextDetailHtml = renderSessionDetailView(state2.activeSession, state2.expandedSections, state2.showAllItems);
+      if (detailEl) {
+        if (detailEl.dataset.renderedHtml !== nextDetailHtml) {
+          detailEl.outerHTML = nextDetailHtml;
+        }
+      }
+    } else if (detailEl) {
+      detailEl.remove();
+    }
+    if (container.dataset) container.dataset.renderedHtml = renderSidebarView(state2);
+  }
+
+  // src/ui/markdown/copyHelper.ts
+  function copyCodeToClipboard(text, btn) {
+    const showFeedback = () => {
+      if (btn) {
+        const origText = btn.textContent;
+        btn.textContent = "Copied!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = origText || "Copy";
+          btn.classList.remove("copied");
+        }, 2e3);
+      }
+    };
+    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      navigator.clipboard.writeText(text).then(showFeedback).catch(() => {
+        fallbackCopyText(text, showFeedback);
+      });
+    } else {
+      fallbackCopyText(text, showFeedback);
+    }
+  }
+  function fallbackCopyText(text, onSuccess) {
+    if (typeof document === "undefined") return;
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "-9999px";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (successful) onSuccess?.();
+    } catch (_e) {
+    }
+  }
+
+  // src/ui/markdown/diagram/diagramHydrator.ts
+  async function hydrateAllDiagrams(root = document) {
+    if (typeof document === "undefined") return;
+    const cards = root.querySelectorAll('.diagram-card:not([data-hydrated="true"])');
+    for (const card of Array.from(cards)) {
+      hydrateSingleDiagram(card);
+    }
+  }
+  async function hydrateSingleDiagram(card) {
+    card.setAttribute("data-hydrated", "true");
+    const code = card.dataset.diagramCode || "";
+    const lang = card.dataset.diagramLang || "mermaid";
+    const body = card.querySelector(".diagram-body");
+    const source = card.querySelector(".diagram-source");
+    const toggleBtn = card.querySelector(".diagram-toggle-btn");
+    const copyBtn = card.querySelector(".diagram-copy-btn");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isVisible = card.classList.toggle("show-source");
+        toggleBtn.textContent = isVisible ? "Diagram" : "Code";
+        source?.classList.toggle("hidden", !isVisible);
+      });
+    }
+    if (copyBtn) {
+      copyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        copyCodeToClipboard(code, copyBtn);
+      });
+    }
+    if (!body) return;
+    const result = await renderDiagramSvg(lang, code);
+    if (result.success && result.svg) {
+      body.innerHTML = result.svg;
+    } else {
+      body.innerHTML = `<div class="diagram-fallback"><div class="diagram-error-hint">${escapeText(result.error || "Diagram rendering issue")}</div></div>`;
+      card.classList.add("diagram-card--error");
+      source?.classList.remove("hidden");
+    }
+  }
+  function escapeText(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // src/ui/chatDomUpdater.ts
+  function updateChatCards(session, messagesEl) {
+    const metrics = session.metrics;
+    const nextTelemetryHtml = metrics ? renderTelemetryCard(metrics) : "";
+    const currentTelemetry = messagesEl.querySelector(".telemetry-card");
+    if (currentTelemetry && nextTelemetryHtml) {
+      if (currentTelemetry.dataset.renderedHtml !== nextTelemetryHtml) {
+        currentTelemetry.outerHTML = nextTelemetryHtml;
+      }
+    }
+    const nextBgHtml = session.backgroundTasks?.length ? renderBackgroundTasksCard(session.backgroundTasks) : "";
+    const currentBg = messagesEl.querySelector(".bg-tasks-container");
+    if (currentBg && nextBgHtml) {
+      if (currentBg.dataset.renderedHtml !== nextBgHtml) {
+        currentBg.outerHTML = nextBgHtml;
+      }
+    }
+  }
+  function updateChatDOM(state2, container) {
+    if (state2.activePlan) {
+      const nextHtml = renderChatView(state2);
+      container.innerHTML = nextHtml;
+      if (container.dataset) container.dataset.renderedHtml = nextHtml;
+      return;
+    }
+    const session = state2.activeSession;
+    const currentSessionId = session?.id || state2.activeSessionId || "";
+    const chatContainer = container.querySelector(".chat-container");
+    const messagesEl = chatContainer?.querySelector("#chat-messages-container");
+    if (!chatContainer || !messagesEl || container.dataset?.activeSessionId !== currentSessionId) {
+      const nextHtml = renderChatView(state2);
+      container.innerHTML = nextHtml;
+      if (container.dataset) {
+        container.dataset.activeSessionId = currentSessionId;
+        container.dataset.renderedHtml = nextHtml;
+      }
+      const initialTurns = typeof container.querySelectorAll === "function" ? container.querySelectorAll(".turn") : [];
+      for (const t of Array.from(initialTurns)) {
+        if (t.dataset) t.dataset.renderedHtml = t.outerHTML;
+      }
+      return;
+    }
+    if (!session) return;
+    updateChatCards(session, messagesEl);
+    const messages = session.messages || [];
+    const toolResults = /* @__PURE__ */ new Map();
+    for (const m of messages) {
+      if (m.role === "tool" && m.tool_call_id) {
+        toolResults.set(m.tool_call_id, m.content);
+      }
+    }
+    const isGenerating = Boolean(session.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === session.id));
+    const visibleTurns = groupMessagesIntoTurns(messages, toolResults, isGenerating);
+    const existingTurns = Array.from(messagesEl.querySelectorAll(".turn"));
+    for (let i = 0; i < visibleTurns.length; i++) {
+      const msg = visibleTurns[i];
+      const expectedHtml = msg.role === "user" ? renderUserTurn(msg) : renderAssistantTurn(msg, state2.composerMode === "agent");
+      const existing = existingTurns[i];
+      if (existing) {
+        if (!existing.dataset?.renderedHtml && existing.outerHTML === expectedHtml) {
+          if (existing.dataset) existing.dataset.renderedHtml = expectedHtml;
+        } else if (existing.dataset?.renderedHtml !== expectedHtml) {
+          existing.outerHTML = expectedHtml;
+          const allTurns = messagesEl.querySelectorAll(".turn");
+          const updatedTurn = allTurns ? allTurns[i] : null;
+          if (updatedTurn) {
+            if (updatedTurn.dataset) updatedTurn.dataset.renderedHtml = expectedHtml;
+            hydrateAllDiagrams(updatedTurn);
+          }
+        }
+      } else if (typeof messagesEl.insertAdjacentHTML === "function") {
+        messagesEl.insertAdjacentHTML("beforeend", expectedHtml);
+        const newTurn = messagesEl.lastElementChild;
+        if (newTurn) {
+          if (newTurn.dataset) newTurn.dataset.renderedHtml = expectedHtml;
+          hydrateAllDiagrams(newTurn);
+        }
+      }
+    }
+    if (existingTurns.length > visibleTurns.length) {
+      for (let i = visibleTurns.length; i < existingTurns.length; i++) {
+        existingTurns[i]?.remove();
+      }
+    }
+    if (container.dataset) container.dataset.renderedHtml = renderChatView(state2);
+  }
+
   // src/ui/composerDomUpdater.ts
   function updateComposerDOM(state2, composerEl) {
     const modeLabel = state2.composerMode === "agent" ? "Agent" : state2.composerMode === "plan" ? "Plan" : "Ask";
@@ -11402,14 +11746,35 @@ ${thought.trim()}` : thought.trim();
   }
 
   // src/ui/layoutDomUpdater.ts
+  function updateMainViewDOM(state2, mainEl, mainHtml) {
+    if (mainEl.dataset.activeTab !== state2.activeTab) {
+      mainEl.innerHTML = mainHtml;
+      mainEl.dataset.activeTab = state2.activeTab;
+      mainEl.dataset.renderedHtml = mainHtml;
+      return true;
+    }
+    if (state2.activeTab === "chat" && !state2.activePlan) {
+      updateChatDOM(state2, mainEl);
+      return false;
+    }
+    if (state2.activeTab === "sidebar") {
+      updateSidebarDOM(state2, mainEl);
+      return false;
+    }
+    if (mainEl.dataset.renderedHtml !== mainHtml) {
+      mainEl.innerHTML = mainHtml;
+      mainEl.dataset.renderedHtml = mainHtml;
+      return true;
+    }
+    return false;
+  }
   function updateLayoutDOM(app, state2, mainHtml, settingsModalHtml) {
     const existingLayout = app.querySelector(".app-layout");
-    let mainUpdated = false;
     if (!existingLayout) {
       app.innerHTML = `
       <div class="app-layout">
         <div id="nav-container">${renderNavHeader(state2)}</div>
-        <main class="app-main">${mainHtml}</main>
+        <main class="app-main" data-active-tab="${state2.activeTab}">${mainHtml}</main>
         ${renderComposerView(state2)}
         <div id="modal-container">${settingsModalHtml}</div>
       </div>
@@ -11426,26 +11791,11 @@ ${thought.trim()}` : thought.trim();
       return true;
     }
     const navContainer = existingLayout.querySelector("#nav-container");
-    const newNavHtml = renderNavHeader(state2);
     if (navContainer) {
-      if (navContainer.dataset.renderedHtml !== newNavHtml) {
-        navContainer.innerHTML = newNavHtml;
-        navContainer.dataset.renderedHtml = newNavHtml;
-      }
-    } else {
-      const navEl = existingLayout.querySelector(".app-header, .app-nav-header");
-      if (navEl && navEl.dataset.renderedHtml !== newNavHtml) {
-        navEl.outerHTML = newNavHtml;
-        const newNav = existingLayout.querySelector(".app-header, .app-nav-header");
-        if (newNav) newNav.dataset.renderedHtml = newNavHtml;
-      }
+      updateNavHeaderDOM(state2, navContainer);
     }
     const mainEl = existingLayout.querySelector(".app-main");
-    if (mainEl && mainEl.dataset.renderedHtml !== mainHtml) {
-      mainEl.innerHTML = mainHtml;
-      mainEl.dataset.renderedHtml = mainHtml;
-      mainUpdated = true;
-    }
+    const mainUpdated = mainEl ? updateMainViewDOM(state2, mainEl, mainHtml) : false;
     const composerEl = existingLayout.querySelector(".app-composer");
     const newComposerHtml = renderComposerView(state2);
     if (composerEl && newComposerHtml) {
@@ -11467,25 +11817,6 @@ ${thought.trim()}` : thought.trim();
           modalContainer.dataset.renderedHtml = settingsModalHtml;
           if (settingsModalHtml) initModalSectionsCache(modalContainer, state2);
         }
-      }
-    } else {
-      const modalEl = existingLayout.querySelector("#settings-modal, #qr-modal");
-      if (settingsModalHtml) {
-        if (modalEl) {
-          if (modalEl.dataset.renderedHtml !== settingsModalHtml) {
-            updateSettingsModalDOM(state2, modalEl);
-            modalEl.dataset.renderedHtml = settingsModalHtml;
-          }
-        } else {
-          existingLayout.insertAdjacentHTML("beforeend", settingsModalHtml);
-          const newModal = existingLayout.querySelector("#settings-modal, #qr-modal");
-          if (newModal) {
-            newModal.dataset.renderedHtml = settingsModalHtml;
-            initModalSectionsCache(newModal, state2);
-          }
-        }
-      } else if (modalEl) {
-        modalEl.remove();
       }
     }
     return mainUpdated;
@@ -12418,90 +12749,6 @@ ${thought.trim()}` : thought.trim();
         settingsBody.scrollTop = snapshot.settingsModalScrollTop;
       }
     }
-  }
-
-  // src/ui/markdown/copyHelper.ts
-  function copyCodeToClipboard(text, btn) {
-    const showFeedback = () => {
-      if (btn) {
-        const origText = btn.textContent;
-        btn.textContent = "Copied!";
-        btn.classList.add("copied");
-        setTimeout(() => {
-          btn.textContent = origText || "Copy";
-          btn.classList.remove("copied");
-        }, 2e3);
-      }
-    };
-    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-      navigator.clipboard.writeText(text).then(showFeedback).catch(() => {
-        fallbackCopyText(text, showFeedback);
-      });
-    } else {
-      fallbackCopyText(text, showFeedback);
-    }
-  }
-  function fallbackCopyText(text, onSuccess) {
-    if (typeof document === "undefined") return;
-    try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      textarea.style.top = "-9999px";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const successful = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      if (successful) onSuccess?.();
-    } catch (_e) {
-    }
-  }
-
-  // src/ui/markdown/diagram/diagramHydrator.ts
-  async function hydrateAllDiagrams(root = document) {
-    if (typeof document === "undefined") return;
-    const cards = root.querySelectorAll('.diagram-card:not([data-hydrated="true"])');
-    for (const card of Array.from(cards)) {
-      hydrateSingleDiagram(card);
-    }
-  }
-  async function hydrateSingleDiagram(card) {
-    card.setAttribute("data-hydrated", "true");
-    const code = card.dataset.diagramCode || "";
-    const lang = card.dataset.diagramLang || "mermaid";
-    const body = card.querySelector(".diagram-body");
-    const source = card.querySelector(".diagram-source");
-    const toggleBtn = card.querySelector(".diagram-toggle-btn");
-    const copyBtn = card.querySelector(".diagram-copy-btn");
-    if (toggleBtn) {
-      toggleBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isVisible = card.classList.toggle("show-source");
-        toggleBtn.textContent = isVisible ? "Diagram" : "Code";
-        source?.classList.toggle("hidden", !isVisible);
-      });
-    }
-    if (copyBtn) {
-      copyBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        copyCodeToClipboard(code, copyBtn);
-      });
-    }
-    if (!body) return;
-    const result = await renderDiagramSvg(lang, code);
-    if (result.success && result.svg) {
-      body.innerHTML = result.svg;
-    } else {
-      body.innerHTML = `<div class="diagram-fallback"><div class="diagram-error-hint">${escapeText(result.error || "Diagram rendering issue")}</div></div>`;
-      card.classList.add("diagram-card--error");
-      source?.classList.remove("hidden");
-    }
-  }
-  function escapeText(str) {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   // src/ui/entry.ts
