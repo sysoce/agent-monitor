@@ -39,7 +39,7 @@ export class GistClient {
 
   async fetchSyncState(etag?: string): Promise<{ data: SyncGistPayload | null; etag?: string; notModified: boolean }> {
     if (this.isBlockedByRateLimit()) return { data: null, etag, notModified: true };
-    const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag) });
+    const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag, false) });
     this.updateRateLimit(res);
 
     if (res.status === 304) return { data: null, etag, notModified: true };
@@ -51,7 +51,8 @@ export class GistClient {
     let raw = fileObj?.content;
     if (fileObj?.truncated && fileObj?.raw_url) {
       try {
-        const rawRes = await fetch(fileObj.raw_url, { headers: { Authorization: `Bearer ${this.config.token}`, 'User-Agent': 'AgentMonitor-Sync' } });
+        const rawHeaders: Record<string, string> = typeof window === 'undefined' ? { Authorization: `Bearer ${this.config.token}` } : {};
+        const rawRes = await fetch(fileObj.raw_url, { headers: rawHeaders });
         if (rawRes.ok) raw = await rawRes.text();
       } catch {}
     }
@@ -113,7 +114,7 @@ export class GistClient {
     const content = encryptSyncData(compressed, this.config.password);
     const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
       method: 'PATCH',
-      headers: buildGistHeaders(this.config.token),
+      headers: buildGistHeaders(this.config.token, undefined, true),
       body: JSON.stringify({ files: { 'agent-sync.json': { content } } }),
     });
     this.updateRateLimit(res);

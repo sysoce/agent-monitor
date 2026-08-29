@@ -7279,7 +7279,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.23" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.24" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7870,13 +7870,15 @@ input:checked + .slider:before {
       state2.consecutiveFailures = 0;
     }
   }
-  function buildGistHeaders(token, etag) {
+  function buildGistHeaders(token, etag, isWrite = false) {
     const h = {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "Content-Type": "application/json"
+      "X-GitHub-Api-Version": "2022-11-28"
     };
+    if (isWrite) {
+      h["Content-Type"] = "application/json";
+    }
     if (typeof window === "undefined") {
       h["User-Agent"] = "AgentMonitor-Sync";
     }
@@ -7890,6 +7892,13 @@ input:checked + .slider:before {
     } catch {
     }
     return `${res.status} ${res.statusText}`.trim() || fallback;
+  }
+  function isNetworkOrOfflineError(err) {
+    if (!err) return false;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+    const msg = typeof err === "string" ? err : err?.message || "";
+    const lower = msg.toLowerCase();
+    return lower.includes("failed to fetch") || lower.includes("networkerror") || lower.includes("load failed") || lower.includes("fetch failed") || lower.includes("enotfound") || lower.includes("econnrefused") || lower.includes("ehostunreach") || lower.includes("etimedout") || lower.includes("aborterror");
   }
 
   // src/sync/gistClient.ts
@@ -7931,7 +7940,7 @@ input:checked + .slider:before {
     }
     async fetchSyncState(etag) {
       if (this.isBlockedByRateLimit()) return { data: null, etag, notModified: true };
-      const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag) });
+      const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag, false) });
       this.updateRateLimit(res);
       if (res.status === 304) return { data: null, etag, notModified: true };
       if (!res.ok) throw new Error(`GitHub Gist API error: ${await parseGistError(res, "Gist error")}`);
@@ -7941,7 +7950,8 @@ input:checked + .slider:before {
       let raw = fileObj?.content;
       if (fileObj?.truncated && fileObj?.raw_url) {
         try {
-          const rawRes = await fetch(fileObj.raw_url, { headers: { Authorization: `Bearer ${this.config.token}`, "User-Agent": "AgentMonitor-Sync" } });
+          const rawHeaders = typeof window === "undefined" ? { Authorization: `Bearer ${this.config.token}` } : {};
+          const rawRes = await fetch(fileObj.raw_url, { headers: rawHeaders });
           if (rawRes.ok) raw = await rawRes.text();
         } catch {
         }
@@ -7996,7 +8006,7 @@ input:checked + .slider:before {
       const content = encryptSyncData(compressed, this.config.password);
       const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
         method: "PATCH",
-        headers: buildGistHeaders(this.config.token),
+        headers: buildGistHeaders(this.config.token, void 0, true),
         body: JSON.stringify({ files: { "agent-sync.json": { content } } })
       });
       this.updateRateLimit(res);
@@ -8079,6 +8089,628 @@ input:checked + .slider:before {
     return CLIENT_POLL_INTERVALS.FOREGROUND_IDLE_MS;
   }
 
+  // src/ui/syncStateMachinePoll.ts
+  async function executeGistPoll(gistClient, lastEtag, callbacks, onRateLimitBlocked) {
+    const rateInfo = gistClient.getRateLimitInfo?.();
+    if (rateInfo) callbacks.onRateLimitChange?.(rateInfo);
+    if (rateInfo?.isBlocked) {
+      callbacks.onStatusChange("syncing");
+      onRateLimitBlocked(rateInfo.resetTime);
+      return { etag: lastEtag, handled: true };
+    }
+    try {
+      const res = await gistClient.fetchSyncState(lastEtag);
+      const updatedInfo = gistClient.getRateLimitInfo?.();
+      if (updatedInfo) callbacks.onRateLimitChange?.(updatedInfo);
+      if (res.notModified) {
+        callbacks.onStatusChange("connected");
+        callbacks.onError?.("");
+      } else if (res.data) {
+        callbacks.onStatusChange("connected");
+        callbacks.onError?.("");
+        callbacks.onDataUpdate(res.data);
+      }
+      return { etag: res.etag || lastEtag, handled: true };
+    } catch (err) {
+      callbacks.onStatusChange("disconnected");
+      if (!isNetworkOrOfflineError(err)) {
+        callbacks.onError?.(err?.message || "Gist sync connection failed");
+      }
+      return { etag: lastEtag, handled: false };
+    }
+  }
+
+  // src/p2p/p2pIceConfig.ts
+  function getDefaultIceServers() {
+    return [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478" }
+    ];
+  }
+
+  // src/p2p/p2pDataChannel.ts
+  var P2PDataChannel = class {
+    constructor(rawChannel) {
+      this.rawChannel = rawChannel;
+      __publicField(this, "listeners", /* @__PURE__ */ new Set());
+      __publicField(this, "openListeners", /* @__PURE__ */ new Set());
+      __publicField(this, "closeListeners", /* @__PURE__ */ new Set());
+      __publicField(this, "queue", []);
+      this.bindEvents();
+    }
+    bindEvents() {
+      if (!this.rawChannel) return;
+      this.rawChannel.onmessage = (ev) => {
+        try {
+          const parsed = JSON.parse(ev.data);
+          for (const listener of this.listeners) listener(parsed);
+        } catch {
+        }
+      };
+      this.rawChannel.onopen = () => {
+        while (this.queue.length > 0) {
+          const item = this.queue.shift();
+          if (item) this.rawChannel.send(item);
+        }
+        for (const listener of this.openListeners) listener();
+      };
+      this.rawChannel.onclose = () => {
+        for (const listener of this.closeListeners) listener();
+      };
+    }
+    send(msg) {
+      const raw = JSON.stringify(msg);
+      if (this.rawChannel.readyState === "open") {
+        this.rawChannel.send(raw);
+        return true;
+      }
+      this.queue.push(raw);
+      return false;
+    }
+    onMessage(listener) {
+      this.listeners.add(listener);
+      return () => this.listeners.delete(listener);
+    }
+    onOpen(listener) {
+      this.openListeners.add(listener);
+      return () => this.openListeners.delete(listener);
+    }
+    onClose(listener) {
+      this.closeListeners.add(listener);
+      return () => this.closeListeners.delete(listener);
+    }
+    isOpen() {
+      return this.rawChannel?.readyState === "open";
+    }
+  };
+
+  // src/p2p/p2pPeerConnection.ts
+  var P2PPeerConnection = class {
+    constructor(options) {
+      this.options = options;
+      __publicField(this, "pc");
+      __publicField(this, "dataChannel", null);
+      __publicField(this, "state", "disconnected");
+      __publicField(this, "stateListeners", /* @__PURE__ */ new Set());
+      __publicField(this, "candidateListeners", /* @__PURE__ */ new Set());
+      const iceServers = options.iceServers || getDefaultIceServers();
+      const config = { iceServers };
+      this.pc = options.createPeerConnection ? options.createPeerConnection(config) : typeof RTCPeerConnection !== "undefined" ? new RTCPeerConnection(config) : null;
+      this.bindEvents();
+    }
+    bindEvents() {
+      if (!this.pc) return;
+      this.pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          for (const listener of this.candidateListeners) {
+            listener(ev.candidate);
+          }
+        }
+      };
+      this.pc.ondatachannel = (ev) => {
+        this.dataChannel = new P2PDataChannel(ev.channel);
+        this.setState("connected");
+      };
+      if (this.pc.onconnectionstatechange !== void 0) {
+        this.pc.onconnectionstatechange = () => {
+          const rawState = this.pc.connectionState || this.pc.iceConnectionState;
+          if (rawState === "connected") this.setState("connected");
+          else if (rawState === "connecting") this.setState("connecting");
+          else if (rawState === "failed" || rawState === "disconnected") this.setState("failed");
+          else if (rawState === "closed") this.setState("closed");
+        };
+      }
+    }
+    async createOffer() {
+      if (!this.pc) throw new Error("WebRTC not supported in this environment");
+      this.setState("signaling");
+      const rawChannel = this.pc.createDataChannel("agent-data", { ordered: true });
+      this.dataChannel = new P2PDataChannel(rawChannel);
+      const offer = await this.pc.createOffer();
+      await this.pc.setLocalDescription(offer);
+      return offer;
+    }
+    async handleOffer(offer) {
+      if (!this.pc) throw new Error("WebRTC not supported in this environment");
+      this.setState("signaling");
+      await this.pc.setRemoteDescription(offer);
+      const answer = await this.pc.createAnswer();
+      await this.pc.setLocalDescription(answer);
+      return answer;
+    }
+    async handleSignal(signal) {
+      if (!this.pc) return;
+      if (signal.type === "answer") {
+        await this.pc.setRemoteDescription(signal.payload);
+        this.setState("connecting");
+      } else if (signal.type === "candidate" && signal.payload) {
+        try {
+          await this.pc.addIceCandidate(signal.payload);
+        } catch {
+        }
+      }
+    }
+    onIceCandidate(listener) {
+      this.candidateListeners.add(listener);
+      return () => this.candidateListeners.delete(listener);
+    }
+    onStateChange(listener) {
+      this.stateListeners.add(listener);
+      return () => this.stateListeners.delete(listener);
+    }
+    getDataChannel() {
+      return this.dataChannel;
+    }
+    getState() {
+      return this.state;
+    }
+    close() {
+      if (this.pc) {
+        try {
+          this.pc.close();
+        } catch {
+        }
+      }
+      this.setState("closed");
+    }
+    setState(s) {
+      if (this.state === s) return;
+      this.state = s;
+      for (const listener of this.stateListeners) {
+        listener(s);
+      }
+    }
+  };
+
+  // src/p2p/p2pSignaler.ts
+  var P2PSignaler = class {
+    constructor(myPeerId) {
+      this.myPeerId = myPeerId;
+    }
+    createOfferSignal(offerPayload, recipientId) {
+      return {
+        type: "offer",
+        senderId: this.myPeerId,
+        recipientId,
+        payload: offerPayload,
+        timestamp: Date.now()
+      };
+    }
+    createAnswerSignal(answerPayload, recipientId) {
+      return {
+        type: "answer",
+        senderId: this.myPeerId,
+        recipientId,
+        payload: answerPayload,
+        timestamp: Date.now()
+      };
+    }
+    createCandidateSignal(candidatePayload, recipientId) {
+      return {
+        type: "candidate",
+        senderId: this.myPeerId,
+        recipientId,
+        payload: candidatePayload,
+        timestamp: Date.now()
+      };
+    }
+    isSignalForMe(signal) {
+      if (!signal || signal.senderId === this.myPeerId) return false;
+      return !signal.recipientId || signal.recipientId === this.myPeerId;
+    }
+  };
+
+  // src/p2p/p2pHeartbeat.ts
+  var P2PHeartbeat = class {
+    constructor(options) {
+      __publicField(this, "intervalMs");
+      __publicField(this, "maxMissed");
+      __publicField(this, "sendFn");
+      __publicField(this, "onTimeout");
+      __publicField(this, "timer", null);
+      __publicField(this, "missedCount", 0);
+      __publicField(this, "latencyMs", 0);
+      __publicField(this, "lastPingSentAt", 0);
+      __publicField(this, "lastPingId", "");
+      this.intervalMs = options.intervalMs || 5e3;
+      this.maxMissed = options.maxMissed || 3;
+      this.sendFn = options.sendFn;
+      this.onTimeout = options.onTimeout;
+    }
+    start() {
+      this.stop();
+      this.missedCount = 0;
+      this.timer = setInterval(() => {
+        this.sendPing();
+      }, this.intervalMs);
+      this.timer.unref?.();
+    }
+    stop() {
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = null;
+      }
+    }
+    sendPing() {
+      if (this.missedCount >= this.maxMissed) {
+        this.stop();
+        this.onTimeout?.();
+        return false;
+      }
+      this.missedCount++;
+      this.lastPingSentAt = Date.now();
+      this.lastPingId = `ping-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      return this.sendFn({
+        id: this.lastPingId,
+        type: "ping",
+        payload: { id: this.lastPingId },
+        timestamp: this.lastPingSentAt
+      });
+    }
+    handleIncomingMessage(msg) {
+      if (msg.type === "ping") {
+        this.sendFn({
+          id: `pong-${Date.now()}`,
+          type: "pong",
+          payload: { pingId: msg.id },
+          timestamp: Date.now()
+        });
+        return true;
+      }
+      if (msg.type === "pong") {
+        this.missedCount = 0;
+        if (this.lastPingSentAt > 0) {
+          this.latencyMs = Math.max(0, Date.now() - this.lastPingSentAt);
+        }
+        return true;
+      }
+      return false;
+    }
+    getMissedCount() {
+      return this.missedCount;
+    }
+    getLatencyMs() {
+      return this.latencyMs;
+    }
+  };
+
+  // src/p2p/p2pTransportAdapter.ts
+  var P2PTransportAdapter = class {
+    constructor(options) {
+      __publicField(this, "mode", "p2p");
+      __publicField(this, "priority", 1);
+      __publicField(this, "name", "WebRTC Peer-to-Peer");
+      __publicField(this, "status", "disconnected");
+      __publicField(this, "dataChannel");
+      __publicField(this, "heartbeat");
+      __publicField(this, "messageListeners", /* @__PURE__ */ new Set());
+      __publicField(this, "statusListeners", /* @__PURE__ */ new Set());
+      this.dataChannel = options.dataChannel;
+      this.heartbeat = new P2PHeartbeat({
+        intervalMs: options.heartbeatIntervalMs || 5e3,
+        sendFn: (msg) => this.dataChannel.send(msg),
+        onTimeout: () => {
+          this.setStatus("reconnecting");
+        }
+      });
+      this.bindDataChannelEvents();
+    }
+    bindDataChannelEvents() {
+      this.dataChannel.onOpen(() => {
+        this.setStatus("connected");
+      });
+      this.dataChannel.onClose(() => {
+        this.setStatus("disconnected");
+      });
+      this.dataChannel.onMessage((msg) => {
+        if (this.status !== "connected" && this.dataChannel.isOpen()) {
+          this.setStatus("connected");
+        }
+        if (this.heartbeat.handleIncomingMessage(msg)) {
+          return;
+        }
+        for (const listener of this.messageListeners) {
+          listener(msg);
+        }
+      });
+      if (this.dataChannel.isOpen()) {
+        this.setStatus("connected");
+      }
+    }
+    getStatus() {
+      if (this.dataChannel.isOpen() && this.status !== "connected") {
+        this.setStatus("connected");
+      }
+      return this.status;
+    }
+    async connect() {
+      if (this.dataChannel.isOpen()) {
+        this.setStatus("connected");
+        return true;
+      }
+      this.setStatus("connecting");
+      return false;
+    }
+    disconnect() {
+      this.heartbeat.stop();
+      this.setStatus("disconnected");
+    }
+    async send(message) {
+      const p2pMsg = {
+        id: message.id,
+        type: message.type,
+        sessionId: message.sessionId,
+        payload: message.payload,
+        timestamp: message.timestamp || Date.now()
+      };
+      return this.dataChannel.send(p2pMsg);
+    }
+    onMessage(listener) {
+      this.messageListeners.add(listener);
+      return () => this.messageListeners.delete(listener);
+    }
+    onStatusChange(listener) {
+      this.statusListeners.add(listener);
+      return () => this.statusListeners.delete(listener);
+    }
+    setStatus(s) {
+      if (this.status === s) return;
+      this.status = s;
+      if (s === "connected") {
+        this.heartbeat.start();
+      } else {
+        this.heartbeat.stop();
+      }
+      for (const listener of this.statusListeners) {
+        listener(s);
+      }
+    }
+  };
+
+  // src/p2p/p2pClientCoordinator.ts
+  var P2PClientCoordinator = class {
+    constructor(options) {
+      this.options = options;
+      __publicField(this, "myPeerId");
+      __publicField(this, "peerConn", null);
+      __publicField(this, "signaler");
+      __publicField(this, "adapter", null);
+      __publicField(this, "isRunning", false);
+      __publicField(this, "pollTimer");
+      __publicField(this, "processedSignalIds", /* @__PURE__ */ new Set());
+      this.myPeerId = options.myPeerId || `client-${Math.random().toString(36).slice(2, 10)}`;
+      this.signaler = new P2PSignaler(this.myPeerId);
+    }
+    async start() {
+      if (this.isRunning) return;
+      this.isRunning = true;
+      this.options.onStatusChange?.("connecting");
+      const pcOpts = {
+        peerId: this.myPeerId,
+        createPeerConnection: this.options.createPeerConnection
+      };
+      this.peerConn = new P2PPeerConnection(pcOpts);
+      this.peerConn.onIceCandidate((candidate) => {
+        const sig = this.signaler.createCandidateSignal(candidate);
+        void this.options.signalTransport.postSignal(sig);
+      });
+      this.peerConn.onStateChange((state2) => {
+        if (state2 === "connected") {
+          this.setupAdapter();
+        } else if (state2 === "failed" || state2 === "closed") {
+          this.options.onStatusChange?.("disconnected");
+        }
+      });
+      const offer = await this.peerConn.createOffer();
+      const offerSig = this.signaler.createOfferSignal(offer);
+      await this.options.signalTransport.postSignal(offerSig);
+      const dataChannel = this.peerConn.getDataChannel();
+      if (dataChannel) {
+        dataChannel.onOpen(() => this.setupAdapter());
+      }
+      this.startSignalPolling();
+    }
+    setupAdapter() {
+      if (this.adapter || !this.peerConn) return;
+      const dc = this.peerConn.getDataChannel();
+      if (!dc) return;
+      this.adapter = new P2PTransportAdapter({ dataChannel: dc });
+      if (this.options.onDataMessage) {
+        this.adapter.onMessage((msg) => this.options.onDataMessage?.(msg));
+      }
+      this.adapter.onStatusChange((status) => this.options.onStatusChange?.(status));
+      this.options.onStatusChange?.("connected");
+      this.options.onConnected?.(this.adapter);
+    }
+    startSignalPolling() {
+      if (!this.isRunning || this.pollTimer) return;
+      const poll = async () => {
+        if (!this.isRunning) return;
+        try {
+          const signals = await this.options.signalTransport.fetchSignals();
+          for (const sig of signals) {
+            const sigId = `${sig.type}-${sig.senderId}-${sig.timestamp}`;
+            if (this.processedSignalIds.has(sigId)) continue;
+            if (this.signaler.isSignalForMe(sig)) {
+              this.processedSignalIds.add(sigId);
+              await this.handleSignal(sig);
+            }
+          }
+        } catch {
+        }
+        if (this.isRunning && !this.isConnected()) {
+          this.pollTimer = setTimeout(() => {
+            this.pollTimer = void 0;
+            void poll();
+          }, 3e3);
+        }
+      };
+      void poll();
+    }
+    async handleSignal(signal) {
+      if (!this.peerConn) return;
+      await this.peerConn.handleSignal(signal);
+    }
+    isConnected() {
+      return Boolean(this.adapter && this.adapter.getStatus() === "connected");
+    }
+    getAdapter() {
+      return this.adapter;
+    }
+    stop() {
+      this.isRunning = false;
+      if (this.pollTimer) {
+        clearTimeout(this.pollTimer);
+        this.pollTimer = void 0;
+      }
+      if (this.adapter) {
+        this.adapter.disconnect();
+        this.adapter = null;
+      }
+      if (this.peerConn) {
+        this.peerConn.close();
+        this.peerConn = null;
+      }
+      this.options.onStatusChange?.("disconnected");
+    }
+  };
+
+  // src/p2p/p2pSignalingExchange.ts
+  async function postSignalToLan(baseUrl, signal) {
+    try {
+      const url = new URL("/api/p2p/signal", baseUrl).toString();
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(signal)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  async function fetchSignalsFromLan(baseUrl, recipientId) {
+    try {
+      const url = new URL("/api/p2p/signal", baseUrl);
+      if (recipientId) url.searchParams.set("recipientId", recipientId);
+      const res = await fetch(url.toString(), { method: "GET" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data.signals) ? data.signals : [];
+    } catch {
+      return [];
+    }
+  }
+  async function postSignalToGist(config, signal, baseUrl = "https://api.github.com") {
+    try {
+      const existing = await fetchSignalsFromGist(config, baseUrl);
+      const now = Date.now();
+      const recent = existing.filter((s) => now - (s.timestamp || 0) < 45e3);
+      recent.push(signal);
+      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/gists/${config.gistId}`, {
+        method: "PATCH",
+        headers: buildGistHeaders(config.token, void 0, true),
+        body: JSON.stringify({
+          files: {
+            "signal.json": {
+              content: JSON.stringify({ signals: recent, updatedAt: now })
+            }
+          }
+        })
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  async function fetchSignalsFromGist(config, baseUrl = "https://api.github.com") {
+    try {
+      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/gists/${config.gistId}`, {
+        method: "GET",
+        headers: buildGistHeaders(config.token, void 0, false)
+      });
+      if (!res.ok) return [];
+      const json = await res.json();
+      const content = json.files?.["signal.json"]?.content;
+      if (!content) return [];
+      const parsed = JSON.parse(content);
+      return Array.isArray(parsed.signals) ? parsed.signals : [];
+    } catch {
+      return [];
+    }
+  }
+
+  // src/p2p/p2pSignalTransportFactory.ts
+  function createP2PSignalTransport(options) {
+    return {
+      postSignal: async (signal) => {
+        if (options.baseUrl) {
+          const ok = await postSignalToLan(options.baseUrl, signal);
+          if (ok) return true;
+        }
+        if (options.gistConfig) {
+          return postSignalToGist(options.gistConfig, signal);
+        }
+        return false;
+      },
+      fetchSignals: async () => {
+        if (options.baseUrl) {
+          const lanSignals = await fetchSignalsFromLan(options.baseUrl, options.peerId);
+          if (lanSignals.length > 0) return lanSignals;
+        }
+        if (options.gistConfig) {
+          return fetchSignalsFromGist(options.gistConfig);
+        }
+        return [];
+      }
+    };
+  }
+
+  // src/ui/syncStateMachineP2P.ts
+  function startP2PCoordination(callbacks, gistConfig, liveServerUrl) {
+    if (typeof RTCPeerConnection === "undefined") {
+      return null;
+    }
+    const transport = createP2PSignalTransport({ baseUrl: liveServerUrl, gistConfig });
+    const coord = new P2PClientCoordinator({
+      signalTransport: transport,
+      onStatusChange: (status) => {
+        let syncStatus = "disconnected";
+        if (status === "connected") syncStatus = "connected";
+        else if (status === "connecting" || status === "reconnecting") syncStatus = "connecting";
+        callbacks.onStatusChange(syncStatus);
+      },
+      onDataMessage: (msg) => {
+        if (msg.type === "session_update" && msg.payload) {
+          callbacks.onDataUpdate(msg.payload);
+        }
+      }
+    });
+    void coord.start();
+    return coord;
+  }
+
   // src/ui/syncStateMachine.ts
   var SyncStateMachine = class {
     constructor(callbacks) {
@@ -8086,6 +8718,7 @@ input:checked + .slider:before {
       __publicField(this, "mode", "p2p");
       __publicField(this, "gistConfig");
       __publicField(this, "gistClient");
+      __publicField(this, "p2pCoord", null);
       __publicField(this, "isAwaitingResponse", false);
       __publicField(this, "awaitingStartedAt");
       __publicField(this, "pollTimer");
@@ -8123,18 +8756,26 @@ input:checked + .slider:before {
       this.reachabilityProbe.stop();
       this.mode = "p2p";
       this.callbacks.onModeChange("p2p");
-      this.callbacks.onStatusChange("connected");
       this.callbacks.onError?.("");
+      this.p2pCoord?.stop();
+      this.p2pCoord = startP2PCoordination(this.callbacks, this.gistConfig);
+      if (!this.p2pCoord) {
+        this.callbacks.onStatusChange("connected");
+      }
     }
     forceLiveSseMode() {
       this.stopGitPolling();
       this.reachabilityProbe.stop();
+      this.p2pCoord?.stop();
+      this.p2pCoord = null;
       this.mode = "live-sse";
       this.callbacks.onModeChange("live-sse");
       this.callbacks.onStatusChange("connecting");
       this.callbacks.onError?.("");
     }
     forceGitBackupMode() {
+      this.p2pCoord?.stop();
+      this.p2pCoord = null;
       if (this.gistConfig) {
         this.mode = "git-backup";
         this.callbacks.onModeChange("git-backup");
@@ -8167,6 +8808,8 @@ input:checked + .slider:before {
     restorePrimaryLive() {
       this.stopGitPolling();
       this.reachabilityProbe.stop();
+      this.p2pCoord?.stop();
+      this.p2pCoord = null;
       this.mode = "live-sse";
       this.callbacks.onModeChange("live-sse");
       this.callbacks.onStatusChange("connected");
@@ -8177,12 +8820,19 @@ input:checked + .slider:before {
       this.callbacks.onLiveServerReachable?.();
     }
     async pushInboxMessage(msg) {
-      if (this.gistClient && this.mode === "git-backup") {
+      if (this.p2pCoord?.isConnected()) {
+        const adapter = this.p2pCoord.getAdapter();
+        if (adapter) {
+          await adapter.send({ id: msg.id, type: "user_input", sessionId: msg.sessionId, payload: msg, timestamp: Date.now() });
+          return;
+        }
+      }
+      if (this.gistClient && (this.mode === "git-backup" || this.mode === "p2p")) {
         await this.gistClient.pushInboxMessage(msg);
         await this.pollOnce();
-      } else {
-        throw new Error("Gist client is not configured or transport mode is not git-backup");
+        return;
       }
+      throw new Error("Gist client is not configured or transport mode is not available");
     }
     restartGitPolling() {
       this.stopGitPolling();
@@ -8194,33 +8844,13 @@ input:checked + .slider:before {
       this.pollTimer = timer;
     }
     async pollOnce() {
-      if (!this.gistClient || this.mode !== "git-backup") return;
-      const rateInfo = this.gistClient.getRateLimitInfo?.();
-      if (rateInfo) this.callbacks.onRateLimitChange?.(rateInfo);
-      if (rateInfo?.isBlocked) {
-        this.callbacks.onStatusChange("syncing");
-        const waitMs = Math.max(3e3, rateInfo.resetTime - Date.now() + 1e3);
+      if (!this.gistClient || this.mode !== "git-backup" && this.mode !== "p2p") return;
+      const { etag } = await executeGistPoll(this.gistClient, this.lastEtag, this.callbacks, (resetTime) => {
+        const waitMs = Math.max(3e3, resetTime - Date.now() + 1e3);
         this.stopGitPolling();
         this.pollTimer = setTimeout(() => this.restartGitPolling(), waitMs);
-        return;
-      }
-      try {
-        const res = await this.gistClient.fetchSyncState(this.lastEtag);
-        const updatedInfo = this.gistClient.getRateLimitInfo?.();
-        if (updatedInfo) this.callbacks.onRateLimitChange?.(updatedInfo);
-        if (res.etag) this.lastEtag = res.etag;
-        if (res.notModified) {
-          this.callbacks.onStatusChange("connected");
-          this.callbacks.onError?.("");
-        } else if (res.data) {
-          this.callbacks.onStatusChange("connected");
-          this.callbacks.onError?.("");
-          this.callbacks.onDataUpdate(res.data);
-        }
-      } catch (err) {
-        this.callbacks.onStatusChange("disconnected");
-        this.callbacks.onError?.(err?.message || "Gist sync connection failed");
-      }
+      });
+      if (etag) this.lastEtag = etag;
     }
     stopGitPolling() {
       if (this.pollTimer) {
@@ -8231,6 +8861,8 @@ input:checked + .slider:before {
     }
     stop() {
       this.reachabilityProbe.stop();
+      this.p2pCoord?.stop();
+      this.p2pCoord = null;
       this.stopGitPolling();
     }
   };
@@ -8309,7 +8941,6 @@ input:checked + .slider:before {
     } else if (targetMode === "p2p") {
       sseCleanup?.();
       syncMachine.forceP2PMode();
-      state2.syncStatus = "connected";
     }
   }
   function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {

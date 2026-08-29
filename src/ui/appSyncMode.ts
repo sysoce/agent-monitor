@@ -90,7 +90,6 @@ export function setSyncModeAction(
   } else if (targetMode === 'p2p') {
     sseCleanup?.();
     syncMachine.forceP2PMode();
-    state.syncStatus = 'connected';
   }
 }
 

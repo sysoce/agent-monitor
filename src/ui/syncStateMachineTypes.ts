@@ -1,6 +1,8 @@
 import type { GistSyncConfig, SyncGistPayload, SyncInboxMessage, TransportMode } from '../sync/types';
 import type { SyncStatus } from './types';
 
+export type { SyncStatus };
+
 export interface RateLimitInfo {
   remaining: number;
   limit: number;

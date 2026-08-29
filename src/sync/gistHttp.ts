@@ -45,13 +45,15 @@ export function updateRateLimitFromResponse(state: RateLimitState, res: Response
   }
 }
 
-export function buildGistHeaders(token: string, etag?: string): Record<string, string> {
+export function buildGistHeaders(token: string, etag?: string, isWrite = false): Record<string, string> {
   const h: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json',
   };
+  if (isWrite) {
+    h['Content-Type'] = 'application/json';
+  }
   if (typeof window === 'undefined') {
     h['User-Agent'] = 'AgentMonitor-Sync';
   }
@@ -65,4 +67,22 @@ export async function parseGistError(res: Response, fallback: string): Promise<s
     if (body?.message) return `${res.status} (${body.message})`;
   } catch {}
   return `${res.status} ${res.statusText}`.trim() || fallback;
+}
+
+export function isNetworkOrOfflineError(err: unknown): boolean {
+  if (!err) return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const msg = typeof err === 'string' ? err : (err as any)?.message || '';
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('load failed') ||
+    lower.includes('fetch failed') ||
+    lower.includes('enotfound') ||
+    lower.includes('econnrefused') ||
+    lower.includes('ehostunreach') ||
+    lower.includes('etimedout') ||
+    lower.includes('aborterror')
+  );
 }

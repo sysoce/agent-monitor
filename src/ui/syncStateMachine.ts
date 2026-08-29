@@ -1,8 +1,11 @@
-import type { GistSyncConfig, SyncGistPayload, SyncInboxMessage, TransportMode } from '../sync/types';
+import type { GistSyncConfig, SyncInboxMessage, TransportMode } from '../sync/types';
 import { GistClient } from '../sync/gistClient';
 import { LiveReachabilityProbe } from './liveReachabilityProbe';
 import { computeClientPollInterval } from '../sync/syncPollingPolicy';
 import type { SyncStateMachineCallbacks, RateLimitInfo } from './syncStateMachineTypes';
+import { executeGistPoll } from './syncStateMachinePoll';
+import { startP2PCoordination } from './syncStateMachineP2P';
+import type { P2PClientCoordinator } from '../p2p/p2pClientCoordinator';
 
 export type { SyncStateMachineCallbacks, RateLimitInfo };
 
@@ -10,6 +13,7 @@ export class SyncStateMachine {
   private mode: TransportMode = 'p2p';
   private gistConfig?: GistSyncConfig;
   private gistClient?: GistClient;
+  private p2pCoord: P2PClientCoordinator | null = null;
   private isAwaitingResponse = false;
   private awaitingStartedAt?: number;
   private pollTimer?: any;
@@ -52,13 +56,19 @@ export class SyncStateMachine {
     this.reachabilityProbe.stop();
     this.mode = 'p2p';
     this.callbacks.onModeChange('p2p');
-    this.callbacks.onStatusChange('connected');
     this.callbacks.onError?.('');
+    this.p2pCoord?.stop();
+    this.p2pCoord = startP2PCoordination(this.callbacks, this.gistConfig);
+    if (!this.p2pCoord) {
+      this.callbacks.onStatusChange('connected');
+    }
   }
 
   forceLiveSseMode(): void {
     this.stopGitPolling();
     this.reachabilityProbe.stop();
+    this.p2pCoord?.stop();
+    this.p2pCoord = null;
     this.mode = 'live-sse';
     this.callbacks.onModeChange('live-sse');
     this.callbacks.onStatusChange('connecting');
@@ -66,6 +76,8 @@ export class SyncStateMachine {
   }
 
   forceGitBackupMode(): void {
+    this.p2pCoord?.stop();
+    this.p2pCoord = null;
     if (this.gistConfig) {
       this.mode = 'git-backup';
       this.callbacks.onModeChange('git-backup');
@@ -100,6 +112,8 @@ export class SyncStateMachine {
   restorePrimaryLive(): void {
     this.stopGitPolling();
     this.reachabilityProbe.stop();
+    this.p2pCoord?.stop();
+    this.p2pCoord = null;
     this.mode = 'live-sse';
     this.callbacks.onModeChange('live-sse');
     this.callbacks.onStatusChange('connected');
@@ -112,12 +126,19 @@ export class SyncStateMachine {
   }
 
   async pushInboxMessage(msg: SyncInboxMessage): Promise<void> {
-    if (this.gistClient && this.mode === 'git-backup') {
+    if (this.p2pCoord?.isConnected()) {
+      const adapter = this.p2pCoord.getAdapter();
+      if (adapter) {
+        await adapter.send({ id: msg.id, type: 'user_input', sessionId: msg.sessionId, payload: msg, timestamp: Date.now() });
+        return;
+      }
+    }
+    if (this.gistClient && (this.mode === 'git-backup' || this.mode === 'p2p')) {
       await this.gistClient.pushInboxMessage(msg);
       await this.pollOnce();
-    } else {
-      throw new Error('Gist client is not configured or transport mode is not git-backup');
+      return;
     }
+    throw new Error('Gist client is not configured or transport mode is not available');
   }
 
   private restartGitPolling(): void {
@@ -129,33 +150,13 @@ export class SyncStateMachine {
   }
 
   async pollOnce(): Promise<void> {
-    if (!this.gistClient || this.mode !== 'git-backup') return;
-    const rateInfo = this.gistClient.getRateLimitInfo?.();
-    if (rateInfo) this.callbacks.onRateLimitChange?.(rateInfo);
-    if (rateInfo?.isBlocked) {
-      this.callbacks.onStatusChange('syncing');
-      const waitMs = Math.max(3000, rateInfo.resetTime - Date.now() + 1000);
+    if (!this.gistClient || (this.mode !== 'git-backup' && this.mode !== 'p2p')) return;
+    const { etag } = await executeGistPoll(this.gistClient, this.lastEtag, this.callbacks, (resetTime) => {
+      const waitMs = Math.max(3000, resetTime - Date.now() + 1000);
       this.stopGitPolling();
       this.pollTimer = setTimeout(() => this.restartGitPolling(), waitMs);
-      return;
-    }
-    try {
-      const res = await this.gistClient.fetchSyncState(this.lastEtag);
-      const updatedInfo = this.gistClient.getRateLimitInfo?.();
-      if (updatedInfo) this.callbacks.onRateLimitChange?.(updatedInfo);
-      if (res.etag) this.lastEtag = res.etag;
-      if (res.notModified) {
-        this.callbacks.onStatusChange('connected');
-        this.callbacks.onError?.('');
-      } else if (res.data) {
-        this.callbacks.onStatusChange('connected');
-        this.callbacks.onError?.('');
-        this.callbacks.onDataUpdate(res.data);
-      }
-    } catch (err: any) {
-      this.callbacks.onStatusChange('disconnected');
-      this.callbacks.onError?.(err?.message || 'Gist sync connection failed');
-    }
+    });
+    if (etag) this.lastEtag = etag;
   }
 
   stopGitPolling(): void {
@@ -164,6 +165,8 @@ export class SyncStateMachine {
 
   stop(): void {
     this.reachabilityProbe.stop();
+    this.p2pCoord?.stop();
+    this.p2pCoord = null;
     this.stopGitPolling();
   }
 }

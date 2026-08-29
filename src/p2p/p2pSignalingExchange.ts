@@ -1,5 +1,6 @@
 import type { P2PSignalMessage } from './types';
 import type { GistSyncConfig } from '../sync/types';
+import { buildGistHeaders } from '../sync/gistHttp';
 
 export async function postSignalToLan(baseUrl: string, signal: P2PSignalMessage): Promise<boolean> {
   try {
@@ -19,13 +20,10 @@ export async function fetchSignalsFromLan(baseUrl: string, recipientId?: string)
   try {
     const url = new URL('/api/p2p/signal', baseUrl);
     if (recipientId) url.searchParams.set('recipientId', recipientId);
-    const res = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const res = await fetch(url.toString(), { method: 'GET' });
     if (!res.ok) return [];
     const data = (await res.json()) as { ok: boolean; signals?: P2PSignalMessage[] };
-    return data.signals || [];
+    return Array.isArray(data.signals) ? data.signals : [];
   } catch {
     return [];
   }
@@ -37,20 +35,18 @@ export async function postSignalToGist(
   baseUrl = 'https://api.github.com'
 ): Promise<boolean> {
   try {
+    const existing = await fetchSignalsFromGist(config, baseUrl);
+    const now = Date.now();
+    const recent = existing.filter((s) => now - (s.timestamp || 0) < 45_000);
+    recent.push(signal);
+
     const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/gists/${config.gistId}`, {
       method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'AgentMonitor-P2P',
-      },
+      headers: buildGistHeaders(config.token, undefined, true),
       body: JSON.stringify({
         files: {
           'signal.json': {
-            content: JSON.stringify({
-              signals: [signal],
-              updatedAt: Date.now(),
-            }),
+            content: JSON.stringify({ signals: recent, updatedAt: now }),
           },
         },
       }),
@@ -68,10 +64,7 @@ export async function fetchSignalsFromGist(
   try {
     const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/gists/${config.gistId}`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'User-Agent': 'AgentMonitor-P2P',
-      },
+      headers: buildGistHeaders(config.token, undefined, false),
     });
     if (!res.ok) return [];
     const json = (await res.json()) as { files?: Record<string, { content?: string }> };
