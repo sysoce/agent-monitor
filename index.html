@@ -7092,7 +7092,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.13" : "1.0.13";
+  var CLIENT_VERSION = true ? "1.0.14" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -11654,10 +11654,20 @@ ${thought.trim()}` : thought.trim();
     }
     const isGenerating = Boolean(session.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === session.id));
     const visibleTurns = groupMessagesIntoTurns(messages, toolResults, isGenerating);
+    const hasLiveAssistantTurn = visibleTurns.some((t) => t.role === "assistant" && Boolean(t.isLive));
+    const expectedTurnHtmls = visibleTurns.map(
+      (msg) => msg.role === "user" ? renderUserTurn(msg) : renderAssistantTurn(msg, state2.composerMode === "agent")
+    );
+    if (isGenerating && !hasLiveAssistantTurn) {
+      expectedTurnHtmls.push(renderGeneratingIndicator());
+    }
+    const emptyEl = messagesEl.querySelector(".conversation-empty");
+    if (emptyEl && expectedTurnHtmls.length > 0) {
+      emptyEl.remove();
+    }
     const existingTurns = Array.from(messagesEl.querySelectorAll(".turn"));
-    for (let i = 0; i < visibleTurns.length; i++) {
-      const msg = visibleTurns[i];
-      const expectedHtml = msg.role === "user" ? renderUserTurn(msg) : renderAssistantTurn(msg, state2.composerMode === "agent");
+    for (let i = 0; i < expectedTurnHtmls.length; i++) {
+      const expectedHtml = expectedTurnHtmls[i];
       const existing = existingTurns[i];
       if (existing) {
         if (!existing.dataset?.renderedHtml && existing.outerHTML === expectedHtml) {
@@ -11680,8 +11690,8 @@ ${thought.trim()}` : thought.trim();
         }
       }
     }
-    if (existingTurns.length > visibleTurns.length) {
-      for (let i = visibleTurns.length; i < existingTurns.length; i++) {
+    if (existingTurns.length > expectedTurnHtmls.length) {
+      for (let i = expectedTurnHtmls.length; i < existingTurns.length; i++) {
         existingTurns[i]?.remove();
       }
     }

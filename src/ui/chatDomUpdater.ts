@@ -70,11 +70,24 @@ export function updateChatDOM(state: AppState, container: HTMLElement): void {
 
   const isGenerating = Boolean(session.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === session.id)));
   const visibleTurns = groupMessagesIntoTurns(messages, toolResults, isGenerating);
+  const hasLiveAssistantTurn = visibleTurns.some((t) => t.role === 'assistant' && Boolean((t as any).isLive));
+  const expectedTurnHtmls: string[] = visibleTurns.map((msg) =>
+    msg.role === 'user' ? renderUserTurn(msg) : renderAssistantTurn(msg, state.composerMode === 'agent')
+  );
+
+  if (isGenerating && !hasLiveAssistantTurn) {
+    expectedTurnHtmls.push(renderGeneratingIndicator());
+  }
+
+  const emptyEl = messagesEl.querySelector<HTMLElement>('.conversation-empty');
+  if (emptyEl && expectedTurnHtmls.length > 0) {
+    emptyEl.remove();
+  }
+
   const existingTurns = Array.from(messagesEl.querySelectorAll<HTMLElement>('.turn'));
 
-  for (let i = 0; i < visibleTurns.length; i++) {
-    const msg = visibleTurns[i]!;
-    const expectedHtml = msg.role === 'user' ? renderUserTurn(msg) : renderAssistantTurn(msg, state.composerMode === 'agent');
+  for (let i = 0; i < expectedTurnHtmls.length; i++) {
+    const expectedHtml = expectedTurnHtmls[i]!;
     const existing = existingTurns[i];
 
     if (existing) {
@@ -99,8 +112,8 @@ export function updateChatDOM(state: AppState, container: HTMLElement): void {
     }
   }
 
-  if (existingTurns.length > visibleTurns.length) {
-    for (let i = visibleTurns.length; i < existingTurns.length; i++) {
+  if (existingTurns.length > expectedTurnHtmls.length) {
+    for (let i = expectedTurnHtmls.length; i < existingTurns.length; i++) {
       existingTurns[i]?.remove();
     }
   }

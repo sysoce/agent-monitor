@@ -38,6 +38,6 @@ test('handleSetupRoute handles /api/setup-info and returns setup metadata', asyn
   assert.ok(json.setupPayload);
   assert.equal(json.hasSyncConfig, true);
   assert.equal(json.gistId, 'gist-abc-123');
-  assert.equal(json.version, '1.0.13');
+  assert.equal(json.version, '1.0.14');
   assert.ok(Array.isArray(json.networks));
 });
