@@ -1,5 +1,5 @@
 import type { SyncStatus } from './types';
-import { getStoredToken } from './authStore';
+import { getStoredToken, buildApiUrl, getServerBaseUrl } from './authStore';
 
 export interface SseClientOptions {
   onStatusChange: (status: SyncStatus) => void;
@@ -9,7 +9,8 @@ export interface SseClientOptions {
 export function isStaticHostEnvironment(): boolean {
   if (typeof window === 'undefined') return false;
   const { hostname, protocol } = window.location;
-  return protocol === 'file:' || hostname.endsWith('github.io') || hostname.endsWith('.pages.dev');
+  const isStatic = protocol === 'file:' || hostname.endsWith('github.io') || hostname.endsWith('.pages.dev');
+  return isStatic && !getServerBaseUrl();
 }
 
 export function initSseClient(opts: SseClientOptions): () => void {
@@ -30,7 +31,8 @@ export function initSseClient(opts: SseClientOptions): () => void {
     if (closed) return;
     opts.onStatusChange('syncing');
     const token = getStoredToken();
-    const url = token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events';
+    const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events';
+    const url = buildApiUrl(relative);
     try {
       es = new EventSource(url);
     } catch {

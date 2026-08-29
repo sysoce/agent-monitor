@@ -5,6 +5,7 @@ import {
   closeSettingsModal,
   selectQrTab,
   selectLanIp,
+  saveCustomServerUrl,
   handleSettingsModalClick,
 } from '../src/ui/settingsModalEvents';
 import type { AppState } from '../src/ui/types';
@@ -94,4 +95,36 @@ test('handleSettingsModalClick handles LAN IP selection button', () => {
   assert.equal(state.selectedLanIp, 'http://10.0.0.5:4200');
   assert.equal(state.qrModalTarget, 'lan');
   assert.equal(rendered, true);
+});
+
+test('saveCustomServerUrl saves server url and triggers feedback', () => {
+  const state = createMockState();
+  let rendered = false;
+  saveCustomServerUrl(state, 'http://192.168.1.99:4200', () => { rendered = true; });
+
+  assert.equal(state.selectedLanIp, 'http://192.168.1.99:4200');
+  assert.equal(state.settingsCopyFeedback, 'server-saved');
+  assert.equal(rendered, true);
+});
+
+test('handleSettingsModalClick handles save custom IP button', () => {
+  const originalDocument = (globalThis as any).document;
+  (globalThis as any).document = {
+    getElementById: (id: string) => id === 'input-custom-server-ip' ? { value: 'http://192.168.1.77:4200' } : null,
+  };
+
+  const state = createMockState();
+  let rendered = false;
+  const target = {
+    closest: (selector: string) => selector.includes('#btn-save-custom-ip') ? {} : null,
+    id: 'btn-save-custom-ip',
+  } as unknown as HTMLElement;
+
+  const handled = handleSettingsModalClick(state, target, { onRender: () => { rendered = true; } } as any);
+  assert.equal(handled, true);
+  assert.equal(state.selectedLanIp, 'http://192.168.1.77:4200');
+  assert.equal(state.settingsCopyFeedback, 'server-saved');
+  assert.equal(rendered, true);
+
+  (globalThis as any).document = originalDocument;
 });

@@ -1,6 +1,6 @@
 import type { AppState } from './types';
 import { CLIENT_VERSION, isNewerVersion } from './version';
-import { buildApiUrl, getServerBaseUrl } from './authStore';
+import { buildApiUrl, hasLiveServer } from './authStore';
 
 const AUTO_UPDATE_KEY = 'agent_auto_update';
 
@@ -67,7 +67,7 @@ export async function checkForUpdates(
   state: AppState,
   onRender: () => void
 ): Promise<boolean> {
-  if (typeof window !== 'undefined' && window.location.protocol === 'file:' && !getServerBaseUrl()) return false;
+  if (!hasLiveServer()) return false;
   try {
     const res = await fetch(buildApiUrl('/api/version'), { cache: 'no-store' });
     if (!res.ok) return false;
@@ -84,4 +84,3 @@ export async function checkForUpdates(
   }
   return false;
 }
-

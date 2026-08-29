@@ -5,7 +5,7 @@ import {
   getCurrentClientPayload,
   type QrTarget,
   type BuildQrUrlOptions,
-} from './settingsModal/types';
+} from './settingsModal/index';
 
 export type { QrTarget, BuildQrUrlOptions };
 export { getCurrentClientPayload };

@@ -48,3 +48,34 @@ test('applyConfigToStorage saves gist sync config, auth token, and git-backup mo
   assert.equal(storage['agent_monitor_token'], 'p1');
   assert.equal(storage['agent_sync_mode'], 'git-backup');
 });
+
+test('parseUrlConfig parses serverUrl from #setup= payload or search params', () => {
+  const payload = encodeSetupPayload({ serverUrl: 'http://192.168.1.100:4200', password: 'pin99' });
+  const result = parseUrlConfig(`#setup=${payload}`);
+  assert.ok(result);
+  assert.equal(result?.serverUrl, 'http://192.168.1.100:4200');
+  assert.equal(result?.password, 'pin99');
+
+  const paramResult = parseUrlConfig('?server=http://192.168.1.100:4200');
+  assert.ok(paramResult);
+  assert.equal(paramResult?.serverUrl, 'http://192.168.1.100:4200');
+});
+
+test('applyConfigToStorage saves serverUrl and sets live-sse mode when gist is not present', () => {
+  const storage: Record<string, string> = {};
+  const mockLocalStorage = {
+    getItem: (k: string) => storage[k] || null,
+    setItem: (k: string, v: string) => { storage[k] = v; },
+    removeItem: (k: string) => { delete storage[k]; },
+  };
+
+  const ok = applyConfigToStorage(
+    { serverUrl: 'http://192.168.1.100:4200', password: 'p1' },
+    mockLocalStorage as any
+  );
+
+  assert.equal(ok, true);
+  assert.equal(storage['agent_server_url'], 'http://192.168.1.100:4200');
+  assert.equal(storage['agent_monitor_token'], 'p1');
+  assert.equal(storage['agent_sync_mode'], 'live-sse');
+});

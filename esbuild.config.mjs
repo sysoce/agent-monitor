@@ -130,6 +130,7 @@ ${safeJs}
 
     async function checkRemote() {
       if (typeof fetch === 'undefined' || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+      if (typeof window !== 'undefined' && window.location.protocol !== 'file:') return;
       var urls = [
         { css: GH_PAGES + '/monitor.css', js: GH_PAGES + '/bundle.js' },
         { css: CDN_FALLBACK + '/monitor.css', js: CDN_FALLBACK + '/bundle.js' }

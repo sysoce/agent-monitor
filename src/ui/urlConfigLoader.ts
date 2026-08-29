@@ -1,10 +1,11 @@
 import { decodeSetupPayload } from '../sync/payloadCodec';
-import { setStoredToken } from './authStore';
+import { setStoredToken, setServerBaseUrl } from './authStore';
 
 export interface ParsedMobileConfig {
   gistId?: string;
   token?: string;
   password?: string;
+  serverUrl?: string;
 }
 
 export function parseUrlConfig(rawInput: string): ParsedMobileConfig | null {
@@ -14,23 +15,24 @@ export function parseUrlConfig(rawInput: string): ParsedMobileConfig | null {
   if (hash.startsWith('setup=')) {
     const payload = hash.slice(6).split('&')[0];
     const decoded = decodeSetupPayload(payload);
-    if (decoded?.gistId || decoded?.token) {
-      return { gistId: decoded.gistId, token: decoded.token, password: decoded.password };
+    if (decoded?.gistId || decoded?.token || decoded?.serverUrl) {
+      return { gistId: decoded.gistId, token: decoded.token, password: decoded.password, serverUrl: decoded.serverUrl };
     }
   }
 
   const directDecoded = decodeSetupPayload(hash);
-  if (directDecoded?.gistId || directDecoded?.token) {
-    return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password };
+  if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl) {
+    return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password, serverUrl: directDecoded.serverUrl };
   }
 
   const params = new URLSearchParams(hash);
   const gistId = params.get('gistId') || params.get('g') || undefined;
   const token = params.get('token') || params.get('t') || undefined;
   const password = params.get('password') || params.get('p') || undefined;
+  const serverUrl = params.get('server') || params.get('serverUrl') || params.get('s') || undefined;
 
-  if (gistId || token) {
-    return { gistId, token, password };
+  if (gistId || token || serverUrl) {
+    return { gistId, token, password, serverUrl };
   }
 
   return null;
@@ -40,11 +42,20 @@ export function applyConfigToStorage(
   config: ParsedMobileConfig,
   storage: Storage = typeof localStorage !== 'undefined' ? localStorage : ({} as Storage)
 ): boolean {
-  if (!config.gistId && !config.token) return false;
+  if (!config.gistId && !config.token && !config.serverUrl) return false;
   try {
-    const gistSync = { gistId: config.gistId || '', token: config.token || '' };
-    storage.setItem('agent_gist_sync', JSON.stringify(gistSync));
-    storage.setItem('agent_sync_mode', 'git-backup');
+    if (config.serverUrl) {
+      storage.setItem('agent_server_url', config.serverUrl);
+      setServerBaseUrl(config.serverUrl);
+    }
+    if (config.gistId && config.token) {
+      const gistSync = { gistId: config.gistId, token: config.token };
+      storage.setItem('agent_gist_sync', JSON.stringify(gistSync));
+      if (!config.serverUrl) storage.setItem('agent_sync_mode', 'git-backup');
+    }
+    if (config.serverUrl && !config.gistId) {
+      storage.setItem('agent_sync_mode', 'live-sse');
+    }
     if (config.password) {
       storage.setItem('agent_monitor_token', config.password);
       setStoredToken(config.password);
@@ -59,11 +70,12 @@ export function checkAndApplyUrlConfig(): {
   imported: boolean;
   gistConfig?: { token: string; gistId: string };
   password?: string;
+  serverUrl?: string;
 } {
   if (typeof window === 'undefined') return { imported: false };
   const raw = window.location.hash || window.location.search;
   const parsed = parseUrlConfig(raw);
-  if (!parsed || (!parsed.gistId && !parsed.token)) return { imported: false };
+  if (!parsed || (!parsed.gistId && !parsed.token && !parsed.serverUrl)) return { imported: false };
 
   const ok = applyConfigToStorage(parsed);
   if (ok) {
@@ -75,6 +87,7 @@ export function checkAndApplyUrlConfig(): {
       imported: true,
       gistConfig: parsed.gistId && parsed.token ? { gistId: parsed.gistId, token: parsed.token } : undefined,
       password: parsed.password,
+      serverUrl: parsed.serverUrl,
     };
   }
 

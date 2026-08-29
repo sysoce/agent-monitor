@@ -2,7 +2,8 @@ import type { AppState } from '../../types';
 import { escapeHtml } from '../markdown';
 import { generateQrMatrix } from '../../../qr/qrEncoder';
 import { renderQrToSvg } from '../../../qr/qrRenderer';
-import { buildSettingsQrUrl, getCurrentClientPayload, type QrTarget } from './types';
+import type { QrTarget } from './types';
+import { buildSettingsQrUrl, getCurrentClientPayload } from './settingsQrBuilder';
 
 export function renderSettingsQrSection(state: AppState): string {
   const target: QrTarget = state.qrModalTarget || 'gh_pages';

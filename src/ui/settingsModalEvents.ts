@@ -1,12 +1,15 @@
 import type { AppState } from './types';
 import type { QrTarget } from './components/settingsModal/types';
-import { buildSettingsQrUrl, getCurrentClientPayload } from './components/settingsModal/types';
 import type { EventHandlerCallbacks } from './eventHandlers';
+import { buildApiUrl, setServerBaseUrl, clearServerBaseUrl } from './authStore';
+import { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
 
-export async function fetchServerSetupInfo(state: AppState, onRender: () => void): Promise<void> {
-  if (state.serverSetupInfo?.networks && state.serverSetupInfo.networks.length > 0) return;
+export { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
+
+export async function fetchServerSetupInfo(state: AppState, onRender: () => void, force = false): Promise<void> {
+  if (!force && state.serverSetupInfo?.networks && state.serverSetupInfo.networks.length > 0) return;
   try {
-    const res = await fetch('/api/setup-info');
+    const res = await fetch(buildApiUrl('/api/setup-info'));
     if (res.ok) {
       state.serverSetupInfo = await res.json();
       onRender();
@@ -42,68 +45,29 @@ export function selectQrTab(state: AppState, target: QrTarget, onRender: () => v
 export function selectLanIp(state: AppState, ipUrl: string, onRender: () => void): void {
   state.selectedLanIp = ipUrl;
   state.qrModalTarget = 'lan';
+  setServerBaseUrl(ipUrl);
   onRender();
+  void fetchServerSetupInfo(state, onRender, true);
 }
 
-export async function copyQrLink(state: AppState, onRender: () => void): Promise<void> {
-  const url = buildSettingsQrUrl({
-    target: state.qrModalTarget || 'gh_pages',
-    payload: getCurrentClientPayload(state),
-    origin: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200',
-    customGhPagesUrl: state.serverSetupInfo?.githubPagesUrl,
-    customLanUrl: state.serverSetupInfo?.lanUrl,
-    selectedLanIp: state.selectedLanIp,
-  });
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText(url);
+export function saveCustomServerUrl(state: AppState, url: string, onRender: () => void): void {
+  const clean = url.trim().replace(/\/+$/, '');
+  if (clean) {
+    setServerBaseUrl(clean);
+    state.selectedLanIp = clean;
+  } else {
+    clearServerBaseUrl();
+    state.selectedLanIp = undefined;
+  }
+  state.settingsCopyFeedback = 'server-saved';
+  onRender();
+  void fetchServerSetupInfo(state, onRender, true);
+  setTimeout(() => {
+    if (state.settingsCopyFeedback === 'server-saved') {
+      state.settingsCopyFeedback = undefined;
+      onRender();
     }
-    state.settingsCopyFeedback = 'link';
-    state.qrCopyFeedback = 'link';
-    onRender();
-    setTimeout(() => {
-      if (state.settingsCopyFeedback === 'link') {
-        state.settingsCopyFeedback = undefined;
-        state.qrCopyFeedback = undefined;
-        onRender();
-      }
-    }, 2500);
-  } catch {}
-}
-
-export async function copySetupHash(state: AppState, onRender: () => void): Promise<void> {
-  const hash = `#setup=${getCurrentClientPayload(state)}`;
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText(hash);
-    }
-    state.settingsCopyFeedback = 'hash';
-    state.qrCopyFeedback = 'hash';
-    onRender();
-    setTimeout(() => {
-      if (state.settingsCopyFeedback === 'hash') {
-        state.settingsCopyFeedback = undefined;
-        state.qrCopyFeedback = undefined;
-        onRender();
-      }
-    }, 2500);
-  } catch {}
-}
-
-export async function copyIpUrl(state: AppState, ipUrl: string, ipAddress: string, onRender: () => void): Promise<void> {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText(ipUrl);
-    }
-    state.settingsCopyFeedback = `ip-${ipAddress}`;
-    onRender();
-    setTimeout(() => {
-      if (state.settingsCopyFeedback === `ip-${ipAddress}`) {
-        state.settingsCopyFeedback = undefined;
-        onRender();
-      }
-    }, 2500);
-  } catch {}
+  }, 2500);
 }
 
 export function handleSettingsModalClick(state: AppState, target: HTMLElement, callbacks: EventHandlerCallbacks): boolean {
@@ -130,6 +94,15 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
     const ipUrl = copyIpBtn.getAttribute('data-copy-ip-url') || '';
     const ipAddr = copyIpBtn.getAttribute('data-ip-address') || '';
     if (ipUrl) void copyIpUrl(state, ipUrl, ipAddr, callbacks.onRender);
+    return true;
+  }
+  if (target.closest('#btn-save-custom-ip')) {
+    const input = document.getElementById('input-custom-server-ip') as HTMLInputElement | null;
+    saveCustomServerUrl(state, input?.value || '', callbacks.onRender);
+    return true;
+  }
+  if (target.closest('#btn-clear-custom-ip')) {
+    saveCustomServerUrl(state, '', callbacks.onRender);
     return true;
   }
   if (target.closest('#btn-copy-qr-link')) { void copyQrLink(state, callbacks.onRender); return true; }

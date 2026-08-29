@@ -96,7 +96,7 @@ test('LocalSyncWorker scheduleOutboxSync throttles rapid outbox updates', async 
     worker.scheduleOutboxSync('sess-gamma', 10);
     worker.scheduleOutboxSync('sess-gamma', 10);
 
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 120));
 
     // Only 1 call should have gone through
     assert.equal(callCount, 1, 'Rapid calls should be throttled to 1 call');

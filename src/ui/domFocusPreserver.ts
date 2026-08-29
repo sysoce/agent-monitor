@@ -8,6 +8,7 @@ export interface FocusSnapshot {
   isChatNearBottom: boolean;
   sidebarScrollTop: number | null;
   plansScrollTop: number | null;
+  settingsModalScrollTop: number | null;
 }
 
 export function captureFocusState(): FocusSnapshot {
@@ -22,6 +23,7 @@ export function captureFocusState(): FocusSnapshot {
       isChatNearBottom: true,
       sidebarScrollTop: null,
       plansScrollTop: null,
+      settingsModalScrollTop: null,
     };
   }
 
@@ -51,6 +53,9 @@ export function captureFocusState(): FocusSnapshot {
   const plansContainer = typeof document.querySelector === 'function' ? document.querySelector<HTMLElement>('.plan-content-scroll, .chat-plan-scroll') : null;
   const plansScrollTop = plansContainer ? plansContainer.scrollTop : null;
 
+  const settingsBody = typeof document.querySelector === 'function' ? document.querySelector<HTMLElement>('.settings-modal-body, #settings-modal .update-modal-body') : null;
+  const settingsModalScrollTop = settingsBody ? settingsBody.scrollTop : null;
+
   return {
     activeElementId: activeId,
     selectionStart: selStart,
@@ -61,6 +66,7 @@ export function captureFocusState(): FocusSnapshot {
     isChatNearBottom,
     sidebarScrollTop,
     plansScrollTop,
+    settingsModalScrollTop,
   };
 }
 
@@ -106,6 +112,12 @@ export function restoreScrollState(snapshot: FocusSnapshot, activeTab: string): 
     const plansContainer = typeof document.querySelector === 'function' ? document.querySelector<HTMLElement>('.plan-content-scroll, .chat-plan-scroll') : null;
     if (plansContainer && snapshot.plansScrollTop !== null) {
       plansContainer.scrollTop = snapshot.plansScrollTop;
+    }
+  }
+  if (snapshot.settingsModalScrollTop !== null) {
+    const settingsBody = typeof document.querySelector === 'function' ? document.querySelector<HTMLElement>('.settings-modal-body, #settings-modal .update-modal-body') : null;
+    if (settingsBody) {
+      settingsBody.scrollTop = snapshot.settingsModalScrollTop;
     }
   }
 }

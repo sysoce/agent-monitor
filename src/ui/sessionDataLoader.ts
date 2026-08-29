@@ -1,5 +1,6 @@
 import type { AppState } from './types';
 import { fetchSessions, fetchSessionDetail, fetchModels } from './apiClient';
+import { hasLiveServer } from './authStore';
 import { mergeSessionDetail } from './sessionMerge';
 import { syncSessionPlans } from './sessionPlanSync';
 import { getSavedTab, getSavedSessionId } from './tabStore';
@@ -11,6 +12,23 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       if (tab) state.activeTab = tab;
       if (sid) state.activeSessionId = sid;
     }
+
+    if (state.syncMode === 'git-backup' || !hasLiveServer()) {
+      if (state.activeSessionId && state.cachedSessionDetails?.[state.activeSessionId]) {
+        state.activeSession = state.cachedSessionDetails[state.activeSessionId];
+      } else if (!state.activeSessionId && state.sessions.length > 0) {
+        state.activeSessionId = (state.sessions.find((s) => s.messageCount > 0) || state.sessions[0])?.id;
+        if (state.activeSessionId && state.cachedSessionDetails?.[state.activeSessionId]) {
+          state.activeSession = state.cachedSessionDetails[state.activeSessionId];
+        }
+      }
+      state.isLoadingSessions = false;
+      state.isLoadingSession = false;
+      await syncSessionPlans(state);
+      onDone();
+      return;
+    }
+
     if (!state.sessions || state.sessions.length === 0) state.isLoadingSessions = true;
     const [sessions, catalog] = await Promise.all([
       fetchSessions().catch(() => null),

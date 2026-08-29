@@ -6,7 +6,6 @@ export function getStoredToken(): string | null {
     const fromUrl = new URLSearchParams(window.location.search).get('token');
     if (fromUrl) {
       setStoredToken(fromUrl);
-      // Clean up token from browser URL bar without reloading
       const url = new URL(window.location.href);
       url.searchParams.delete('token');
       window.history.replaceState({}, '', url.toString());
@@ -44,9 +43,28 @@ export function getServerBaseUrl(): string {
   return '';
 }
 
+export function isStaticDeployment(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.protocol === 'file:' ||
+    window.location.hostname.endsWith('github.io') ||
+    window.location.hostname.endsWith('.pages.dev') ||
+    window.location.hostname.endsWith('.vercel.app') ||
+    window.location.hostname.endsWith('.netlify.app');
+}
+
+export function hasLiveServer(): boolean {
+  return Boolean(getServerBaseUrl()) || !isStaticDeployment();
+}
+
 export function setServerBaseUrl(url: string): void {
   try {
     localStorage.setItem(SERVER_KEY, url.replace(/\/+$/, ''));
+  } catch {}
+}
+
+export function clearServerBaseUrl(): void {
+  try {
+    localStorage.removeItem(SERVER_KEY);
   } catch {}
 }
 

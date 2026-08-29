@@ -1,7 +1,7 @@
 import type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup } from '../server/types';
 import type { MentionSuggestionItem } from '../types';
 import type { AttachmentItem } from '../types';
-import { getStoredToken, setStoredToken } from './authStore';
+import { getStoredToken, setStoredToken, buildApiUrl, hasLiveServer } from './authStore';
 
 function getAuthHeaders(): Record<string, string> {
   const token = getStoredToken();
@@ -15,10 +15,9 @@ export interface AuthVerifyResult {
 }
 
 export async function verifyAuthStatus(): Promise<AuthVerifyResult> {
-  const isFile = typeof window !== 'undefined' && window.location.protocol === 'file:';
-  if (!isFile) {
+  if (hasLiveServer()) {
     try {
-      const res = await fetch('/api/auth/verify', { headers: getAuthHeaders() });
+      const res = await fetch(buildApiUrl('/api/auth/verify'), { headers: getAuthHeaders() });
       if (res.ok) {
         const data = (await res.json()) as AuthVerifyResult;
         if (data.gistConfig) localStorage.setItem('agent_gist_sync', JSON.stringify(data.gistConfig));
@@ -31,10 +30,9 @@ export async function verifyAuthStatus(): Promise<AuthVerifyResult> {
 }
 
 export async function loginWithPassword(password: string): Promise<boolean> {
-  const isFile = typeof window !== 'undefined' && window.location.protocol === 'file:';
-  if (!isFile) {
+  if (hasLiveServer()) {
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(buildApiUrl('/api/auth/login'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
       });
       if (res.ok) {
@@ -61,8 +59,9 @@ export async function loginWithPassword(password: string): Promise<boolean> {
 
 export interface ModelCatalogResponse { models: ModelOption[]; groups?: ModelGroup[]; currentProvider?: string; }
 export async function fetchModels(): Promise<ModelCatalogResponse> {
+  if (!hasLiveServer()) return { models: [] };
   try {
-    const res = await fetch('/api/models', { headers: getAuthHeaders() });
+    const res = await fetch(buildApiUrl('/api/models'), { headers: getAuthHeaders() });
     if (!res.ok) return { models: [] };
     const data = (await res.json()) as ModelCatalogResponse;
     return { models: data.models || [], groups: data.groups || [], currentProvider: data.currentProvider };
@@ -70,27 +69,30 @@ export async function fetchModels(): Promise<ModelCatalogResponse> {
 }
 
 export async function fetchMentions(query: string): Promise<MentionSuggestionItem[]> {
+  if (!hasLiveServer()) return [];
   try {
-    const res = await fetch(`/api/mentions?q=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
+    const res = await fetch(buildApiUrl(`/api/mentions?q=${encodeURIComponent(query)}`), { headers: getAuthHeaders() });
     if (!res.ok) return [];
     return ((await res.json()) as { mentions: MentionSuggestionItem[] }).mentions || [];
   } catch { return []; }
 }
 
 export async function fetchSessions(): Promise<SessionSummary[]> {
-  const res = await fetch('/api/sessions', { headers: getAuthHeaders() });
+  if (!hasLiveServer()) return [];
+  const res = await fetch(buildApiUrl('/api/sessions'), { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.statusText}`);
   return ((await res.json()) as { sessions: SessionSummary[] }).sessions;
 }
 
 export async function fetchSessionDetail(id: string): Promise<SessionDetail> {
-  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
+  if (!hasLiveServer()) throw new Error('No live server');
+  const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(id)}`), { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch session detail: ${res.statusText}`);
   return ((await res.json()) as { session: SessionDetail }).session;
 }
 
 export async function createSession(title?: string): Promise<{ id: string }> {
-  const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ title }) });
+  const res = await fetch(buildApiUrl('/api/sessions'), { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ title }) });
   if (!res.ok) throw new Error(`Failed to create session: ${res.statusText}`);
   return (await res.json()) as { id: string };
 }
@@ -98,7 +100,7 @@ export async function createSession(title?: string): Promise<{ id: string }> {
 export async function sendSessionMessage(
   sessionId: string, content: string, role?: 'user' | 'assistant', model?: string, mode?: string, attachments?: AttachmentItem[]
 ): Promise<void> {
-  const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/messages`, {
+  const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/messages`), {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ content, role, model, mode, attachments }),
   });
@@ -107,7 +109,7 @@ export async function sendSessionMessage(
 
 export async function stopSession(sessionId: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/stop`, {
+    const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/stop`), {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     });
     return res.ok;
@@ -116,7 +118,7 @@ export async function stopSession(sessionId: string): Promise<boolean> {
 
 export async function resolveSessionApproval(sessionId: string, commandId: string, allowed: boolean): Promise<boolean> {
   try {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/approvals`, {
+    const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/approvals`), {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ commandId, allowed }),
     });
@@ -125,13 +127,15 @@ export async function resolveSessionApproval(sessionId: string, commandId: strin
 }
 
 export async function fetchPlans(): Promise<PlanSummary[]> {
-  const res = await fetch('/api/plans', { headers: getAuthHeaders() });
+  if (!hasLiveServer()) return [];
+  const res = await fetch(buildApiUrl('/api/plans'), { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch plans: ${res.statusText}`);
   return ((await res.json()) as { plans: PlanSummary[] }).plans;
 }
 
 export async function fetchPlanDetail(name: string): Promise<PlanDetail> {
-  const res = await fetch(`/api/plans/${encodeURIComponent(name)}`, { headers: getAuthHeaders() });
+  if (!hasLiveServer()) throw new Error('No live server');
+  const res = await fetch(buildApiUrl(`/api/plans/${encodeURIComponent(name)}`), { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch plan detail: ${res.statusText}`);
   return ((await res.json()) as { plan: PlanDetail }).plan;
 }

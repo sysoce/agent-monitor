@@ -1,13 +1,11 @@
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
-import {
-  renderSettingsModal,
-  buildSettingsQrUrl,
-  renderSettingsQrSection,
-  renderSettingsNetworkSection,
-  renderSettingsSyncSection,
-  renderSettingsAppSection,
-} from '../src/ui/components/settingsModal';
+import { renderSettingsModal } from '../src/ui/components/settingsModal/settingsModalView';
+import { renderSettingsQrSection } from '../src/ui/components/settingsModal/settingsQrSection';
+import { renderSettingsNetworkSection } from '../src/ui/components/settingsModal/settingsNetworkSection';
+import { renderSettingsSyncSection } from '../src/ui/components/settingsModal/settingsSyncSection';
+import { renderSettingsAppSection } from '../src/ui/components/settingsModal/settingsAppSection';
+import { buildSettingsQrUrl } from '../src/ui/components/settingsModal/settingsQrBuilder';
 import type { AppState } from '../src/ui/types';
 
 function createMockState(overrides: Partial<AppState> = {}): AppState {

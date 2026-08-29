@@ -46,6 +46,7 @@ export interface GistSyncConfig {
   token: string;
   gistId: string;
   password?: string;
+  serverUrl?: string;
 }
 
 export type TransportMode = 'live-sse' | 'git-backup' | 'offline';

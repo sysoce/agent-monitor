@@ -68,6 +68,7 @@ test('restoreFocusState focuses new element and restores selection range and scr
     isChatNearBottom: false,
     sidebarScrollTop: null,
     plansScrollTop: null,
+    settingsModalScrollTop: null,
   };
 
   restoreFocusState(snapshot);
@@ -100,6 +101,7 @@ test('restoreChatScroll pins to bottom when isChatNearBottom is true', () => {
     isChatNearBottom: true,
     sidebarScrollTop: null,
     plansScrollTop: null,
+    settingsModalScrollTop: null,
   };
 
   restoreChatScroll(snapshot);
@@ -129,6 +131,7 @@ test('restoreChatScroll preserves scroll offset when user has scrolled up', () =
     isChatNearBottom: false,
     sidebarScrollTop: null,
     plansScrollTop: null,
+    settingsModalScrollTop: null,
   };
 
   restoreChatScroll(snapshot);

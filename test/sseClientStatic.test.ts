@@ -30,6 +30,15 @@ test('isStaticHostEnvironment detects github.io and file: protocols', () => {
   };
   assert.equal(isStaticHostEnvironment(), false);
 
+  (global as any).localStorage = {
+    getItem: (k: string) => (k === 'agent_server_url' ? 'http://192.168.1.50:4200' : null),
+  };
+  (global as any).window = {
+    location: { hostname: 'sysoce.github.io', protocol: 'https:' },
+  };
+  assert.equal(isStaticHostEnvironment(), false);
+
+  delete (global as any).localStorage;
   (global as any).window = originalWindow;
 });
 

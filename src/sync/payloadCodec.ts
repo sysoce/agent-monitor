@@ -5,6 +5,7 @@ export function encodeSetupPayload(config: Partial<GistSyncConfig>): string {
     g: config.gistId || '',
     t: config.token || '',
     p: config.password || '',
+    s: config.serverUrl || '',
   });
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(payload, 'utf8').toString('base64url');
@@ -26,19 +27,23 @@ export function decodeSetupPayload(raw: string): Partial<GistSyncConfig> | null 
       g?: string;
       t?: string;
       p?: string;
+      s?: string;
       gistId?: string;
       token?: string;
       password?: string;
+      serverUrl?: string;
     };
     const gistId = parsed.g || parsed.gistId;
     const token = parsed.t || parsed.token;
     const password = parsed.p || parsed.password;
-    if (!gistId && !token) return null;
-    return {
-      gistId: gistId || undefined,
-      token: token || undefined,
-      password: password || undefined,
-    };
+    const serverUrl = parsed.s || parsed.serverUrl;
+    if (!gistId && !token && !serverUrl) return null;
+    const res: Partial<GistSyncConfig> = {};
+    if (gistId) res.gistId = gistId;
+    if (token) res.token = token;
+    if (password) res.password = password;
+    if (serverUrl) res.serverUrl = serverUrl;
+    return res;
   } catch {
     return null;
   }

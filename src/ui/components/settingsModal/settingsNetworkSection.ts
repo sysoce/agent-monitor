@@ -1,17 +1,19 @@
 import type { AppState } from '../../types';
 import { escapeHtml } from '../markdown';
-import { getCurrentClientPayload } from './types';
+import { getServerBaseUrl } from '../../authStore';
+import { getCurrentClientPayload } from './settingsQrBuilder';
 
 export function renderSettingsNetworkSection(state: AppState): string {
   const networks = state.serverSetupInfo?.networks || [];
   const payload = getCurrentClientPayload(state);
   const copyFeedback = state.settingsCopyFeedback || '';
-  const selectedLan = state.selectedLanIp;
+  const currentBaseUrl = getServerBaseUrl() || state.selectedLanIp || '';
+  const isServerSaved = copyFeedback === 'server-saved';
 
   const renderedList = networks.length > 0
     ? networks.map((net) => {
         const fullSetupUrl = `${net.url}/#setup=${payload}`;
-        const isSelected = selectedLan === net.url || (!selectedLan && net.url === state.serverSetupInfo?.lanUrl?.split('/#')[0]);
+        const isSelected = currentBaseUrl === net.url || (!currentBaseUrl && net.url === state.serverSetupInfo?.lanUrl?.split('/#')[0]);
         const isCopied = copyFeedback === `ip-${net.address}`;
 
         return `
@@ -22,16 +24,16 @@ export function renderSettingsNetworkSection(state: AppState): string {
                 <span class="network-ip-badge ${net.isTailscale ? 'badge-tailscale' : 'badge-lan'}">
                   ${net.isTailscale ? '🔒 Tailscale' : '🏠 Local LAN'}
                 </span>
-                ${isSelected ? '<span class="network-ip-active-tag">Active QR</span>' : ''}
+                ${isSelected ? '<span class="network-ip-active-tag">Active</span>' : ''}
               </div>
               <div class="network-ip-actions">
                 <button
                   type="button"
                   class="btn btn-secondary network-btn-use-qr ${isSelected ? 'active' : ''}"
                   data-use-ip="${escapeHtml(net.url)}"
-                  title="Generate QR code for this network IP"
+                  title="Use this network address for live SSE & QR"
                 >
-                  ${isSelected ? '✓ In QR' : '📲 Use in QR'}
+                  ${isSelected ? '✓ Active' : '📲 Set as Active'}
                 </button>
                 <button
                   type="button"
@@ -60,10 +62,30 @@ export function renderSettingsNetworkSection(state: AppState): string {
   return `
     <div class="settings-section settings-section--network" id="settings-section-network">
       <div class="settings-section-header">
-        <h4 class="settings-section-title">🌐 Local Network & IP Addresses</h4>
+        <h4 class="settings-section-title">🌐 Local Network & Server IP</h4>
         <p class="settings-section-subtitle">
           Connect directly via local Wi-Fi, LAN, or Tailscale for zero-latency <strong>Live SSE streaming</strong> without cloud sync.
         </p>
+      </div>
+
+      <div class="server-ip-config-box" style="margin-bottom: 12px;">
+        <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
+          Agent Server Address (LAN / Tailscale IP):
+        </label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input
+            id="input-custom-server-ip"
+            class="search-input"
+            type="text"
+            placeholder="http://192.168.1.50:4200"
+            value="${escapeHtml(currentBaseUrl)}"
+            style="flex: 1;"
+          />
+          <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
+            ${isServerSaved ? '✅ Saved!' : '💾 Set IP'}
+          </button>
+          ${currentBaseUrl ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ''}
+        </div>
       </div>
 
       <div class="network-ip-list">

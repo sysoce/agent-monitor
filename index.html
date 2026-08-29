@@ -6736,9 +6736,22 @@ input:checked + .slider:before {
     }
     return "";
   }
+  function isStaticDeployment() {
+    if (typeof window === "undefined") return false;
+    return window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev") || window.location.hostname.endsWith(".vercel.app") || window.location.hostname.endsWith(".netlify.app");
+  }
+  function hasLiveServer() {
+    return Boolean(getServerBaseUrl()) || !isStaticDeployment();
+  }
   function setServerBaseUrl(url) {
     try {
       localStorage.setItem(SERVER_KEY, url.replace(/\/+$/, ""));
+    } catch {
+    }
+  }
+  function clearServerBaseUrl() {
+    try {
+      localStorage.removeItem(SERVER_KEY);
     } catch {
     }
   }
@@ -6754,10 +6767,9 @@ input:checked + .slider:before {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
   async function verifyAuthStatus() {
-    const isFile = typeof window !== "undefined" && window.location.protocol === "file:";
-    if (!isFile) {
+    if (hasLiveServer()) {
       try {
-        const res = await fetch("/api/auth/verify", { headers: getAuthHeaders() });
+        const res = await fetch(buildApiUrl("/api/auth/verify"), { headers: getAuthHeaders() });
         if (res.ok) {
           const data = await res.json();
           if (data.gistConfig) localStorage.setItem("agent_gist_sync", JSON.stringify(data.gistConfig));
@@ -6770,10 +6782,9 @@ input:checked + .slider:before {
     return { required: true, authorized: Boolean(stored && rawGist) };
   }
   async function loginWithPassword(password) {
-    const isFile = typeof window !== "undefined" && window.location.protocol === "file:";
-    if (!isFile) {
+    if (hasLiveServer()) {
       try {
-        const res = await fetch("/api/auth/login", {
+        const res = await fetch(buildApiUrl("/api/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password })
@@ -6802,8 +6813,9 @@ input:checked + .slider:before {
     return false;
   }
   async function fetchModels() {
+    if (!hasLiveServer()) return { models: [] };
     try {
-      const res = await fetch("/api/models", { headers: getAuthHeaders() });
+      const res = await fetch(buildApiUrl("/api/models"), { headers: getAuthHeaders() });
       if (!res.ok) return { models: [] };
       const data = await res.json();
       return { models: data.models || [], groups: data.groups || [], currentProvider: data.currentProvider };
@@ -6812,8 +6824,9 @@ input:checked + .slider:before {
     }
   }
   async function fetchMentions(query) {
+    if (!hasLiveServer()) return [];
     try {
-      const res = await fetch(`/api/mentions?q=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
+      const res = await fetch(buildApiUrl(`/api/mentions?q=${encodeURIComponent(query)}`), { headers: getAuthHeaders() });
       if (!res.ok) return [];
       return (await res.json()).mentions || [];
     } catch {
@@ -6821,22 +6834,24 @@ input:checked + .slider:before {
     }
   }
   async function fetchSessions() {
-    const res = await fetch("/api/sessions", { headers: getAuthHeaders() });
+    if (!hasLiveServer()) return [];
+    const res = await fetch(buildApiUrl("/api/sessions"), { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.statusText}`);
     return (await res.json()).sessions;
   }
   async function fetchSessionDetail(id) {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
+    if (!hasLiveServer()) throw new Error("No live server");
+    const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(id)}`), { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`Failed to fetch session detail: ${res.statusText}`);
     return (await res.json()).session;
   }
   async function createSession(title) {
-    const res = await fetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ title }) });
+    const res = await fetch(buildApiUrl("/api/sessions"), { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ title }) });
     if (!res.ok) throw new Error(`Failed to create session: ${res.statusText}`);
     return await res.json();
   }
   async function sendSessionMessage(sessionId, content, role, model, mode, attachments) {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/messages`, {
+    const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/messages`), {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ content, role, model, mode, attachments })
@@ -6845,7 +6860,7 @@ input:checked + .slider:before {
   }
   async function stopSession(sessionId) {
     try {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/stop`, {
+      const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/stop`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() }
       });
@@ -6856,7 +6871,7 @@ input:checked + .slider:before {
   }
   async function resolveSessionApproval(sessionId, commandId, allowed) {
     try {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/approvals`, {
+      const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/approvals`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ commandId, allowed })
@@ -6867,7 +6882,8 @@ input:checked + .slider:before {
     }
   }
   async function fetchPlanDetail(name) {
-    const res = await fetch(`/api/plans/${encodeURIComponent(name)}`, { headers: getAuthHeaders() });
+    if (!hasLiveServer()) throw new Error("No live server");
+    const res = await fetch(buildApiUrl(`/api/plans/${encodeURIComponent(name)}`), { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`Failed to fetch plan detail: ${res.statusText}`);
     return (await res.json()).plan;
   }
@@ -6876,7 +6892,8 @@ input:checked + .slider:before {
   function isStaticHostEnvironment() {
     if (typeof window === "undefined") return false;
     const { hostname, protocol } = window.location;
-    return protocol === "file:" || hostname.endsWith("github.io") || hostname.endsWith(".pages.dev");
+    const isStatic = protocol === "file:" || hostname.endsWith("github.io") || hostname.endsWith(".pages.dev");
+    return isStatic && !getServerBaseUrl();
   }
   function initSseClient(opts) {
     let es = null;
@@ -6894,7 +6911,8 @@ input:checked + .slider:before {
       if (closed) return;
       opts.onStatusChange("syncing");
       const token = getStoredToken();
-      const url = token ? `/api/events?token=${encodeURIComponent(token)}` : "/api/events";
+      const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : "/api/events";
+      const url = buildApiUrl(relative);
       try {
         es = new EventSource(url);
       } catch {
@@ -7055,7 +7073,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.8" : "1.0.3";
+  var CLIENT_VERSION = true ? "1.0.9" : "1.0.3";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7120,7 +7138,7 @@ input:checked + .slider:before {
     return { hasUpdate: true, autoDownloaded: false };
   }
   async function checkForUpdates(state2, onRender) {
-    if (typeof window !== "undefined" && window.location.protocol === "file:" && !getServerBaseUrl()) return false;
+    if (!hasLiveServer()) return false;
     try {
       const res = await fetch(buildApiUrl("/api/version"), { cache: "no-store" });
       if (!res.ok) return false;
@@ -7901,12 +7919,10 @@ input:checked + .slider:before {
   function applyPersistedSyncMode(syncMachine, startSse) {
     const cfg = loadCachedGistConfig();
     if (cfg) syncMachine.setGistConfig(cfg);
-    const isStatic = typeof window !== "undefined" && (window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev"));
+    const liveServer = hasLiveServer();
     const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-    const mode = saved || (isStatic && cfg ? "git-backup" : "live-sse");
-    if (mode === "git-backup" && cfg) {
-      syncMachine.forceGitBackupMode();
-    } else if (isStatic && cfg) {
+    const mode = saved || (!liveServer && cfg ? "git-backup" : "live-sse");
+    if (mode === "git-backup" || !liveServer) {
       syncMachine.forceGitBackupMode();
     } else {
       startSse();
@@ -7914,17 +7930,14 @@ input:checked + .slider:before {
   }
   function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
     const isGit = state2.syncMode === "git-backup";
-    try {
-      localStorage.setItem("agent_sync_mode", isGit ? "live-sse" : "git-backup");
-    } catch {
-    }
     if (isGit) {
-      syncMachine.restorePrimaryLive();
+      if (!hasLiveServer()) return;
+      if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", "live-sse");
+      syncMachine.stop();
       startSse();
     } else {
+      if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", "git-backup");
       sseCleanup?.();
-      const cfg = loadCachedGistConfig();
-      if (cfg) syncMachine.setGistConfig(cfg);
       syncMachine.forceGitBackupMode();
     }
   }
@@ -7975,7 +7988,8 @@ input:checked + .slider:before {
     const payload = JSON.stringify({
       g: config.gistId || "",
       t: config.token || "",
-      p: config.password || ""
+      p: config.password || "",
+      s: config.serverUrl || ""
     });
     if (typeof Buffer !== "undefined") {
       return Buffer.from(payload, "utf8").toString("base64url");
@@ -7996,12 +8010,14 @@ input:checked + .slider:before {
       const gistId = parsed.g || parsed.gistId;
       const token = parsed.t || parsed.token;
       const password = parsed.p || parsed.password;
-      if (!gistId && !token) return null;
-      return {
-        gistId: gistId || void 0,
-        token: token || void 0,
-        password: password || void 0
-      };
+      const serverUrl = parsed.s || parsed.serverUrl;
+      if (!gistId && !token && !serverUrl) return null;
+      const res = {};
+      if (gistId) res.gistId = gistId;
+      if (token) res.token = token;
+      if (password) res.password = password;
+      if (serverUrl) res.serverUrl = serverUrl;
+      return res;
     } catch {
       return null;
     }
@@ -8014,29 +8030,39 @@ input:checked + .slider:before {
     if (hash.startsWith("setup=")) {
       const payload = hash.slice(6).split("&")[0];
       const decoded = decodeSetupPayload(payload);
-      if (decoded?.gistId || decoded?.token) {
-        return { gistId: decoded.gistId, token: decoded.token, password: decoded.password };
+      if (decoded?.gistId || decoded?.token || decoded?.serverUrl) {
+        return { gistId: decoded.gistId, token: decoded.token, password: decoded.password, serverUrl: decoded.serverUrl };
       }
     }
     const directDecoded = decodeSetupPayload(hash);
-    if (directDecoded?.gistId || directDecoded?.token) {
-      return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password };
+    if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl) {
+      return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password, serverUrl: directDecoded.serverUrl };
     }
     const params = new URLSearchParams(hash);
     const gistId = params.get("gistId") || params.get("g") || void 0;
     const token = params.get("token") || params.get("t") || void 0;
     const password = params.get("password") || params.get("p") || void 0;
-    if (gistId || token) {
-      return { gistId, token, password };
+    const serverUrl = params.get("server") || params.get("serverUrl") || params.get("s") || void 0;
+    if (gistId || token || serverUrl) {
+      return { gistId, token, password, serverUrl };
     }
     return null;
   }
   function applyConfigToStorage(config, storage = typeof localStorage !== "undefined" ? localStorage : {}) {
-    if (!config.gistId && !config.token) return false;
+    if (!config.gistId && !config.token && !config.serverUrl) return false;
     try {
-      const gistSync = { gistId: config.gistId || "", token: config.token || "" };
-      storage.setItem("agent_gist_sync", JSON.stringify(gistSync));
-      storage.setItem("agent_sync_mode", "git-backup");
+      if (config.serverUrl) {
+        storage.setItem("agent_server_url", config.serverUrl);
+        setServerBaseUrl(config.serverUrl);
+      }
+      if (config.gistId && config.token) {
+        const gistSync = { gistId: config.gistId, token: config.token };
+        storage.setItem("agent_gist_sync", JSON.stringify(gistSync));
+        if (!config.serverUrl) storage.setItem("agent_sync_mode", "git-backup");
+      }
+      if (config.serverUrl && !config.gistId) {
+        storage.setItem("agent_sync_mode", "live-sse");
+      }
       if (config.password) {
         storage.setItem("agent_monitor_token", config.password);
         setStoredToken(config.password);
@@ -8050,7 +8076,7 @@ input:checked + .slider:before {
     if (typeof window === "undefined") return { imported: false };
     const raw = window.location.hash || window.location.search;
     const parsed = parseUrlConfig(raw);
-    if (!parsed || !parsed.gistId && !parsed.token) return { imported: false };
+    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl) return { imported: false };
     const ok = applyConfigToStorage(parsed);
     if (ok) {
       try {
@@ -8061,7 +8087,8 @@ input:checked + .slider:before {
       return {
         imported: true,
         gistConfig: parsed.gistId && parsed.token ? { gistId: parsed.gistId, token: parsed.token } : void 0,
-        password: parsed.password
+        password: parsed.password,
+        serverUrl: parsed.serverUrl
       };
     }
     return { imported: false };
@@ -8074,6 +8101,21 @@ input:checked + .slider:before {
         const tab = getSavedTab(), sid = getSavedSessionId();
         if (tab) state2.activeTab = tab;
         if (sid) state2.activeSessionId = sid;
+      }
+      if (state2.syncMode === "git-backup" || !hasLiveServer()) {
+        if (state2.activeSessionId && state2.cachedSessionDetails?.[state2.activeSessionId]) {
+          state2.activeSession = state2.cachedSessionDetails[state2.activeSessionId];
+        } else if (!state2.activeSessionId && state2.sessions.length > 0) {
+          state2.activeSessionId = (state2.sessions.find((s) => s.messageCount > 0) || state2.sessions[0])?.id;
+          if (state2.activeSessionId && state2.cachedSessionDetails?.[state2.activeSessionId]) {
+            state2.activeSession = state2.cachedSessionDetails[state2.activeSessionId];
+          }
+        }
+        state2.isLoadingSessions = false;
+        state2.isLoadingSession = false;
+        await syncSessionPlans(state2);
+        onDone();
+        return;
       }
       if (!state2.sessions || state2.sessions.length === 0) state2.isLoadingSessions = true;
       const [sessions, catalog] = await Promise.all([
@@ -8147,6 +8189,13 @@ input:checked + .slider:before {
       saveActiveSessionId(id);
       void syncSessionPlans(this.state);
       this.render();
+      if (this.state.syncMode === "git-backup" || !hasLiveServer()) {
+        if (cached) this.state.activeSession = cached;
+        this.state.isLoadingSession = false;
+        await syncSessionPlans(this.state);
+        this.render();
+        return;
+      }
       try {
         const d = await fetchSessionDetail(id);
         if (this.state.activeSessionId === id) {
@@ -10241,7 +10290,7 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
-  // src/ui/components/settingsModal/types.ts
+  // src/ui/components/settingsModal/settingsQrBuilder.ts
   function buildSettingsQrUrl(opts) {
     const payload = opts.payload || "";
     if (opts.target === "lan") {
@@ -10260,13 +10309,15 @@ ${thought.trim()}` : thought.trim();
     return `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
   }
   function getCurrentClientPayload(state2) {
-    if (state2.serverSetupInfo?.setupPayload) return state2.serverSetupInfo.setupPayload;
+    if (state2.serverSetupInfo?.setupPayload && !state2.selectedLanIp) return state2.serverSetupInfo.setupPayload;
     const cfg = loadCachedGistConfig();
     const token = getStoredToken();
+    const serverUrl = state2.selectedLanIp || getServerBaseUrl() || (typeof window !== "undefined" && window.location.port === "4200" ? window.location.origin : void 0);
     return encodeSetupPayload({
       gistId: cfg?.gistId || "",
       token: cfg?.token || "",
-      password: token || ""
+      password: token || "",
+      serverUrl: serverUrl || void 0
     });
   }
 
@@ -10492,10 +10543,11 @@ ${thought.trim()}` : thought.trim();
     const networks = state2.serverSetupInfo?.networks || [];
     const payload = getCurrentClientPayload(state2);
     const copyFeedback = state2.settingsCopyFeedback || "";
-    const selectedLan = state2.selectedLanIp;
+    const currentBaseUrl = getServerBaseUrl() || state2.selectedLanIp || "";
+    const isServerSaved = copyFeedback === "server-saved";
     const renderedList = networks.length > 0 ? networks.map((net) => {
       const fullSetupUrl = `${net.url}/#setup=${payload}`;
-      const isSelected = selectedLan === net.url || !selectedLan && net.url === state2.serverSetupInfo?.lanUrl?.split("/#")[0];
+      const isSelected = currentBaseUrl === net.url || !currentBaseUrl && net.url === state2.serverSetupInfo?.lanUrl?.split("/#")[0];
       const isCopied = copyFeedback === `ip-${net.address}`;
       return `
           <div class="network-ip-item ${isSelected ? "selected" : ""}" data-ip-url="${escapeHtml2(net.url)}">
@@ -10505,16 +10557,16 @@ ${thought.trim()}` : thought.trim();
                 <span class="network-ip-badge ${net.isTailscale ? "badge-tailscale" : "badge-lan"}">
                   ${net.isTailscale ? "\u{1F512} Tailscale" : "\u{1F3E0} Local LAN"}
                 </span>
-                ${isSelected ? '<span class="network-ip-active-tag">Active QR</span>' : ""}
+                ${isSelected ? '<span class="network-ip-active-tag">Active</span>' : ""}
               </div>
               <div class="network-ip-actions">
                 <button
                   type="button"
                   class="btn btn-secondary network-btn-use-qr ${isSelected ? "active" : ""}"
                   data-use-ip="${escapeHtml2(net.url)}"
-                  title="Generate QR code for this network IP"
+                  title="Use this network address for live SSE & QR"
                 >
-                  ${isSelected ? "\u2713 In QR" : "\u{1F4F2} Use in QR"}
+                  ${isSelected ? "\u2713 Active" : "\u{1F4F2} Set as Active"}
                 </button>
                 <button
                   type="button"
@@ -10541,10 +10593,30 @@ ${thought.trim()}` : thought.trim();
     return `
     <div class="settings-section settings-section--network" id="settings-section-network">
       <div class="settings-section-header">
-        <h4 class="settings-section-title">\u{1F310} Local Network & IP Addresses</h4>
+        <h4 class="settings-section-title">\u{1F310} Local Network & Server IP</h4>
         <p class="settings-section-subtitle">
           Connect directly via local Wi-Fi, LAN, or Tailscale for zero-latency <strong>Live SSE streaming</strong> without cloud sync.
         </p>
+      </div>
+
+      <div class="server-ip-config-box" style="margin-bottom: 12px;">
+        <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
+          Agent Server Address (LAN / Tailscale IP):
+        </label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input
+            id="input-custom-server-ip"
+            class="search-input"
+            type="text"
+            placeholder="http://192.168.1.50:4200"
+            value="${escapeHtml2(currentBaseUrl)}"
+            style="flex: 1;"
+          />
+          <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
+            ${isServerSaved ? "\u2705 Saved!" : "\u{1F4BE} Set IP"}
+          </button>
+          ${currentBaseUrl ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ""}
+        </div>
       </div>
 
       <div class="network-ip-list">
@@ -10657,7 +10729,7 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
-  // src/ui/components/settingsModal/settingsModal.ts
+  // src/ui/components/settingsModal/settingsModalView.ts
   function renderSettingsModal(state2) {
     if (!state2.isSettingsModalOpen && !state2.isQrModalOpen) return "";
     return `
@@ -11384,45 +11456,7 @@ ${thought.trim()}` : thought.trim();
     setupModelSearchInput(state2, callbacks);
   }
 
-  // src/ui/settingsModalEvents.ts
-  async function fetchServerSetupInfo(state2, onRender) {
-    if (state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
-    try {
-      const res = await fetch("/api/setup-info");
-      if (res.ok) {
-        state2.serverSetupInfo = await res.json();
-        onRender();
-      }
-    } catch {
-    }
-  }
-  function openSettingsModal(state2, onRender) {
-    state2.isSettingsModalOpen = true;
-    state2.isQrModalOpen = true;
-    state2.qrModalTarget = state2.qrModalTarget || "gh_pages";
-    state2.settingsCopyFeedback = void 0;
-    state2.qrCopyFeedback = void 0;
-    onRender();
-    void fetchServerSetupInfo(state2, onRender);
-  }
-  function closeSettingsModal(state2, onRender) {
-    state2.isSettingsModalOpen = false;
-    state2.isQrModalOpen = false;
-    state2.settingsCopyFeedback = void 0;
-    state2.qrCopyFeedback = void 0;
-    onRender();
-  }
-  function selectQrTab(state2, target, onRender) {
-    state2.qrModalTarget = target;
-    state2.settingsCopyFeedback = void 0;
-    state2.qrCopyFeedback = void 0;
-    onRender();
-  }
-  function selectLanIp(state2, ipUrl, onRender) {
-    state2.selectedLanIp = ipUrl;
-    state2.qrModalTarget = "lan";
-    onRender();
-  }
+  // src/ui/settingsClipboardActions.ts
   async function copyQrLink(state2, onRender) {
     const url = buildSettingsQrUrl({
       target: state2.qrModalTarget || "gh_pages",
@@ -11484,6 +11518,67 @@ ${thought.trim()}` : thought.trim();
     } catch {
     }
   }
+
+  // src/ui/settingsModalEvents.ts
+  async function fetchServerSetupInfo(state2, onRender, force = false) {
+    if (!force && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
+    try {
+      const res = await fetch(buildApiUrl("/api/setup-info"));
+      if (res.ok) {
+        state2.serverSetupInfo = await res.json();
+        onRender();
+      }
+    } catch {
+    }
+  }
+  function openSettingsModal(state2, onRender) {
+    state2.isSettingsModalOpen = true;
+    state2.isQrModalOpen = true;
+    state2.qrModalTarget = state2.qrModalTarget || "gh_pages";
+    state2.settingsCopyFeedback = void 0;
+    state2.qrCopyFeedback = void 0;
+    onRender();
+    void fetchServerSetupInfo(state2, onRender);
+  }
+  function closeSettingsModal(state2, onRender) {
+    state2.isSettingsModalOpen = false;
+    state2.isQrModalOpen = false;
+    state2.settingsCopyFeedback = void 0;
+    state2.qrCopyFeedback = void 0;
+    onRender();
+  }
+  function selectQrTab(state2, target, onRender) {
+    state2.qrModalTarget = target;
+    state2.settingsCopyFeedback = void 0;
+    state2.qrCopyFeedback = void 0;
+    onRender();
+  }
+  function selectLanIp(state2, ipUrl, onRender) {
+    state2.selectedLanIp = ipUrl;
+    state2.qrModalTarget = "lan";
+    setServerBaseUrl(ipUrl);
+    onRender();
+    void fetchServerSetupInfo(state2, onRender, true);
+  }
+  function saveCustomServerUrl(state2, url, onRender) {
+    const clean = url.trim().replace(/\/+$/, "");
+    if (clean) {
+      setServerBaseUrl(clean);
+      state2.selectedLanIp = clean;
+    } else {
+      clearServerBaseUrl();
+      state2.selectedLanIp = void 0;
+    }
+    state2.settingsCopyFeedback = "server-saved";
+    onRender();
+    void fetchServerSetupInfo(state2, onRender, true);
+    setTimeout(() => {
+      if (state2.settingsCopyFeedback === "server-saved") {
+        state2.settingsCopyFeedback = void 0;
+        onRender();
+      }
+    }, 2500);
+  }
   function handleSettingsModalClick(state2, target, callbacks) {
     if (target.closest("#btn-open-settings, #btn-show-qr, #btn-sidebar-qr")) {
       openSettingsModal(state2, callbacks.onRender);
@@ -11516,6 +11611,15 @@ ${thought.trim()}` : thought.trim();
       const ipUrl = copyIpBtn.getAttribute("data-copy-ip-url") || "";
       const ipAddr = copyIpBtn.getAttribute("data-ip-address") || "";
       if (ipUrl) void copyIpUrl(state2, ipUrl, ipAddr, callbacks.onRender);
+      return true;
+    }
+    if (target.closest("#btn-save-custom-ip")) {
+      const input = document.getElementById("input-custom-server-ip");
+      saveCustomServerUrl(state2, input?.value || "", callbacks.onRender);
+      return true;
+    }
+    if (target.closest("#btn-clear-custom-ip")) {
+      saveCustomServerUrl(state2, "", callbacks.onRender);
       return true;
     }
     if (target.closest("#btn-copy-qr-link")) {
@@ -12109,7 +12213,8 @@ ${thought.trim()}` : thought.trim();
         chatScrollTop: null,
         isChatNearBottom: true,
         sidebarScrollTop: null,
-        plansScrollTop: null
+        plansScrollTop: null,
+        settingsModalScrollTop: null
       };
     }
     const active = document.activeElement;
@@ -12132,6 +12237,8 @@ ${thought.trim()}` : thought.trim();
     const sidebarScrollTop = sidebarContainer ? sidebarContainer.scrollTop : null;
     const plansContainer = typeof document.querySelector === "function" ? document.querySelector(".plan-content-scroll, .chat-plan-scroll") : null;
     const plansScrollTop = plansContainer ? plansContainer.scrollTop : null;
+    const settingsBody = typeof document.querySelector === "function" ? document.querySelector(".settings-modal-body, #settings-modal .update-modal-body") : null;
+    const settingsModalScrollTop = settingsBody ? settingsBody.scrollTop : null;
     return {
       activeElementId: activeId,
       selectionStart: selStart,
@@ -12141,7 +12248,8 @@ ${thought.trim()}` : thought.trim();
       chatScrollTop,
       isChatNearBottom,
       sidebarScrollTop,
-      plansScrollTop
+      plansScrollTop,
+      settingsModalScrollTop
     };
   }
   function restoreFocusState(snapshot) {
@@ -12182,6 +12290,12 @@ ${thought.trim()}` : thought.trim();
       const plansContainer = typeof document.querySelector === "function" ? document.querySelector(".plan-content-scroll, .chat-plan-scroll") : null;
       if (plansContainer && snapshot.plansScrollTop !== null) {
         plansContainer.scrollTop = snapshot.plansScrollTop;
+      }
+    }
+    if (snapshot.settingsModalScrollTop !== null) {
+      const settingsBody = typeof document.querySelector === "function" ? document.querySelector(".settings-modal-body, #settings-modal .update-modal-body") : null;
+      if (settingsBody) {
+        settingsBody.scrollTop = snapshot.settingsModalScrollTop;
       }
     }
   }
@@ -12398,6 +12512,7 @@ ${thought.trim()}` : thought.trim();
 
     async function checkRemote() {
       if (typeof fetch === 'undefined' || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+      if (typeof window !== 'undefined' && window.location.protocol !== 'file:') return;
       var urls = [
         { css: GH_PAGES + '/monitor.css', js: GH_PAGES + '/bundle.js' },
         { css: CDN_FALLBACK + '/monitor.css', js: CDN_FALLBACK + '/bundle.js' }

@@ -1,7 +1,7 @@
 import type { AppState } from './types';
 import type { SessionDetail } from '../server/types';
 import { fetchSessionDetail, verifyAuthStatus, resolveSessionApproval } from './apiClient';
-import { clearStoredToken } from './authStore';
+import { clearStoredToken, hasLiveServer } from './authStore';
 import { initSseClient } from './sseClient';
 import { SyncStateMachine } from './syncStateMachine';
 import { syncSessionPlans, selectPlanDetail, applyGistSyncPayload, loadCachedGistConfig } from './sessionPlanSync';
@@ -31,6 +31,12 @@ export class AppController {
     const hasCachedMsgs = Boolean(cached?.messages && cached.messages.length > 0);
     Object.assign(this.state, { activeSessionId: id, activeSession: initial, activeTab: 'chat', activePlan: undefined, activePlanName: undefined, isLoadingSession: !hasCachedMsgs });
     saveActiveTab('chat'); saveActiveSessionId(id); void syncSessionPlans(this.state); this.render();
+    if (this.state.syncMode === 'git-backup' || !hasLiveServer()) {
+      if (cached) this.state.activeSession = cached;
+      this.state.isLoadingSession = false;
+      await syncSessionPlans(this.state); this.render();
+      return;
+    }
     try {
       const d = await fetchSessionDetail(id);
       if (this.state.activeSessionId === id) {

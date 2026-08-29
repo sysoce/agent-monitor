@@ -1,6 +1,7 @@
 import type { AppState } from './types';
 import { SyncStateMachine } from './syncStateMachine';
 import { loadCachedGistConfig, applyGistSyncPayload } from './sessionPlanSync';
+import { hasLiveServer } from './authStore';
 
 export function createAppSyncMachine(state: AppState, render: () => void): SyncStateMachine {
   let machine: SyncStateMachine;
@@ -35,16 +36,11 @@ export function createAppSyncMachine(state: AppState, render: () => void): SyncS
 export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: () => void): void {
   const cfg = loadCachedGistConfig();
   if (cfg) syncMachine.setGistConfig(cfg);
-  const isStatic = typeof window !== 'undefined' && (
-    window.location.protocol === 'file:' ||
-    window.location.hostname.endsWith('github.io') ||
-    window.location.hostname.endsWith('.pages.dev')
-  );
+  const liveServer = hasLiveServer();
   const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) || undefined;
-  const mode = saved || (isStatic && cfg ? 'git-backup' : 'live-sse');
-  if (mode === 'git-backup' && cfg) {
-    syncMachine.forceGitBackupMode();
-  } else if (isStatic && cfg) {
+  const mode = saved || (!liveServer && cfg ? 'git-backup' : 'live-sse');
+
+  if (mode === 'git-backup' || !liveServer) {
     syncMachine.forceGitBackupMode();
   } else {
     startSse();
@@ -58,14 +54,14 @@ export function toggleSyncModeAction(
   sseCleanup?: () => void
 ): void {
   const isGit = state.syncMode === 'git-backup';
-  try { localStorage.setItem('agent_sync_mode', isGit ? 'live-sse' : 'git-backup'); } catch {}
   if (isGit) {
-    syncMachine.restorePrimaryLive();
+    if (!hasLiveServer()) return;
+    if (typeof localStorage !== 'undefined') localStorage.setItem('agent_sync_mode', 'live-sse');
+    syncMachine.stop();
     startSse();
   } else {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('agent_sync_mode', 'git-backup');
     sseCleanup?.();
-    const cfg = loadCachedGistConfig();
-    if (cfg) syncMachine.setGistConfig(cfg);
     syncMachine.forceGitBackupMode();
   }
 }
