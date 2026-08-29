@@ -6858,7 +6858,7 @@ input:checked + .slider:before {
       }
     } catch {
     }
-    return "";
+    return "http://192.168.1.111:4200";
   }
   function getServerBaseUrl() {
     try {
@@ -7224,7 +7224,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.18" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.19" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7626,9 +7626,10 @@ input:checked + .slider:before {
     const planRef = planPath ? ` [${title}](${planPath})` : "";
     return `I am ready to implement the plan${planRef}. Please follow each step in the plan, work through the checklist items in order, verify the changes, and produce a walkthrough.md artifact summarizing the changes made, verification results, and tested behavior.`;
   }
-  async function submitMessageFlow(state2, syncMachine, text, onReload, onRender) {
+  async function submitMessageFlow(state2, syncMachine, text, onReload, onRender, options) {
     const input = typeof document !== "undefined" ? document.getElementById("composer-input") : null;
-    const attachments = state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0;
+    const attachments = options?.attachments ?? (state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0);
+    if (options?.mode) state2.composerMode = options.mode;
     appendOptimisticUserMessage(state2, text);
     Object.assign(state2, {
       composerDraft: "",
@@ -8532,7 +8533,10 @@ input:checked + .slider:before {
       stopSession2();
     }
     render2();
-    await submitMessageFlow(state2, syncMachine, msg.text, () => reloadData(false), render2);
+    await submitMessageFlow(state2, syncMachine, msg.text, () => reloadData(false), render2, {
+      mode: msg.mode,
+      attachments: msg.attachments
+    });
   }
   function handleEditQueuedMessage(state2, id, render2) {
     const msg = removeQueuedMessageById(state2, id);
@@ -8561,7 +8565,10 @@ input:checked + .slider:before {
     const next = dequeueNextQueuedMessage(state2, state2.activeSessionId);
     if (!next) return;
     render2();
-    await submitMessageFlow(state2, syncMachine, next.text, () => reloadData(false), render2);
+    await submitMessageFlow(state2, syncMachine, next.text, () => reloadData(false), render2, {
+      mode: next.mode,
+      attachments: next.attachments
+    });
   }
 
   // src/ui/appController.ts
@@ -11606,7 +11613,7 @@ ${thought.trim()}` : thought.trim();
             id="input-custom-server-ip"
             class="search-input"
             type="text"
-            placeholder="http://192.168.1.50:4200"
+            placeholder="http://192.168.1.111:4200"
             value="${escapeHtml2(currentBaseUrl)}"
             style="flex: 1;"
           />

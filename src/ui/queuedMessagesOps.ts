@@ -66,7 +66,10 @@ export async function handleSendNowQueuedMessage(
     stopSession();
   }
   render();
-  await submitMessageFlow(state, syncMachine, msg.text, () => reloadData(false), render);
+  await submitMessageFlow(state, syncMachine, msg.text, () => reloadData(false), render, {
+    mode: msg.mode,
+    attachments: msg.attachments,
+  });
 }
 
 export function handleEditQueuedMessage(
@@ -117,5 +120,8 @@ export async function processNextQueuedMessageIfReady(
   if (!next) return;
 
   render();
-  await submitMessageFlow(state, syncMachine, next.text, () => reloadData(false), render);
+  await submitMessageFlow(state, syncMachine, next.text, () => reloadData(false), render, {
+    mode: next.mode,
+    attachments: next.attachments,
+  });
 }

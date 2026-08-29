@@ -2,9 +2,9 @@ import test from 'node:test';
 import * as assert from 'node:assert/strict';
 import { getServerBaseUrl, setServerBaseUrl, clearServerBaseUrl, getDefaultServerUrl } from '../src/ui/authStore';
 
-test('getDefaultServerUrl returns empty string or configured define', () => {
+test('getDefaultServerUrl returns default LAN IP when define is undefined', () => {
   const def = getDefaultServerUrl();
-  assert.equal(typeof def, 'string');
+  assert.equal(def, 'http://192.168.1.111:4200');
 });
 
 test('getServerBaseUrl returns default LAN IP when localStorage is empty', () => {

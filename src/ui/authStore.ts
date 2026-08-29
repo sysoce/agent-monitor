@@ -37,7 +37,7 @@ export function getDefaultServerUrl(): string {
       return __DEFAULT_SERVER_URL__;
     }
   } catch {}
-  return '';
+  return 'http://192.168.1.111:4200';
 }
 
 export function getServerBaseUrl(): string {

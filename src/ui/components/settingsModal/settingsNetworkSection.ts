@@ -78,7 +78,7 @@ export function renderSettingsNetworkSection(state: AppState): string {
             id="input-custom-server-ip"
             class="search-input"
             type="text"
-            placeholder="http://192.168.1.50:4200"
+            placeholder="http://192.168.1.111:4200"
             value="${escapeHtml(currentBaseUrl)}"
             style="flex: 1;"
           />

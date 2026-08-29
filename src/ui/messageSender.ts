@@ -114,11 +114,16 @@ export function buildPlanHandoffPrompt(planPath: string, planTitle?: string): st
 }
 
 export async function submitMessageFlow(
-  state: AppState, syncMachine: SyncStateMachine, text: string,
-  onReload: () => Promise<void>, onRender: () => void
+  state: AppState,
+  syncMachine: SyncStateMachine,
+  text: string,
+  onReload: () => Promise<void>,
+  onRender: () => void,
+  options?: { mode?: 'agent' | 'plan' | 'ask'; attachments?: AttachmentItem[] }
 ): Promise<void> {
   const input = typeof document !== 'undefined' ? (document.getElementById('composer-input') as HTMLTextAreaElement | null) : null;
-  const attachments = state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined;
+  const attachments = options?.attachments ?? (state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined);
+  if (options?.mode) state.composerMode = options.mode;
   appendOptimisticUserMessage(state, text);
   Object.assign(state, {
     composerDraft: '', attachments: [], isMentionOpen: false,

@@ -14,6 +14,7 @@ import {
   isAgentBusy,
   handleEditQueuedMessage,
   handleDeleteQueuedMessage,
+  processNextQueuedMessageIfReady,
 } from '../src/ui/queuedMessagesOps';
 
 function createMockState(partial: Partial<AppState> = {}): AppState {
@@ -128,4 +129,15 @@ test('handleEditQueuedMessage and handleDeleteQueuedMessage update state properl
   const msg2 = enqueueQueuedMessage(state, 'Deletable text', undefined, 'agent', 'sess-1');
   handleDeleteQueuedMessage(state, msg2.id, () => { rendered = true; });
   assert.equal(getQueuedMessagesForSession(state, 'sess-1').length, 0);
+});
+
+test('processNextQueuedMessageIfReady respects busy state and drains when idle', async () => {
+  const state = createMockState({ activeSessionId: 'sess-1', isSending: true });
+  enqueueQueuedMessage(state, 'Pending queue prompt', undefined, 'plan', 'sess-1');
+  let flowTriggered = false;
+  const mockSyncMachine = { setAwaitingResponse: () => {} } as any;
+
+  await processNextQueuedMessageIfReady(state, mockSyncMachine, async () => {}, () => { flowTriggered = true; });
+  assert.equal(flowTriggered, false);
+  assert.equal(getQueuedMessagesForSession(state, 'sess-1').length, 1);
 });
