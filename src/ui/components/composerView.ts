@@ -4,14 +4,13 @@ import { renderAttachmentPill } from './attachmentPill';
 import { renderMentionDropdown } from './mentionDropdown';
 import { renderModelPickerDropdown } from './modelPickerDropdown';
 import { formatModelLabel } from '../../utils/modelCatalogPresets';
-import { isComposerStopMode } from '../composerButton';
+import { renderComposerActionsHtml } from '../composerButton';
 
 export function renderComposerView(state: AppState): string {
   if (state.activeTab === 'plans') return '';
 
   const modeLabel = state.composerMode === 'agent' ? 'Agent' : state.composerMode === 'plan' ? 'Plan' : 'Ask';
   const modelLabel = formatModelLabel(state.selectedModel, state.availableModels);
-  const stopMode = isComposerStopMode(state);
   const attachments = state.attachments || [];
 
   return `
@@ -57,20 +56,7 @@ export function renderComposerView(state: AppState): string {
             </div>
           </div>
           <div class="composer-toolbar-right composer-actions">
-            <button
-              type="button"
-              class="send-btn ${stopMode ? 'btn-stop stop-mode' : 'btn-send'}"
-              id="${stopMode ? 'btn-stop' : 'btn-send'}"
-              title="${stopMode ? 'Stop (Immediate stop)' : 'Send (Enter)'}"
-              aria-label="${stopMode ? 'Stop agent' : 'Send message'}"
-            >
-              <svg class="submit-icon send-icon ${stopMode ? 'hidden' : ''}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M8 12V4M8 4L5 7M8 4l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <svg class="submit-icon stop-icon ${stopMode ? '' : 'hidden'}" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <rect x="4.5" y="4.5" width="7" height="7" rx="1.5"/>
-              </svg>
-            </button>
+            ${renderComposerActionsHtml(state)}
           </div>
         </div>
       </div>

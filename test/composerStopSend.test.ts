@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { renderComposerView } from '../src/ui/components/composerView';
-import { updateComposerButton } from '../src/ui/composerButton';
+import { updateComposerButton, isAgentRunning } from '../src/ui/composerButton';
+import { handleControlClick } from '../src/ui/controlHandlers';
 import type { AppState } from '../src/ui/types';
 
 function createMockState(overrides: Partial<AppState> = {}, isGenerating = false): AppState {
@@ -37,23 +38,43 @@ test('renderComposerView renders only Stop button when running and draft is empt
   const html = renderComposerView(createMockState({ composerDraft: '' }, true));
   assert.ok(html.includes('id="btn-stop"'), 'Renders Stop button ID when agent is generating without draft');
   assert.ok(html.includes('stop-mode'), 'Button has stop-mode class');
-  assert.ok(!html.includes('id="btn-send"'), 'Does NOT render separate Send button ID side by side');
+  assert.ok(!html.includes('id="btn-send"'), 'Does NOT render Send button when empty');
 });
 
-test('renderComposerView renders Send button when running but user has typed a message', () => {
+test('renderComposerView renders BOTH Stop and Send buttons when running and user has typed a message', () => {
   const html = renderComposerView(createMockState({ composerDraft: 'next instruction' }, true));
-  assert.ok(html.includes('id="btn-send"'), 'Renders Send button when user is typing during active run');
-  assert.ok(!html.includes('stop-mode'), 'Button does not have stop-mode class when typing');
-  assert.ok(!html.includes('id="btn-stop"'), 'Does not render separate Stop button ID side by side');
+  assert.ok(html.includes('id="btn-stop"'), 'Stop button MUST be present even when typing');
+  assert.ok(html.includes('stop-mode'), 'Stop button has stop-mode class');
+  assert.ok(html.includes('id="btn-send"'), 'Send button is also present to queue next instruction');
 });
 
-test('renderComposerView renders Send button when running but user has attachments', () => {
+test('renderComposerView renders BOTH Stop and Send buttons when running and user has attachments', () => {
   const html = renderComposerView(createMockState({
     composerDraft: '',
     attachments: [{ id: 'a1', type: 'file', label: 'test.ts', path: 'test.ts' }],
   }, true));
-  assert.ok(html.includes('id="btn-send"'), 'Renders Send button when user has attachments');
-  assert.ok(!html.includes('stop-mode'), 'Button does not have stop-mode');
+  assert.ok(html.includes('id="btn-stop"'), 'Stop button MUST be present when running with attachments');
+  assert.ok(html.includes('id="btn-send"'), 'Send button is present when user has attachments');
+});
+
+test('renderComposerView renders Stop button when subagents are running', () => {
+  const state = createMockState({
+    activeSession: {
+      id: 'sess-1',
+      title: 'Session',
+      mode: 'agent',
+      createdAt: 1000,
+      updatedAt: 1000,
+      messages: [],
+      filesChanged: [],
+      artifacts: [],
+      subagents: [{ id: 'sub-1', role: 'research', status: 'running' }],
+      isGenerating: false,
+    },
+  }, false);
+  const html = renderComposerView(state);
+  assert.ok(html.includes('id="btn-stop"'), 'Stop button MUST be present when subagents are running');
+  assert.equal(isAgentRunning(state), true, 'isAgentRunning returns true when subagents are running');
 });
 
 test('renderComposerView renders only Send button when idle', () => {
@@ -63,38 +84,29 @@ test('renderComposerView renders only Send button when idle', () => {
   assert.ok(!html.includes('stop-mode'), 'Button does not have stop-mode when idle');
 });
 
-test('updateComposerButton dynamically updates button attributes and icons in DOM', () => {
-  const mockSendIcon = { classList: { toggle: (cls: string, val: boolean) => {} } };
-  const mockStopIcon = { classList: { toggle: (cls: string, val: boolean) => {} } };
-  const mockBtn: any = {
-    id: 'btn-send',
-    className: 'send-btn btn-send',
-    title: 'Send (Enter)',
-    attrs: {} as Record<string, string>,
-    setAttribute: (k: string, v: string) => { mockBtn.attrs[k] = v; },
-    querySelector: (sel: string) => (sel === '.send-icon' ? mockSendIcon : sel === '.stop-icon' ? mockStopIcon : null),
-  };
-  const mockTextarea: any = { value: '' };
-
-  const mockDoc: any = {
-    querySelector: (sel: string) => mockBtn,
-    getElementById: (id: string) => (id === 'composer-input' ? mockTextarea : null),
+test('handleControlClick triggers onStopSession when Stop button is clicked even with draft text', () => {
+  let stopped = false;
+  let sent = false;
+  const state = createMockState({ composerDraft: 'some text to send' }, true);
+  const stopTarget: any = {
+    id: 'btn-stop',
+    classList: { contains: (c: string) => c === 'btn-stop' || c === 'stop-mode' },
+    closest: (sel: string) => (sel.includes('btn-stop') ? stopTarget : null),
   };
 
-  const state = createMockState({}, true);
+  const handled = handleControlClick(stopTarget, state, {
+    onSelectSession: () => {},
+    onNewSession: () => {},
+    onSendMessage: () => { sent = true; },
+    onStopSession: () => { stopped = true; },
+    onSelectPlan: () => {},
+    onLoginSuccess: () => {},
+    onRender: () => {},
+  });
 
-  // Empty input + generating => stop-mode
-  updateComposerButton(state, mockDoc);
-  assert.equal(mockBtn.id, 'btn-stop');
-  assert.ok(mockBtn.className.includes('stop-mode'));
-  assert.equal(mockBtn.title, 'Stop (Immediate stop)');
-
-  // Typing text + generating => send mode
-  mockTextarea.value = 'hello';
-  updateComposerButton(state, mockDoc);
-  assert.equal(mockBtn.id, 'btn-send');
-  assert.ok(!mockBtn.className.includes('stop-mode'));
-  assert.equal(mockBtn.title, 'Send (Enter)');
+  assert.equal(handled, true);
+  assert.equal(stopped, true, 'onStopSession MUST be called when clicking stop button');
+  assert.equal(sent, false, 'onSendMessage MUST NOT be called when clicking stop button with draft text');
 });
 
 

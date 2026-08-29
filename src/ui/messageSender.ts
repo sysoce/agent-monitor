@@ -63,15 +63,14 @@ export async function stopCurrentSession(state: AppState, syncMachine?: SyncStat
   const sid = state.activeSessionId || state.awaitingSessionId || state.activeSession?.id || state.sessions.find((s) => s.isGenerating)?.id || 'default';
   if (state.activeSession) {
     state.activeSession.isGenerating = false;
-    if (state.activeSession.messages) {
-      state.activeSession.messages = state.activeSession.messages.filter((m: any) =>
-        !(m?.role === 'assistant' && !m?.content?.trim() && !m?.tool_calls?.length && !m?.thinking && !m?.thought)
-      );
-    }
+    state.activeSession.messages?.forEach((m: any) => { if (m.isLive) m.isLive = false; });
+    state.activeSession.messages = state.activeSession.messages?.filter((m: any) =>
+      !(m?.role === 'assistant' && !m?.content?.trim() && !m?.tool_calls?.length && !m?.thinking && !m?.thought)
+    ) || [];
+    state.activeSession.subagents?.forEach((s) => { if (s.status === 'running') s.status = 'failed'; });
+    state.activeSession.backgroundTasks?.forEach((t) => { if (t.status === 'running') t.status = 'failed'; });
   }
-  for (const s of state.sessions) {
-    if (s.id === sid || s.isGenerating) s.isGenerating = false;
-  }
+  state.sessions.forEach((s) => { if (s.id === sid || s.isGenerating) s.isGenerating = false; });
   state.isSending = false;
   state.isAwaitingResponse = false;
   state.awaitingSessionId = undefined;

@@ -88,11 +88,14 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
       hasDraft = draftSt.isFile() && (Date.now() - draftSt.mtimeMs < 60_000);
     } catch {}
   }
-  const isGenerating = !isAborted && Boolean(hasActiveLock || (hasDraft && hasPending));
+  const isGenerating = !isAborted && Boolean(hasActiveLock || hasDraft);
   const subagents = parseSubagents(messages, isGenerating);
   const backgroundTasks = parseBackgroundTasks(messages, isGenerating);
+  const hasRunningSub = subagents.some((s) => s.status === 'running');
+  const hasRunningBg = backgroundTasks.some((t) => t.status === 'running');
+  const finalIsGenerating = !isAborted && Boolean(isGenerating || hasRunningSub || hasRunningBg);
   const pendingApprovals = await readPendingApprovals(sDir);
-  const detail: SessionDetail = { id: sessionId, title, mode, createdAt: sFile.birthtimeMs, updatedAt: sFile.mtimeMs, messages, filesChanged, artifacts, subagents, backgroundTasks, pendingApprovals, plans, isGenerating };
+  const detail: SessionDetail = { id: sessionId, title, mode, createdAt: sFile.birthtimeMs, updatedAt: sFile.mtimeMs, messages, filesChanged, artifacts, subagents, backgroundTasks, pendingApprovals, plans, isGenerating: finalIsGenerating };
   if (isAborted) return detail;
   const draft = await readSessionDraft(workspaceRoot, sessionId);
   return draft ? injectDraftIntoSession(detail, draft) : detail;

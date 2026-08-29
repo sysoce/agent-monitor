@@ -92,19 +92,14 @@ export function handleControlClick(target: HTMLElement, state: AppState, callbac
     return true;
   }
 
-  const composerActionBtn = target.closest('#btn-send, #btn-stop, .send-btn, .btn-stop, .stop-mode');
-  if (composerActionBtn) {
-    const composer = typeof document !== 'undefined' ? (document.getElementById('composer-input') as HTMLTextAreaElement | null) : null;
-    const currentText = (composer ? composer.value : state.composerDraft) || '';
-    const hasContent = Boolean(currentText.trim().length > 0 || (state.attachments && state.attachments.length > 0));
-    if (hasContent) {
-      void callbacks.onSendMessage();
-      return true;
-    }
-    if (isComposerStopMode(state, currentText) || composerActionBtn.classList.contains('stop-mode') || composerActionBtn.id === 'btn-stop') {
-      void callbacks.onStopSession?.();
-      return true;
-    }
+  const stopBtn = target.closest('#btn-stop, .btn-stop, .stop-mode');
+  if (stopBtn) {
+    void callbacks.onStopSession?.();
+    return true;
+  }
+
+  const sendBtn = target.closest('#btn-send, .btn-send, .send-btn');
+  if (sendBtn) {
     void callbacks.onSendMessage();
     return true;
   }
