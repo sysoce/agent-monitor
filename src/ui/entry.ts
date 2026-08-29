@@ -91,6 +91,7 @@ function render() {
     onLogout: () => controller.handleLogout(),
     onToggleSyncMode: () => controller.toggleSyncMode(),
     onSetSyncMode: (mode) => controller.setSyncMode(mode),
+    onToggleAutoFallback: (enabled) => controller.toggleAutoFallback(enabled),
     onRender: render,
   });
 

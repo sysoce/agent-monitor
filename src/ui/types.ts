@@ -55,6 +55,7 @@ export interface AppState {
   lastAbortedSessionId?: string;
   errorMessage?: string;
   autoUpdateEnabled?: boolean;
+  autoFallbackEnabled?: boolean;
   availableUpdateVersion?: string;
   updateDownloaded?: boolean;
   hostPresence?: ClientPresence;

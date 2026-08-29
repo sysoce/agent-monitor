@@ -76,6 +76,7 @@ test('renderSettingsModal renders full modal with all sections and 3 sync modes 
   assert.ok(html.includes('data-set-sync-mode="p2p"'));
   assert.ok(html.includes('data-set-sync-mode="live-sse"'));
   assert.ok(html.includes('data-set-sync-mode="git-backup"'));
+  assert.ok(html.includes('id="toggle-auto-fallback"'));
   assert.ok(html.includes('id="toggle-auto-update"'));
   assert.ok(html.includes('id="btn-settings-logout"'));
 });

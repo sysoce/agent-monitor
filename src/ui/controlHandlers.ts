@@ -5,6 +5,7 @@ import { filterSessionCardsInPlace } from './sessionFilter';
 import { isComposerStopMode } from './composerButton';
 import { flashCopyButton, copyTextToClipboard } from './copyActions';
 import { setAutoUpdateEnabled, triggerBundleDownload } from './updateManager';
+import { setAutoFallbackEnabled } from './fallbackSettings';
 
 export const copyToClipboard = copyTextToClipboard;
 
@@ -59,6 +60,14 @@ export function handlePlanClick(target: HTMLElement, state: AppState, callbacks:
 }
 
 export function handleControlClick(target: HTMLElement, state: AppState, callbacks: EventHandlerCallbacks): boolean {
+  const autoFallbackChk = target.closest<HTMLInputElement>('#toggle-auto-fallback, .btn-toggle-auto-fallback');
+  if (autoFallbackChk) {
+    setAutoFallbackEnabled(autoFallbackChk.checked);
+    state.autoFallbackEnabled = autoFallbackChk.checked;
+    callbacks.onToggleAutoFallback?.(autoFallbackChk.checked);
+    callbacks.onRender();
+    return true;
+  }
   const autoUpdateChk = target.closest<HTMLInputElement>('#toggle-auto-update, .btn-toggle-auto-update');
   if (autoUpdateChk) {
     setAutoUpdateEnabled(autoUpdateChk.checked);

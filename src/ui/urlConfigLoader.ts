@@ -6,6 +6,7 @@ export interface ParsedMobileConfig {
   token?: string;
   password?: string;
   serverUrl?: string;
+  autoFallback?: boolean;
 }
 
 export function parseUrlConfig(rawInput: string): ParsedMobileConfig | null {
@@ -30,9 +31,11 @@ export function parseUrlConfig(rawInput: string): ParsedMobileConfig | null {
   const token = params.get('token') || params.get('t') || undefined;
   const password = params.get('password') || params.get('p') || undefined;
   const serverUrl = params.get('server') || params.get('serverUrl') || params.get('s') || undefined;
+  const fbParam = params.get('fallback') ?? params.get('autoFallback');
+  const autoFallback = fbParam !== null ? (fbParam !== '0' && fbParam !== 'false') : undefined;
 
-  if (gistId || token || serverUrl) {
-    return { gistId, token, password, serverUrl };
+  if (gistId || token || serverUrl || autoFallback !== undefined) {
+    return { gistId, token, password, serverUrl, autoFallback };
   }
 
   return null;
@@ -42,8 +45,11 @@ export function applyConfigToStorage(
   config: ParsedMobileConfig,
   storage: Storage = typeof localStorage !== 'undefined' ? localStorage : ({} as Storage)
 ): boolean {
-  if (!config.gistId && !config.token && !config.serverUrl) return false;
+  if (!config.gistId && !config.token && !config.serverUrl && config.autoFallback === undefined) return false;
   try {
+    if (config.autoFallback !== undefined) {
+      storage.setItem('agent_auto_fallback', String(config.autoFallback));
+    }
     if (config.serverUrl) {
       storage.setItem('agent_server_url', config.serverUrl);
       setServerBaseUrl(config.serverUrl);

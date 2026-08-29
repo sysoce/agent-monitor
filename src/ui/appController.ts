@@ -18,6 +18,8 @@ import {
   handleDeleteQueuedMessage, handleToggleQueuedCollapseAction, processNextQueuedMessageIfReady,
 } from './queuedMessagesOps';
 
+import { isAutoFallbackEnabled, setAutoFallbackEnabled } from './fallbackSettings';
+
 export class AppController {
   private sseCleanup: (() => void) | null = null;
   private syncMachine: SyncStateMachine;
@@ -29,9 +31,9 @@ export class AppController {
   async selectSession(id: string): Promise<void> {
     const s = this.state.sessions.find((sess) => sess.id === id), cached = this.state.cachedSessionDetails?.[id];
     const initial: SessionDetail = cached || {
-      id, title: s?.title || id, mode: 'agent', createdAt: s?.createdAt || Date.now(), updatedAt: s?.updatedAt || Date.now(),
+      id, title: s?.title || id, mode: 'agent', createdAt: s?.createdAt || 0, updatedAt: s?.updatedAt || s?.createdAt || 0,
       messages: [], filesChanged: [], artifacts: [], subagents: [],
-      plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || [],
+      plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: 0, sizeBytes: 0 })) || [],
     };
     const hasCachedMsgs = Boolean(cached?.messages && cached.messages.length > 0);
     Object.assign(this.state, { activeSessionId: id, activeSession: initial, activeTab: 'chat', activePlan: undefined, activePlanName: undefined, isLoadingSession: !hasCachedMsgs });
@@ -72,9 +74,12 @@ export class AppController {
   handleSelectModel(modelId: string): void { this.state.selectedModel = modelId; this.render(); }
   toggleSyncMode(): void { toggleSyncModeAction(this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || undefined); this.render(); }
   setSyncMode(mode: TransportMode): void { setSyncModeAction(mode, this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || undefined); this.render(); }
+  toggleAutoFallback(enabled?: boolean): void {
+    const next = enabled ?? !(this.state.autoFallbackEnabled ?? isAutoFallbackEnabled());
+    this.state.autoFallbackEnabled = next; setAutoFallbackEnabled(next); this.syncMachine.setAutoFallback(next); this.render();
+  }
   handleStopSession(): void {
-    this.state.lastAbortedAt = Date.now();
-    this.state.lastAbortedSessionId = this.state.activeSessionId;
+    this.state.lastAbortedAt = Date.now(); this.state.lastAbortedSessionId = this.state.activeSessionId;
     Object.assign(this.state, { isAwaitingResponse: false, awaitingSessionId: undefined, isSending: false });
     if (this.state.activeSession) this.state.activeSession.isGenerating = false;
     for (const s of this.state.sessions) { if (s.id === this.state.activeSessionId || s.isGenerating) s.isGenerating = false; }
@@ -89,18 +94,11 @@ export class AppController {
     this.render();
   }
 
-  async handleSendMessage(): Promise<void> {
-    await handleQueueOrSendMessage(this.state, this.syncMachine, (init) => this.reloadData(init), this.render);
-  }
-
-  async handleSendNowQueued(id: string): Promise<void> {
-    await handleSendNowQueuedMessage(this.state, this.syncMachine, id, () => this.handleStopSession(), (init) => this.reloadData(init), this.render);
-  }
-
+  async handleSendMessage(): Promise<void> { await handleQueueOrSendMessage(this.state, this.syncMachine, (init) => this.reloadData(init), this.render); }
+  async handleSendNowQueued(id: string): Promise<void> { await handleSendNowQueuedMessage(this.state, this.syncMachine, id, () => this.handleStopSession(), (init) => this.reloadData(init), this.render); }
   handleEditQueued(id: string): void { handleEditQueuedMessage(this.state, id, this.render); }
   handleDeleteQueued(id: string): void { handleDeleteQueuedMessage(this.state, id, this.render); }
   handleToggleQueuedCollapse(): void { handleToggleQueuedCollapseAction(this.state, this.render); }
-
   async handleBuildPlan(planPath: string, planTitle?: string): Promise<void> {
     this.state.composerMode = 'agent';
     await submitMessageFlow(this.state, this.syncMachine, buildPlanHandoffPrompt(planPath, planTitle), () => this.reloadData(false), this.render);
@@ -120,12 +118,8 @@ export class AppController {
       onStatusChange: (s) => {
         const changed = this.state.syncStatus !== s;
         this.state.syncStatus = s;
-        if (s === 'disconnected') {
-          this.syncMachine.handlePrimarySseFailure();
-        } else if (s === 'connected') {
-          this.syncMachine.restorePrimaryLive();
-          void this.reloadData(false);
-        }
+        if (s === 'disconnected') { this.syncMachine.handlePrimarySseFailure(); }
+        else if (s === 'connected') { this.syncMachine.restorePrimaryLive(); void this.reloadData(false); }
         if (changed) this.render();
       },
       onChange: () => { void this.reloadData(false); },
@@ -137,6 +131,7 @@ export class AppController {
     this.state.isAuthenticated = urlConfig.imported || !auth.required || auth.authorized;
     this.render();
     if (this.state.isAuthenticated) {
+      this.state.autoFallbackEnabled = isAutoFallbackEnabled();
       applyPersistedSyncMode(this.syncMachine, () => this.startSse());
       await this.reloadData(true);
       void checkForUpdates(this.state, this.render);

@@ -3540,6 +3540,7 @@ input:checked + .slider:before {
 }
 
 .settings-auto-update-row,
+.settings-fallback-row,
 .settings-download-row {
   display: flex;
   justify-content: space-between;
@@ -3547,7 +3548,14 @@ input:checked + .slider:before {
   gap: 10px;
 }
 
+.settings-fallback-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .settings-auto-update-label,
+.settings-fallback-label,
 .settings-download-info {
   display: flex;
   flex-direction: column;

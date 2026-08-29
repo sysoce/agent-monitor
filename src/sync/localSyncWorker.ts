@@ -53,10 +53,13 @@ export class LocalSyncWorker {
         for (const sid of Object.keys(recentDetails)) if (recentDetails[sid]) recentDetails[sid].isGenerating = false;
       } else if (activeId && !recentDetails[activeId] && res.data.inbox[0]) {
         const first = res.data.inbox[0];
-        recentDetails[activeId] = { id: activeId, title: first.content?.slice(0, 40) || (first.attachments?.[0]?.label ?? activeId), mode: first.mode || 'agent', createdAt: Date.now(), updatedAt: Date.now(), messages: [{ role: first.role || 'user', content: first.content || '', attachments: first.attachments }], filesChanged: [], artifacts: [], subagents: [], backgroundTasks: [], plans: [], isGenerating: true };
+        const msgTs = first.timestamp || Date.now();
+        recentDetails[activeId] = { id: activeId, title: first.content?.slice(0, 40) || (first.attachments?.[0]?.label ?? activeId), mode: first.mode || 'agent', createdAt: msgTs, updatedAt: msgTs, messages: [{ role: first.role || 'user', content: first.content || '', attachments: first.attachments, timestamp: msgTs }], filesChanged: [], artifacts: [], subagents: [], backgroundTasks: [], plans: [], isGenerating: true };
       }
       if (activeId && !sessions.some((s) => s.id === activeId)) {
-        sessions.unshift({ id: activeId, title: recentDetails[activeId]?.title || activeId, createdAt: Date.now(), updatedAt: Date.now(), messageCount: 1, preview: res.data.inbox[0]?.content?.slice(0, 80) || '(empty session)' });
+        const recent = recentDetails[activeId];
+        const ts = recent?.updatedAt || Date.now();
+        sessions.unshift({ id: activeId, title: recent?.title || activeId, createdAt: recent?.createdAt || ts, updatedAt: ts, messageCount: 1, preview: res.data.inbox[0]?.content?.slice(0, 80) || '(empty session)', isGenerating: true });
       }
       const activeDetail = activeId ? (recentDetails[activeId] || await getSessionDetail(this.workspaceRoot, activeId)) : undefined;
       const outbox: SyncOutboxState = { sessionId: activeId || '', updatedAt: Date.now(), session: activeDetail ? sanitizeSessionForSync(activeDetail) : undefined, plans: activeDetail?.plans || [] };

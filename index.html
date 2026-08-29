@@ -6709,13 +6709,20 @@ input:checked + .slider:before {
   font-size: 12px;
 }
 .settings-auto-update-row,
+.settings-fallback-row,
 .settings-download-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
 }
+.settings-fallback-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
 .settings-auto-update-label,
+.settings-fallback-label,
 .settings-download-info {
   display: flex;
   flex-direction: column;
@@ -7326,7 +7333,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.26" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.26" : "1.0.26";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7407,6 +7414,31 @@ input:checked + .slider:before {
     return false;
   }
 
+  // src/ui/sessionSorting.ts
+  function isSessionRunningInState(s, state2) {
+    if (s.isGenerating) return true;
+    if (!state2) return false;
+    if (s.id === state2.activeSessionId) {
+      if (state2.activeSession?.isGenerating) return true;
+      if (state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === s.id)) return true;
+    }
+    return false;
+  }
+  function sortSessions(sessions, state2) {
+    return [...sessions].sort((a, b) => {
+      const aRunning = isSessionRunningInState(a, state2) ? 1 : 0;
+      const bRunning = isSessionRunningInState(b, state2) ? 1 : 0;
+      if (aRunning !== bRunning) return bRunning - aRunning;
+      const aTime = state2?.activeSessionId === a.id && state2.activeSession?.updatedAt ? Math.max(a.updatedAt || 0, state2.activeSession.updatedAt) : a.updatedAt || a.createdAt || 0;
+      const bTime = state2?.activeSessionId === b.id && state2.activeSession?.updatedAt ? Math.max(b.updatedAt || 0, state2.activeSession.updatedAt) : b.updatedAt || b.createdAt || 0;
+      if (bTime !== aTime) return bTime - aTime;
+      const bCreated = b.createdAt || 0;
+      const aCreated = a.createdAt || 0;
+      if (bCreated !== aCreated) return bCreated - aCreated;
+      return a.id.localeCompare(b.id);
+    });
+  }
+
   // src/ui/gistPayloadApplier.ts
   function isMessageFinished(lastMsg) {
     if (!lastMsg || lastMsg.role !== "assistant") return false;
@@ -7422,13 +7454,14 @@ input:checked + .slider:before {
       merged.unshift({
         id: sid,
         title: sess.title || sid,
-        createdAt: sess.createdAt || Date.now(),
-        updatedAt: sess.updatedAt || Date.now(),
+        createdAt: sess.createdAt || 0,
+        updatedAt: sess.updatedAt || sess.createdAt || 0,
         messageCount: sess.messages?.length || 1,
-        preview: sess.messages?.[0]?.content?.slice(0, 80) || "(empty session)"
+        preview: sess.messages?.[0]?.content?.slice(0, 80) || "(empty session)",
+        isGenerating: sess.isGenerating
       });
     }
-    return merged;
+    return sortSessions(merged, state2);
   }
   function applyGistSyncPayload(state2, payload) {
     if (payload.appVersion) {
@@ -7474,13 +7507,13 @@ input:checked + .slider:before {
           id: sid,
           title: sum?.title || sid,
           mode: "agent",
-          createdAt: sum?.createdAt || Date.now(),
-          updatedAt: sum?.updatedAt || Date.now(),
+          createdAt: sum?.createdAt || 0,
+          updatedAt: sum?.updatedAt || sum?.createdAt || 0,
           messages: [],
           filesChanged: [],
           artifacts: [],
           subagents: [],
-          plans: sum?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || []
+          plans: sum?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: 0, sizeBytes: 0 })) || []
         };
         state2.plans = state2.activeSession.plans || [];
         state2.isLoadingSession = false;
@@ -8770,16 +8803,24 @@ input:checked + .slider:before {
       __publicField(this, "awaitingStartedAt");
       __publicField(this, "pollTimer");
       __publicField(this, "lastEtag");
+      __publicField(this, "autoFallback", true);
       __publicField(this, "reachabilityProbe");
       this.reachabilityProbe = new LiveReachabilityProbe({ onReachable: () => this.triggerLiveServerReachable() });
       if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden) {
             if (this.mode === "git-backup") this.restartGitPolling();
-            void this.reachabilityProbe.checkReachability();
+            if (this.autoFallback) void this.reachabilityProbe.checkReachability();
           }
         });
       }
+    }
+    setAutoFallback(enabled) {
+      this.autoFallback = enabled;
+      if (!enabled) this.reachabilityProbe.stop();
+    }
+    getAutoFallback() {
+      return this.autoFallback;
     }
     getMode() {
       return this.mode;
@@ -8828,18 +8869,17 @@ input:checked + .slider:before {
         this.callbacks.onModeChange("git-backup");
         this.callbacks.onStatusChange("connected");
         this.callbacks.onError?.("");
-        this.reachabilityProbe.start();
+        if (this.autoFallback) this.reachabilityProbe.start();
         this.restartGitPolling();
       } else {
         this.callbacks.onError?.("Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.");
       }
     }
     handlePrimarySseFailure() {
-      if (this.mode === "live-sse") {
+      if (!this.autoFallback || this.mode === "live-sse" || this.mode === "p2p") {
         this.callbacks.onStatusChange("disconnected");
         return;
       }
-      if (this.mode === "p2p") return;
       if (this.gistConfig) {
         this.mode = "git-backup";
         this.callbacks.onModeChange("git-backup");
@@ -8864,6 +8904,7 @@ input:checked + .slider:before {
     }
     triggerLiveServerReachable() {
       this.reachabilityProbe.stop();
+      if (!this.autoFallback) return;
       this.callbacks.onLiveServerReachable?.();
     }
     async pushInboxMessage(msg) {
@@ -8914,10 +8955,27 @@ input:checked + .slider:before {
     }
   };
 
+  // src/ui/fallbackSettings.ts
+  var STORAGE_KEY_AUTO_FALLBACK = "agent_auto_fallback";
+  function isAutoFallbackEnabled(storage = typeof localStorage !== "undefined" ? localStorage : {}) {
+    try {
+      const val = storage.getItem?.(STORAGE_KEY_AUTO_FALLBACK);
+      if (val === "false" || val === "0") return false;
+      return true;
+    } catch {
+      return true;
+    }
+  }
+  function setAutoFallbackEnabled(enabled, storage = typeof localStorage !== "undefined" ? localStorage : {}) {
+    try {
+      storage.setItem?.(STORAGE_KEY_AUTO_FALLBACK, String(enabled));
+    } catch {
+    }
+  }
+
   // src/ui/appSyncMode.ts
   function createAppSyncMachine(state2, render2, onLiveServerReachable) {
-    let machine;
-    machine = new SyncStateMachine({
+    const machine = new SyncStateMachine({
       onModeChange: (m) => {
         if (state2.syncMode !== m) {
           state2.syncMode = m;
@@ -8951,11 +9009,14 @@ input:checked + .slider:before {
         onLiveServerReachable?.();
       }
     });
+    const fallback = state2.autoFallbackEnabled ?? isAutoFallbackEnabled();
+    machine.setAutoFallback(fallback);
     return machine;
   }
   function applyPersistedSyncMode(syncMachine, startSse) {
     const cfg = loadCachedGistConfig();
     if (cfg) syncMachine.setGistConfig(cfg);
+    syncMachine.setAutoFallback(isAutoFallbackEnabled());
     const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
     let mode = saved;
     if (!mode) {
@@ -9104,14 +9165,19 @@ input:checked + .slider:before {
     const token = params.get("token") || params.get("t") || void 0;
     const password = params.get("password") || params.get("p") || void 0;
     const serverUrl = params.get("server") || params.get("serverUrl") || params.get("s") || void 0;
-    if (gistId || token || serverUrl) {
-      return { gistId, token, password, serverUrl };
+    const fbParam = params.get("fallback") ?? params.get("autoFallback");
+    const autoFallback = fbParam !== null ? fbParam !== "0" && fbParam !== "false" : void 0;
+    if (gistId || token || serverUrl || autoFallback !== void 0) {
+      return { gistId, token, password, serverUrl, autoFallback };
     }
     return null;
   }
   function applyConfigToStorage(config, storage = typeof localStorage !== "undefined" ? localStorage : {}) {
-    if (!config.gistId && !config.token && !config.serverUrl) return false;
+    if (!config.gistId && !config.token && !config.serverUrl && config.autoFallback === void 0) return false;
     try {
+      if (config.autoFallback !== void 0) {
+        storage.setItem("agent_auto_fallback", String(config.autoFallback));
+      }
       if (config.serverUrl) {
         storage.setItem("agent_server_url", config.serverUrl);
         setServerBaseUrl(config.serverUrl);
@@ -9176,13 +9242,13 @@ input:checked + .slider:before {
               id: state2.activeSessionId,
               title: s?.title || state2.activeSessionId,
               mode: "agent",
-              createdAt: s?.createdAt || Date.now(),
-              updatedAt: s?.updatedAt || Date.now(),
+              createdAt: s?.createdAt || 0,
+              updatedAt: s?.updatedAt || s?.createdAt || 0,
               messages: [],
               filesChanged: [],
               artifacts: [],
               subagents: [],
-              plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || []
+              plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: 0, sizeBytes: 0 })) || []
             };
           }
         }
@@ -9210,15 +9276,11 @@ input:checked + .slider:before {
               state2.activeSession.isGenerating = matching.isGenerating;
             }
             matching.messageCount = Math.max(matching.messageCount || 0, state2.activeSession.messages?.length || 0);
-            matching.updatedAt = Math.max(matching.updatedAt || 0, state2.activeSession.updatedAt || 0);
+            const activeLastMsg = state2.activeSession.messages?.reduce((max, m) => Math.max(max, Number(m.timestamp || 0)), 0) || 0;
+            if (activeLastMsg > 0) matching.updatedAt = Math.max(matching.updatedAt || 0, activeLastMsg);
           }
         }
-        state2.sessions = sessions.sort((a, b) => {
-          const aRunning = a.isGenerating ? 1 : 0;
-          const bRunning = b.isGenerating ? 1 : 0;
-          if (aRunning !== bRunning) return bRunning - aRunning;
-          return b.updatedAt - a.updatedAt;
-        });
+        state2.sessions = sortSessions(sessions, state2);
       }
       state2.isLoadingSessions = false;
       if (catalog.models?.length) state2.availableModels = catalog.models;
@@ -9250,13 +9312,9 @@ input:checked + .slider:before {
           if (matching) {
             matching.isGenerating = state2.activeSession.isGenerating;
             matching.messageCount = Math.max(matching.messageCount || 0, state2.activeSession.messages?.length || 0);
-            matching.updatedAt = Math.max(matching.updatedAt || 0, state2.activeSession.updatedAt || 0);
-            state2.sessions.sort((a, b) => {
-              const aRunning = a.isGenerating ? 1 : 0;
-              const bRunning = b.isGenerating ? 1 : 0;
-              if (aRunning !== bRunning) return bRunning - aRunning;
-              return b.updatedAt - a.updatedAt;
-            });
+            const activeLastMsg = state2.activeSession.messages?.reduce((max, m) => Math.max(max, Number(m.timestamp || 0)), 0) || 0;
+            if (activeLastMsg > 0) matching.updatedAt = Math.max(matching.updatedAt || 0, activeLastMsg);
+            state2.sessions = sortSessions(state2.sessions, state2);
           }
         }
         await syncSessionPlans(state2);
@@ -9406,13 +9464,13 @@ input:checked + .slider:before {
         id,
         title: s?.title || id,
         mode: "agent",
-        createdAt: s?.createdAt || Date.now(),
-        updatedAt: s?.updatedAt || Date.now(),
+        createdAt: s?.createdAt || 0,
+        updatedAt: s?.updatedAt || s?.createdAt || 0,
         messages: [],
         filesChanged: [],
         artifacts: [],
         subagents: [],
-        plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || []
+        plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: 0, sizeBytes: 0 })) || []
       };
       const hasCachedMsgs = Boolean(cached?.messages && cached.messages.length > 0);
       Object.assign(this.state, { activeSessionId: id, activeSession: initial, activeTab: "chat", activePlan: void 0, activePlanName: void 0, isLoadingSession: !hasCachedMsgs });
@@ -9480,6 +9538,13 @@ input:checked + .slider:before {
     }
     setSyncMode(mode) {
       setSyncModeAction(mode, this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || void 0);
+      this.render();
+    }
+    toggleAutoFallback(enabled) {
+      const next = enabled ?? !(this.state.autoFallbackEnabled ?? isAutoFallbackEnabled());
+      this.state.autoFallbackEnabled = next;
+      setAutoFallbackEnabled(next);
+      this.syncMachine.setAutoFallback(next);
       this.render();
     }
     handleStopSession() {
@@ -9550,6 +9615,7 @@ input:checked + .slider:before {
       this.state.isAuthenticated = urlConfig.imported || !auth.required || auth.authorized;
       this.render();
       if (this.state.isAuthenticated) {
+        this.state.autoFallbackEnabled = isAutoFallbackEnabled();
         applyPersistedSyncMode(this.syncMachine, () => this.startSse());
         await this.reloadData(true);
         void checkForUpdates(this.state, this.render);
@@ -11015,6 +11081,7 @@ ${items}
 
   // src/ui/sidebarSessionUtils.ts
   function formatRelativeTime(ts) {
+    if (!ts || ts <= 0) return "";
     const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
     if (diffSec < 60) return "just now";
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
@@ -11042,8 +11109,8 @@ ${items}
       list.unshift({
         id: state2.activeSession.id,
         title: state2.activeSession.title || state2.activeSession.id,
-        createdAt: state2.activeSession.createdAt || Date.now(),
-        updatedAt: state2.activeSession.updatedAt || Date.now(),
+        createdAt: state2.activeSession.createdAt || 0,
+        updatedAt: state2.activeSession.updatedAt || state2.activeSession.createdAt || 0,
         messageCount: state2.activeSession.messages?.length || 0,
         preview: state2.activeSession.messages?.[0]?.content?.slice(0, 80) || "(empty session)",
         isGenerating: state2.activeSession.isGenerating,
@@ -11051,25 +11118,12 @@ ${items}
         artifacts: state2.activeSession.artifacts?.map((a) => ({ name: a.name, path: a.path, type: a.type }))
       });
     }
-    return list.sort((a, b) => {
-      const aRunning = Boolean(
-        a.isGenerating || a.id === state2.activeSessionId && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === a.id))
-      ) ? 1 : 0;
-      const bRunning = Boolean(
-        b.isGenerating || b.id === state2.activeSessionId && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === b.id))
-      ) ? 1 : 0;
-      if (aRunning !== bRunning) return bRunning - aRunning;
-      const aTime = a.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(a.updatedAt || 0, state2.activeSession.updatedAt) : a.updatedAt || 0;
-      const bTime = b.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(b.updatedAt || 0, state2.activeSession.updatedAt) : b.updatedAt || 0;
-      return bTime - aTime;
-    });
+    return sortSessions(list, state2);
   }
   function renderSessionCard(s, state2) {
-    const isGenerating = Boolean(
-      s.isGenerating || s.id === state2.activeSessionId && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === s.id))
-    );
+    const isGenerating = isSessionRunningInState(s, state2);
     const msgCount = s.id === state2.activeSessionId && state2.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0;
-    const updatedTs = s.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state2.activeSession.updatedAt) : s.updatedAt || 0;
+    const updatedTs = s.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state2.activeSession.updatedAt) : s.updatedAt || s.createdAt || 0;
     const timeStr = isGenerating ? "running" : formatRelativeTime(updatedTs);
     return `
     <div
@@ -12460,6 +12514,7 @@ ${thought.trim()}` : thought.trim();
     const isSSE = state2.syncMode === "live-sse";
     const isConnected = state2.syncStatus === "connected";
     const isSyncing = state2.syncStatus === "syncing" || state2.syncStatus === "connecting";
+    const isAutoFallback = state2.autoFallbackEnabled ?? isAutoFallbackEnabled();
     const gistConfig = loadCachedGistConfig();
     const hasGist = Boolean(gistConfig?.gistId || state2.serverSetupInfo?.gistId);
     const host = state2.hostPresence;
@@ -12520,6 +12575,22 @@ ${thought.trim()}` : thought.trim();
             <span class="settings-sync-label">GitHub Gist ID:</span>
             <span class="settings-sync-val font-mono"><span class="text-muted">None (Direct mode)</span></span>
           </div>`}
+        </div>
+
+        <div class="settings-fallback-row">
+          <div class="settings-fallback-label">
+            <span class="settings-row-title">Automatic Fallback</span>
+            <span class="settings-row-desc">Auto-failover to backup transports (Turn off to isolate a single transport for testing)</span>
+          </div>
+          <label class="switch" for="toggle-auto-fallback" aria-label="Toggle Auto-fallback">
+            <input
+              type="checkbox"
+              id="toggle-auto-fallback"
+              class="btn-toggle-auto-fallback"
+              ${isAutoFallback ? "checked" : ""}
+            />
+            <span class="slider round"></span>
+          </label>
         </div>
       </div>
     </div>
@@ -14098,6 +14169,14 @@ ${thought.trim()}` : thought.trim();
     return false;
   }
   function handleControlClick(target, state2, callbacks) {
+    const autoFallbackChk = target.closest("#toggle-auto-fallback, .btn-toggle-auto-fallback");
+    if (autoFallbackChk) {
+      setAutoFallbackEnabled(autoFallbackChk.checked);
+      state2.autoFallbackEnabled = autoFallbackChk.checked;
+      callbacks.onToggleAutoFallback?.(autoFallbackChk.checked);
+      callbacks.onRender();
+      return true;
+    }
     const autoUpdateChk = target.closest("#toggle-auto-update, .btn-toggle-auto-update");
     if (autoUpdateChk) {
       setAutoUpdateEnabled(autoUpdateChk.checked);
@@ -14779,6 +14858,7 @@ ${thought.trim()}` : thought.trim();
       onLogout: () => controller.handleLogout(),
       onToggleSyncMode: () => controller.toggleSyncMode(),
       onSetSyncMode: (mode) => controller.setSyncMode(mode),
+      onToggleAutoFallback: (enabled) => controller.toggleAutoFallback(enabled),
       onRender: render
     });
     restoreScrollState(focusSnapshot, state.activeTab);

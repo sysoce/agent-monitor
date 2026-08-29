@@ -26,6 +26,7 @@ export interface EventHandlerCallbacks {
   onLogout?: () => void;
   onToggleSyncMode?: () => void;
   onSetSyncMode?: (mode: TransportMode) => void;
+  onToggleAutoFallback?: (enabled: boolean) => void;
   onRender: () => void;
 }
 

@@ -10,6 +10,7 @@ import { parseSubagents, parseBackgroundTasks, enrichPlanDetails, enrichToolResu
 import { readPendingApprovals } from './sessionApprovals';
 import { readSessionDraft, injectDraftIntoSession } from './sessionDraft';
 import { findSessionFile, parseAndDeduplicateLines } from './sessionFinder';
+import { extractMessageTimestamp } from './sessionActivity';
 
 export { listSessions } from './sessionLister';
 
@@ -22,10 +23,14 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
   const messages: ChatMessage[] = parseAndDeduplicateLines(raw);
 
   let hasPending = false;
+  let incomingMtime = 0;
   try {
     const inDir = path.join(sDir, 'incoming');
     const inFiles = (await fs.readdir(inDir)).filter((f) => f.endsWith('.json')).sort();
     hasPending = inFiles.some((f) => !f.startsWith('abort-'));
+    if (hasPending) {
+      incomingMtime = (await fs.stat(inDir).catch(() => ({ mtimeMs: 0 }))).mtimeMs;
+    }
     const seenUser = new Set<string>();
     for (const m of messages.slice(-5)) {
       if (m.role === 'user' && typeof m.content === 'string') seenUser.add(m.content.trim());
@@ -76,27 +81,45 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
   const isAborted = abortedAt > 0 && !hasNewUserTurn;
 
   let hasActiveLock = false;
+  let activeMtime = 0;
   if (!isAborted) {
     try {
       const activeSt = await fs.stat(path.join(sDir, '.active'));
       hasActiveLock = activeSt.isFile() && (Date.now() - activeSt.mtimeMs < 120_000);
+      activeMtime = activeSt.mtimeMs;
     } catch {}
   }
   let hasDraft = false;
+  let draftMtime = 0;
   if (!isAborted) {
     try {
       const draftSt = await fs.stat(path.join(sDir, 'live_draft.json'));
       hasDraft = draftSt.isFile() && (Date.now() - draftSt.mtimeMs < 60_000);
+      draftMtime = draftSt.mtimeMs;
     } catch {}
   }
-  const isGenerating = !isAborted && Boolean(hasActiveLock || hasDraft);
+  const isGenerating = !isAborted && Boolean(hasActiveLock || hasDraft || hasPending);
   const subagents = parseSubagents(messages, isGenerating);
   const backgroundTasks = parseBackgroundTasks(messages, isGenerating);
   const hasRunningSub = subagents.some((s) => s.status === 'running');
   const hasRunningBg = backgroundTasks.some((t) => t.status === 'running');
   const finalIsGenerating = !isAborted && Boolean(isGenerating || hasRunningSub || hasRunningBg);
   const pendingApprovals = await readPendingApprovals(sDir);
-  const detail: SessionDetail = { id: sessionId, title, mode, createdAt: sFile.birthtimeMs, updatedAt: sFile.mtimeMs, messages, filesChanged, artifacts, subagents, backgroundTasks, pendingApprovals, plans, isGenerating: finalIsGenerating };
+
+  let firstMsgTimestamp: number | undefined;
+  let lastMsgTimestamp: number | undefined;
+  for (const m of messages) {
+    const ts = extractMessageTimestamp(m);
+    if (ts !== undefined) {
+      if (firstMsgTimestamp === undefined || ts < firstMsgTimestamp) firstMsgTimestamp = ts;
+      if (lastMsgTimestamp === undefined || ts > lastMsgTimestamp) lastMsgTimestamp = ts;
+    }
+  }
+  const liveMax = Math.max(activeMtime, draftMtime, incomingMtime);
+  const updatedAt = lastMsgTimestamp !== undefined ? Math.max(lastMsgTimestamp, liveMax) : Math.max(sFile.mtimeMs, liveMax);
+  const createdAt = firstMsgTimestamp || sFile.birthtimeMs || sFile.mtimeMs || updatedAt;
+
+  const detail: SessionDetail = { id: sessionId, title, mode, createdAt, updatedAt, messages, filesChanged, artifacts, subagents, backgroundTasks, pendingApprovals, plans, isGenerating: finalIsGenerating };
   if (isAborted) return detail;
   const draft = await readSessionDraft(workspaceRoot, sessionId);
   return draft ? injectDraftIntoSession(detail, draft) : detail;

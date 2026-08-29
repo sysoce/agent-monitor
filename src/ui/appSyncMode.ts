@@ -3,14 +3,14 @@ import type { TransportMode } from '../sync/types';
 import { SyncStateMachine } from './syncStateMachine';
 import { loadCachedGistConfig, applyGistSyncPayload } from './sessionPlanSync';
 import { hasLiveServer } from './authStore';
+import { isAutoFallbackEnabled } from './fallbackSettings';
 
 export function createAppSyncMachine(
   state: AppState,
   render: () => void,
   onLiveServerReachable?: () => void
 ): SyncStateMachine {
-  let machine: SyncStateMachine;
-  machine = new SyncStateMachine({
+  const machine = new SyncStateMachine({
     onModeChange: (m) => {
       if (state.syncMode !== m) {
         state.syncMode = m;
@@ -44,12 +44,15 @@ export function createAppSyncMachine(
       onLiveServerReachable?.();
     },
   });
+  const fallback = state.autoFallbackEnabled ?? isAutoFallbackEnabled();
+  machine.setAutoFallback(fallback);
   return machine;
 }
 
 export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: () => void): void {
   const cfg = loadCachedGistConfig();
   if (cfg) syncMachine.setGistConfig(cfg);
+  syncMachine.setAutoFallback(isAutoFallbackEnabled());
   const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
   let mode = saved;
   if (!mode) {

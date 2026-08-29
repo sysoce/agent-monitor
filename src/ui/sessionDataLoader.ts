@@ -4,6 +4,7 @@ import { hasLiveServer } from './authStore';
 import { mergeSessionDetail } from './sessionMerge';
 import { syncSessionPlans } from './sessionPlanSync';
 import { getSavedTab, getSavedSessionId } from './tabStore';
+import { sortSessions } from './sessionSorting';
 
 export async function reloadSessionData(state: AppState, isInitial: boolean, onDone: () => void): Promise<void> {
   try {
@@ -26,13 +27,13 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
             id: state.activeSessionId,
             title: s?.title || state.activeSessionId,
             mode: 'agent',
-            createdAt: s?.createdAt || Date.now(),
-            updatedAt: s?.updatedAt || Date.now(),
+            createdAt: s?.createdAt || 0,
+            updatedAt: s?.updatedAt || s?.createdAt || 0,
             messages: [],
             filesChanged: [],
             artifacts: [],
             subagents: [],
-            plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || [],
+            plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: 0, sizeBytes: 0 })) || [],
           };
         }
       }
@@ -61,15 +62,11 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
             state.activeSession.isGenerating = matching.isGenerating;
           }
           matching.messageCount = Math.max(matching.messageCount || 0, state.activeSession.messages?.length || 0);
-          matching.updatedAt = Math.max(matching.updatedAt || 0, state.activeSession.updatedAt || 0);
+          const activeLastMsg = state.activeSession.messages?.reduce((max, m) => Math.max(max, Number((m as any).timestamp || 0)), 0) || 0;
+          if (activeLastMsg > 0) matching.updatedAt = Math.max(matching.updatedAt || 0, activeLastMsg);
         }
       }
-      state.sessions = sessions.sort((a, b) => {
-        const aRunning = a.isGenerating ? 1 : 0;
-        const bRunning = b.isGenerating ? 1 : 0;
-        if (aRunning !== bRunning) return bRunning - aRunning;
-        return b.updatedAt - a.updatedAt;
-      });
+      state.sessions = sortSessions(sessions, state);
     }
     state.isLoadingSessions = false;
     if (catalog.models?.length) state.availableModels = catalog.models;
@@ -101,13 +98,9 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
         if (matching) {
           matching.isGenerating = state.activeSession.isGenerating;
           matching.messageCount = Math.max(matching.messageCount || 0, state.activeSession.messages?.length || 0);
-          matching.updatedAt = Math.max(matching.updatedAt || 0, state.activeSession.updatedAt || 0);
-          state.sessions.sort((a, b) => {
-            const aRunning = a.isGenerating ? 1 : 0;
-            const bRunning = b.isGenerating ? 1 : 0;
-            if (aRunning !== bRunning) return bRunning - aRunning;
-            return b.updatedAt - a.updatedAt;
-          });
+          const activeLastMsg = state.activeSession.messages?.reduce((max, m) => Math.max(max, Number((m as any).timestamp || 0)), 0) || 0;
+          if (activeLastMsg > 0) matching.updatedAt = Math.max(matching.updatedAt || 0, activeLastMsg);
+          state.sessions = sortSessions(state.sessions, state);
         }
       }
       await syncSessionPlans(state);

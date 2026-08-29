@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { SessionSummary } from './types';
 import { extractSummaryPlansAndArtifacts } from './sessionEnricher';
 import { findSessionFile } from './sessionFinder';
+import { extractSessionActivityFromLines } from './sessionActivity';
 
 export async function listSessions(workspaceRoot: string): Promise<SessionSummary[]> {
   const root = path.join(workspaceRoot, '.agent', 'sessions');
@@ -17,16 +18,6 @@ export async function listSessions(workspaceRoot: string): Promise<SessionSummar
     try {
       const raw = await fs.readFile(sFile.path, 'utf8');
       const lines = raw.split('\n').filter((l) => l.trim().length > 0);
-      let preview = '';
-      for (const line of lines) {
-        try {
-          const msg = JSON.parse(line) as { role?: string; content?: string };
-          if (msg.role === 'user' && msg.content?.trim()) {
-            preview = msg.content.trim().split(/\r?\n/)[0]?.slice(0, 80) ?? '';
-            break;
-          }
-        } catch {}
-      }
       const { plans, artifacts } = extractSummaryPlansAndArtifacts(lines);
 
       let abortedAt = 0;
@@ -68,15 +59,15 @@ export async function listSessions(workspaceRoot: string): Promise<SessionSummar
       } catch {}
 
       const isGenerating = Boolean((hasActiveLock || hasDraft || hasIncoming) && abortedAt === 0);
-      const updatedAt = Math.max(sFile.mtimeMs, activeMtime, draftMtime, incomingMtime);
+      const activity = extractSessionActivityFromLines(lines, sFile, { activeMtime, draftMtime, incomingMtime });
 
       summaries.push({
         id: entry.name,
-        title: preview ? preview.slice(0, 40) : entry.name,
-        createdAt: sFile.birthtimeMs,
-        updatedAt,
-        messageCount: lines.length,
-        preview: preview || '(empty session)',
+        title: activity.preview ? activity.preview.slice(0, 40) : entry.name,
+        createdAt: activity.createdAt,
+        updatedAt: activity.updatedAt,
+        messageCount: activity.messageCount,
+        preview: activity.preview || '(empty session)',
         plans: plans.length > 0 ? plans : undefined,
         artifacts: artifacts.length > 0 ? artifacts : undefined,
         isGenerating: isGenerating || undefined,
@@ -87,7 +78,8 @@ export async function listSessions(workspaceRoot: string): Promise<SessionSummar
     const aRunning = a.isGenerating ? 1 : 0;
     const bRunning = b.isGenerating ? 1 : 0;
     if (aRunning !== bRunning) return bRunning - aRunning;
-    return b.updatedAt - a.updatedAt;
+    if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+    if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
+    return a.id.localeCompare(b.id);
   });
 }
-

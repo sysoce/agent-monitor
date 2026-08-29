@@ -1,6 +1,7 @@
 import type { AppState } from '../../types';
 import { escapeHtml } from '../markdown';
 import { loadCachedGistConfig } from '../../sessionPlanSync';
+import { isAutoFallbackEnabled } from '../../fallbackSettings';
 
 export function renderSettingsSyncSection(state: AppState): string {
   const isP2P = state.syncMode === 'p2p';
@@ -8,6 +9,7 @@ export function renderSettingsSyncSection(state: AppState): string {
   const isSSE = state.syncMode === 'live-sse';
   const isConnected = state.syncStatus === 'connected';
   const isSyncing = state.syncStatus === 'syncing' || state.syncStatus === 'connecting';
+  const isAutoFallback = state.autoFallbackEnabled ?? isAutoFallbackEnabled();
   const gistConfig = loadCachedGistConfig();
   const hasGist = Boolean(gistConfig?.gistId || state.serverSetupInfo?.gistId);
   const host = state.hostPresence;
@@ -86,6 +88,22 @@ export function renderSettingsSyncSection(state: AppState): string {
             <span class="settings-sync-val font-mono"><span class="text-muted">None (Direct mode)</span></span>
           </div>`
           }
+        </div>
+
+        <div class="settings-fallback-row">
+          <div class="settings-fallback-label">
+            <span class="settings-row-title">Automatic Fallback</span>
+            <span class="settings-row-desc">Auto-failover to backup transports (Turn off to isolate a single transport for testing)</span>
+          </div>
+          <label class="switch" for="toggle-auto-fallback" aria-label="Toggle Auto-fallback">
+            <input
+              type="checkbox"
+              id="toggle-auto-fallback"
+              class="btn-toggle-auto-fallback"
+              ${isAutoFallback ? 'checked' : ''}
+            />
+            <span class="slider round"></span>
+          </label>
         </div>
       </div>
     </div>

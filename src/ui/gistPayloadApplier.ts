@@ -2,6 +2,7 @@ import type { AppState } from './types';
 import type { SyncGistPayload } from '../sync/types';
 import { mergeSessionDetail } from './sessionMerge';
 import { processVersionCheck } from './updateManager';
+import { sortSessions } from './sessionSorting';
 
 function isMessageFinished(lastMsg: any): boolean {
   if (!lastMsg || lastMsg.role !== 'assistant') return false;
@@ -21,13 +22,14 @@ function mergeActiveIntoSessions(state: AppState, payloadSessions: any[]): any[]
     merged.unshift({
       id: sid,
       title: sess.title || sid,
-      createdAt: sess.createdAt || Date.now(),
-      updatedAt: sess.updatedAt || Date.now(),
+      createdAt: sess.createdAt || 0,
+      updatedAt: sess.updatedAt || sess.createdAt || 0,
       messageCount: sess.messages?.length || 1,
       preview: sess.messages?.[0]?.content?.slice(0, 80) || '(empty session)',
+      isGenerating: sess.isGenerating,
     });
   }
-  return merged;
+  return sortSessions(merged, state);
 }
 
 export function applyGistSyncPayload(state: AppState, payload: SyncGistPayload): boolean {
@@ -78,13 +80,13 @@ export function applyGistSyncPayload(state: AppState, payload: SyncGistPayload):
         id: sid,
         title: sum?.title || sid,
         mode: 'agent',
-        createdAt: sum?.createdAt || Date.now(),
-        updatedAt: sum?.updatedAt || Date.now(),
+        createdAt: sum?.createdAt || 0,
+        updatedAt: sum?.updatedAt || sum?.createdAt || 0,
         messages: [],
         filesChanged: [],
         artifacts: [],
         subagents: [],
-        plans: sum?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || [],
+        plans: sum?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: 0, sizeBytes: 0 })) || [],
       };
       state.plans = state.activeSession.plans || [];
       state.isLoadingSession = false;

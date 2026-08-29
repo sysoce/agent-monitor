@@ -1,7 +1,9 @@
 import type { AppState, SessionSummary } from './types';
 import { escapeHtml } from './components/markdown';
+import { sortSessions, isSessionRunningInState } from './sessionSorting';
 
 export function formatRelativeTime(ts: number): string {
+  if (!ts || ts <= 0) return '';
   const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (diffSec < 60) return 'just now';
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
@@ -33,8 +35,8 @@ export function getSortedSessions(state: AppState): SessionSummary[] {
     list.unshift({
       id: state.activeSession.id,
       title: state.activeSession.title || state.activeSession.id,
-      createdAt: state.activeSession.createdAt || Date.now(),
-      updatedAt: state.activeSession.updatedAt || Date.now(),
+      createdAt: state.activeSession.createdAt || 0,
+      updatedAt: state.activeSession.updatedAt || state.activeSession.createdAt || 0,
       messageCount: state.activeSession.messages?.length || 0,
       preview: state.activeSession.messages?.[0]?.content?.slice(0, 80) || '(empty session)',
       isGenerating: state.activeSession.isGenerating,
@@ -42,29 +44,13 @@ export function getSortedSessions(state: AppState): SessionSummary[] {
       artifacts: state.activeSession.artifacts?.map((a) => ({ name: a.name, path: a.path, type: a.type })),
     });
   }
-  return list.sort((a, b) => {
-    const aRunning = Boolean(
-      a.isGenerating ||
-      (a.id === state.activeSessionId && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === a.id))))
-    ) ? 1 : 0;
-    const bRunning = Boolean(
-      b.isGenerating ||
-      (b.id === state.activeSessionId && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === b.id))))
-    ) ? 1 : 0;
-    if (aRunning !== bRunning) return bRunning - aRunning;
-    const aTime = a.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(a.updatedAt || 0, state.activeSession.updatedAt) : (a.updatedAt || 0);
-    const bTime = b.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(b.updatedAt || 0, state.activeSession.updatedAt) : (b.updatedAt || 0);
-    return bTime - aTime;
-  });
+  return sortSessions(list, state);
 }
 
 export function renderSessionCard(s: SessionSummary, state: AppState): string {
-  const isGenerating = Boolean(
-    s.isGenerating ||
-    (s.id === state.activeSessionId && (state.activeSession?.isGenerating || (state.isAwaitingResponse && (!state.awaitingSessionId || state.awaitingSessionId === s.id))))
-  );
+  const isGenerating = isSessionRunningInState(s, state);
   const msgCount = s.id === state.activeSessionId && state.activeSession?.messages ? state.activeSession.messages.length : (s.messageCount || 0);
-  const updatedTs = s.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state.activeSession.updatedAt) : (s.updatedAt || 0);
+  const updatedTs = s.id === state.activeSessionId && state.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state.activeSession.updatedAt) : (s.updatedAt || s.createdAt || 0);
   const timeStr = isGenerating ? 'running' : formatRelativeTime(updatedTs);
 
   return `

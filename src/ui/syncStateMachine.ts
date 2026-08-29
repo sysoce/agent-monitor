@@ -18,6 +18,7 @@ export class SyncStateMachine {
   private awaitingStartedAt?: number;
   private pollTimer?: any;
   private lastEtag?: string;
+  private autoFallback = true;
   private reachabilityProbe: LiveReachabilityProbe;
 
   constructor(private readonly callbacks: SyncStateMachineCallbacks) {
@@ -26,11 +27,18 @@ export class SyncStateMachine {
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
           if (this.mode === 'git-backup') this.restartGitPolling();
-          void this.reachabilityProbe.checkReachability();
+          if (this.autoFallback) void this.reachabilityProbe.checkReachability();
         }
       });
     }
   }
+
+  setAutoFallback(enabled: boolean): void {
+    this.autoFallback = enabled;
+    if (!enabled) this.reachabilityProbe.stop();
+  }
+
+  getAutoFallback(): boolean { return this.autoFallback; }
 
   getMode(): TransportMode { return this.mode; }
 
@@ -83,7 +91,7 @@ export class SyncStateMachine {
       this.callbacks.onModeChange('git-backup');
       this.callbacks.onStatusChange('connected');
       this.callbacks.onError?.('');
-      this.reachabilityProbe.start();
+      if (this.autoFallback) this.reachabilityProbe.start();
       this.restartGitPolling();
     } else {
       this.callbacks.onError?.('Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.');
@@ -91,11 +99,10 @@ export class SyncStateMachine {
   }
 
   handlePrimarySseFailure(): void {
-    if (this.mode === 'live-sse') {
+    if (!this.autoFallback || this.mode === 'live-sse' || this.mode === 'p2p') {
       this.callbacks.onStatusChange('disconnected');
       return;
     }
-    if (this.mode === 'p2p') return;
     if (this.gistConfig) {
       this.mode = 'git-backup';
       this.callbacks.onModeChange('git-backup');
@@ -122,6 +129,7 @@ export class SyncStateMachine {
 
   triggerLiveServerReachable(): void {
     this.reachabilityProbe.stop();
+    if (!this.autoFallback) return;
     this.callbacks.onLiveServerReachable?.();
   }
 
