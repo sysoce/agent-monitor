@@ -48,7 +48,6 @@ export function renderNavHeader(state: AppState): string {
     <header class="app-header">
       <div class="header-top">
         <div class="brand">
-          <span class="brand-icon">⚡</span>
           <span class="brand-version">v${escapeHtml(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
