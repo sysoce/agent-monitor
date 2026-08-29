@@ -2,12 +2,12 @@ export function extractMessageTimestamp(msg: any): number | undefined {
   if (!msg || typeof msg !== 'object') return undefined;
   const val = msg.timestamp ?? msg.time ?? msg.created_at ?? msg.createdAt ?? msg.ts;
   if (typeof val === 'number' && !isNaN(val) && val > 0) {
-    return val < 1e11 ? val * 1000 : val;
+    return val >= 1e8 && val < 1e11 ? val * 1000 : val;
   }
   if (typeof val === 'string' && val.trim().length > 0) {
     const num = Number(val);
     if (!isNaN(num) && num > 0) {
-      return num < 1e11 ? num * 1000 : num;
+      return num >= 1e8 && num < 1e11 ? num * 1000 : num;
     }
     const parsed = Date.parse(val);
     if (!isNaN(parsed) && parsed > 0) {
