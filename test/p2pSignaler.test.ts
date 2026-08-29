@@ -36,4 +36,17 @@ describe('P2PSignaler', () => {
     assert.equal(signaler.isSignalForMe(signalForMe), true);
     assert.equal(signaler.isSignalForMe(signalForOther), false);
   });
+
+  it('creates answer and ICE candidate signals', () => {
+    const signaler = new P2PSignaler('mobile-client-1');
+    const answerSdp = { type: 'answer' as const, sdp: 'v=0\r\no=- 67890 2 IN IP4 127.0.0.1\r\n' };
+    const answerSignal = signaler.createAnswerSignal(answerSdp, 'host-desktop-1');
+    assert.equal(answerSignal.type, 'answer');
+    assert.deepEqual(answerSignal.payload, answerSdp);
+
+    const candidate = { candidate: 'candidate:1 1 UDP 2130706431 192.168.1.50 50000 typ host', sdpMid: '0', sdpMLineIndex: 0 };
+    const candSignal = signaler.createCandidateSignal(candidate, 'host-desktop-1');
+    assert.equal(candSignal.type, 'candidate');
+    assert.deepEqual(candSignal.payload, candidate);
+  });
 });

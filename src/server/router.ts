@@ -11,6 +11,8 @@ import { isRequestAuthorized } from './auth';
 import { readJsonBody, sendJson, handleAuthRoutes } from './authRoutes';
 import { serveStaticFile } from './staticHandler';
 import { handleSetupRoute } from './setupHandler';
+import { handleAttachmentRoute } from './attachmentHandler';
+import { handleP2PSignalRoute } from './p2pSignalRouter';
 import type { AttachmentItem } from '../types';
 
 export { readJsonBody };
@@ -35,6 +37,7 @@ export async function handleRequest(
 
   if (await handleAuthRoutes(req, res, pathname, url, password, syncConfig)) return;
   if (await handleSetupRoute(res, pathname, url, workspaceRoot, staticDir, password, syncConfig)) return;
+  if (await handleP2PSignalRoute(req, res, pathname, url)) return;
   if (pathname === '/' || pathname === '/index.html') return serveStaticFile(req, res, staticDir, 'index.html', 'text/html; charset=utf-8');
   if (pathname === '/bundle.js') return serveStaticFile(req, res, staticDir, 'bundle.js', 'application/javascript');
   if (pathname === '/monitor.css') return serveStaticFile(req, res, staticDir, 'monitor.css', 'text/css');
@@ -42,12 +45,12 @@ export async function handleRequest(
   if (pathname === '/icon.svg') return serveStaticFile(req, res, staticDir, 'icon.svg', 'image/svg+xml');
   if (pathname === '/standalone.html') return serveStaticFile(req, res, staticDir, 'standalone.html', 'text/html; charset=utf-8');
 
-
   if (password && !isRequestAuthorized(req, password, url)) {
     sendJson(res, 401, { error: 'Unauthorized', authRequired: true }, req);
     return;
   }
 
+  if (await handleAttachmentRoute(req, res, url, workspaceRoot)) return;
   if (pathname === '/api/events') { sse.addClient(res); return; }
   if (pathname === '/api/models' && req.method === 'GET') {
     const catalog = getMonitorModelCatalog();

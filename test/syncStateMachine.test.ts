@@ -2,14 +2,14 @@ import test from 'node:test';
 import * as assert from 'node:assert/strict';
 import { SyncStateMachine } from '../src/ui/syncStateMachine';
 
-test('SyncStateMachine initializes in live-sse mode and transitions on status updates', () => {
+test('SyncStateMachine initializes in p2p default mode and transitions on status updates', () => {
   const sm = new SyncStateMachine({
     onModeChange: () => {},
     onStatusChange: () => {},
     onDataUpdate: () => {},
   });
 
-  assert.equal(sm.getMode(), 'live-sse');
+  assert.equal(sm.getMode(), 'p2p');
   assert.equal(sm.getPollInterval(), 15000);
 
   // Set active turn (waiting for agent response)
@@ -36,7 +36,7 @@ test('SyncStateMachine triggers failover to git-backup when primary SSE fails', 
   sm.stop();
 });
 
-test('SyncStateMachine allows manual toggle to git-backup and back to live-sse', () => {
+test('SyncStateMachine allows manual toggle across p2p, git-backup, and live-sse', () => {
   let activeMode = '';
   const sm = new SyncStateMachine({
     onModeChange: (m) => { activeMode = m; },
@@ -53,5 +53,9 @@ test('SyncStateMachine allows manual toggle to git-backup and back to live-sse',
   sm.restorePrimaryLive();
   assert.equal(activeMode, 'live-sse');
   assert.equal(sm.getMode(), 'live-sse');
+
+  sm.forceP2PMode();
+  assert.equal(activeMode, 'p2p');
+  assert.equal(sm.getMode(), 'p2p');
   sm.stop();
 });

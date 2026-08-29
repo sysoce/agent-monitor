@@ -7,7 +7,7 @@ import type { SyncStateMachineCallbacks, RateLimitInfo } from './syncStateMachin
 export type { SyncStateMachineCallbacks, RateLimitInfo };
 
 export class SyncStateMachine {
-  private mode: TransportMode = 'live-sse';
+  private mode: TransportMode = 'p2p';
   private gistConfig?: GistSyncConfig;
   private gistClient?: GistClient;
   private isAwaitingResponse = false;
@@ -45,6 +45,15 @@ export class SyncStateMachine {
   setGistConfig(config?: GistSyncConfig): void {
     this.gistConfig = config;
     this.gistClient = config ? new GistClient(config) : undefined;
+  }
+
+  forceP2PMode(): void {
+    this.stopGitPolling();
+    this.reachabilityProbe.stop();
+    this.mode = 'p2p';
+    this.callbacks.onModeChange('p2p');
+    this.callbacks.onStatusChange('connected');
+    this.callbacks.onError?.('');
   }
 
   forceGitBackupMode(): void {

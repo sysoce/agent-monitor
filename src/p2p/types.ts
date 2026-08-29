@@ -23,3 +23,10 @@ export interface P2PDataMessage {
   payload: any;
   timestamp: number;
 }
+
+export interface P2PConnectionOptions {
+  peerId: string;
+  iceServers?: { urls: string; username?: string; credential?: string }[];
+  isInitiator?: boolean;
+  signalingTimeoutMs?: number;
+}

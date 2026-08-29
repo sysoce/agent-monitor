@@ -2,6 +2,8 @@ import type { P2PDataMessage } from './types';
 
 export class P2PDataChannel {
   private readonly listeners = new Set<(msg: P2PDataMessage) => void>();
+  private readonly openListeners = new Set<() => void>();
+  private readonly closeListeners = new Set<() => void>();
   private readonly queue: string[] = [];
 
   constructor(private readonly rawChannel: {
@@ -28,6 +30,10 @@ export class P2PDataChannel {
         const item = this.queue.shift();
         if (item) this.rawChannel.send(item);
       }
+      for (const listener of this.openListeners) listener();
+    };
+    this.rawChannel.onclose = () => {
+      for (const listener of this.closeListeners) listener();
     };
   }
 
@@ -44,6 +50,16 @@ export class P2PDataChannel {
   onMessage(listener: (msg: P2PDataMessage) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onOpen(listener: () => void): () => void {
+    this.openListeners.add(listener);
+    return () => this.openListeners.delete(listener);
+  }
+
+  onClose(listener: () => void): () => void {
+    this.closeListeners.add(listener);
+    return () => this.closeListeners.delete(listener);
   }
 
   isOpen(): boolean {

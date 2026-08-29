@@ -50,11 +50,12 @@ export function createAppSyncMachine(
 export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: () => void): void {
   const cfg = loadCachedGistConfig();
   if (cfg) syncMachine.setGistConfig(cfg);
-  const liveServer = hasLiveServer();
   const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
-  const mode = saved || (!liveServer && cfg ? 'git-backup' : 'live-sse');
+  const mode = saved || 'p2p';
 
-  if (mode === 'git-backup' || !liveServer) {
+  if (mode === 'p2p') {
+    syncMachine.forceP2PMode();
+  } else if (mode === 'git-backup') {
     syncMachine.forceGitBackupMode();
   } else {
     startSse();
@@ -77,7 +78,7 @@ export function setSyncModeAction(
     syncMachine.forceGitBackupMode();
   } else if (targetMode === 'p2p') {
     sseCleanup?.();
-    syncMachine.stop();
+    syncMachine.forceP2PMode();
     state.syncMode = 'p2p';
     state.syncStatus = 'connected';
   }
@@ -89,14 +90,14 @@ export function toggleSyncModeAction(
   startSse: () => void,
   sseCleanup?: () => void
 ): void {
-  const current = state.syncMode || 'live-sse';
-  let next: TransportMode = 'live-sse';
-  if (current === 'live-sse') {
-    next = loadCachedGistConfig() ? 'git-backup' : 'p2p';
-  } else if (current === 'git-backup') {
-    next = 'p2p';
-  } else {
+  const current = state.syncMode || 'p2p';
+  let next: TransportMode = 'p2p';
+  if (current === 'p2p') {
     next = hasLiveServer() ? 'live-sse' : 'git-backup';
+  } else if (current === 'live-sse') {
+    next = loadCachedGistConfig() ? 'git-backup' : 'p2p';
+  } else {
+    next = 'p2p';
   }
   setSyncModeAction(next, state, syncMachine, startSse, sseCleanup);
 }
