@@ -91,3 +91,61 @@ test('updateLayoutDOM avoids re-rendering main and modal when renderedHtml match
   assert.equal(mainInnerHtmlSetCount, 0, 'Should not rewrite mainEl innerHTML');
   assert.equal(modalInnerHtmlSetCount, 0, 'Should not rewrite modalContainer innerHTML');
 });
+
+test('updateLayoutDOM updates existing modal in-place without rewriting modalContainer innerHTML', () => {
+  let modalInnerHtmlSetCount = 0;
+  let qrSectionReplaced = false;
+
+  const qrMock: any = {
+    id: 'settings-section-qr',
+    dataset: { renderedHtml: '<div id="settings-section-qr">Old QR</div>' },
+    set outerHTML(val: string) {
+      qrSectionReplaced = true;
+      qrMock.dataset.renderedHtml = val;
+    },
+    get outerHTML() {
+      return qrMock.dataset.renderedHtml;
+    },
+  };
+
+  const existingSettingsModal: any = {
+    id: 'settings-modal',
+    querySelector(sel: string) {
+      if (sel === '#settings-section-qr') return qrMock;
+      return null;
+    },
+  };
+
+  const modalContainer: any = {
+    dataset: { renderedHtml: '<div id="settings-modal">Old Content</div>' },
+    querySelector(sel: string) {
+      if (sel.includes('#settings-modal')) return existingSettingsModal;
+      return null;
+    },
+    set innerHTML(_val: string) {
+      modalInnerHtmlSetCount++;
+    },
+  };
+
+  const layoutEl: any = {
+    querySelector(sel: string) {
+      if (sel === '#modal-container') return modalContainer;
+      return null;
+    },
+    insertAdjacentHTML() {},
+  };
+
+  const app: any = {
+    querySelector: (sel: string) => (sel === '.app-layout' ? layoutEl : null),
+  };
+
+  const state = createMockState({ isSettingsModalOpen: true, qrModalTarget: 'lan' });
+  const newModalHtml = '<div id="settings-modal">New Content</div>';
+
+  updateLayoutDOM(app, state, '', newModalHtml);
+
+  assert.equal(modalInnerHtmlSetCount, 0, 'Should NOT replace modalContainer innerHTML');
+  assert.equal(qrSectionReplaced, true, 'Should update QR section in-place');
+  assert.equal(modalContainer.dataset.renderedHtml, newModalHtml);
+});
+

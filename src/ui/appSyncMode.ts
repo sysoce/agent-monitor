@@ -3,7 +3,11 @@ import { SyncStateMachine } from './syncStateMachine';
 import { loadCachedGistConfig, applyGistSyncPayload } from './sessionPlanSync';
 import { hasLiveServer } from './authStore';
 
-export function createAppSyncMachine(state: AppState, render: () => void): SyncStateMachine {
+export function createAppSyncMachine(
+  state: AppState,
+  render: () => void,
+  onLiveServerReachable?: () => void
+): SyncStateMachine {
   let machine: SyncStateMachine;
   machine = new SyncStateMachine({
     onModeChange: (m) => {
@@ -29,9 +33,13 @@ export function createAppSyncMachine(state: AppState, render: () => void): SyncS
         render();
       }
     },
+    onLiveServerReachable: () => {
+      onLiveServerReachable?.();
+    },
   });
   return machine;
 }
+
 
 export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: () => void): void {
   const cfg = loadCachedGistConfig();

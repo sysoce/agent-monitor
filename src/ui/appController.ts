@@ -18,8 +18,9 @@ export class AppController {
   private syncMachine: SyncStateMachine;
 
   constructor(private state: AppState, private render: () => void) {
-    this.syncMachine = createAppSyncMachine(this.state, this.render);
+    this.syncMachine = createAppSyncMachine(this.state, this.render, () => this.startSse());
   }
+
 
   async selectSession(id: string): Promise<void> {
     const s = this.state.sessions.find((sess) => sess.id === id), cached = this.state.cachedSessionDetails?.[id];

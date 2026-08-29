@@ -2,8 +2,23 @@ import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, cpSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 
+import * as os from 'node:os';
+
 const isWatch = process.argv.includes('--watch');
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
+
+function getDefaultLanUrl(port = 4200) {
+  const interfaces = os.networkInterfaces();
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    if (!addrs) continue;
+    for (const addr of addrs) {
+      if (addr.family === 'IPv4' && !addr.internal) {
+        return `http://${addr.address}:${port}`;
+      }
+    }
+  }
+  return `http://localhost:${port}`;
+}
 
 const serverConfig = {
   entryPoints: ['src/cli.ts'],
@@ -35,8 +50,10 @@ const uiConfig = {
   target: 'es2020',
   define: {
     __MONITOR_VERSION__: JSON.stringify(pkg.version),
+    __DEFAULT_SERVER_URL__: JSON.stringify(getDefaultLanUrl(4200)),
   },
 };
+
 
 const cssConfig = {
   entryPoints: ['src/ui/monitor.css'],

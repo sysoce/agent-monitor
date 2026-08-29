@@ -1,5 +1,6 @@
 import type { GistSyncConfig, SyncGistPayload, SyncInboxMessage, TransportMode } from '../sync/types';
 import { GistClient } from '../sync/gistClient';
+import { LiveReachabilityProbe } from './liveReachabilityProbe';
 import type { SyncStatus } from './types';
 
 export interface SyncStateMachineCallbacks {
@@ -7,6 +8,7 @@ export interface SyncStateMachineCallbacks {
   onStatusChange: (status: SyncStatus) => void;
   onDataUpdate: (payload: SyncGistPayload) => void;
   onError?: (error?: string) => void;
+  onLiveServerReachable?: () => void;
 }
 
 export class SyncStateMachine {
@@ -16,11 +18,18 @@ export class SyncStateMachine {
   private isAwaitingResponse = false;
   private pollTimer?: any;
   private lastEtag?: string;
+  private reachabilityProbe: LiveReachabilityProbe;
 
   constructor(private readonly callbacks: SyncStateMachineCallbacks) {
+    this.reachabilityProbe = new LiveReachabilityProbe({
+      onReachable: () => this.triggerLiveServerReachable(),
+    });
     if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && this.mode === 'git-backup') this.restartGitPolling();
+        if (!document.hidden) {
+          if (this.mode === 'git-backup') this.restartGitPolling();
+          void this.reachabilityProbe.checkReachability();
+        }
       });
     }
   }
@@ -54,6 +63,7 @@ export class SyncStateMachine {
       this.callbacks.onModeChange('git-backup');
       this.callbacks.onStatusChange('connected');
       this.callbacks.onError?.('');
+      this.reachabilityProbe.start();
       this.restartGitPolling();
     } else {
       this.callbacks.onError?.('Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.');
@@ -65,6 +75,7 @@ export class SyncStateMachine {
       this.mode = 'git-backup';
       this.callbacks.onModeChange('git-backup');
       this.callbacks.onStatusChange('syncing');
+      this.reachabilityProbe.start();
       this.restartGitPolling();
     } else {
       this.mode = 'offline';
@@ -75,10 +86,16 @@ export class SyncStateMachine {
 
   restorePrimaryLive(): void {
     this.stopGitPolling();
+    this.reachabilityProbe.stop();
     this.mode = 'live-sse';
     this.callbacks.onModeChange('live-sse');
     this.callbacks.onStatusChange('connected');
     this.callbacks.onError?.('');
+  }
+
+  triggerLiveServerReachable(): void {
+    this.reachabilityProbe.stop();
+    this.callbacks.onLiveServerReachable?.();
   }
 
   async pushInboxMessage(msg: SyncInboxMessage): Promise<void> {
@@ -93,12 +110,8 @@ export class SyncStateMachine {
   private restartGitPolling(): void {
     this.stopGitPolling();
     void this.pollOnce();
-    const timer = setInterval(() => {
-      void this.pollOnce();
-    }, this.getPollInterval());
-    if (typeof (timer as any)?.unref === 'function') {
-      (timer as any).unref();
-    }
+    const timer = setInterval(() => { void this.pollOnce(); }, this.getPollInterval());
+    if (typeof (timer as any)?.unref === 'function') (timer as any).unref();
     this.pollTimer = timer;
   }
 
@@ -126,13 +139,11 @@ export class SyncStateMachine {
   }
 
   stopGitPolling(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = undefined;
-    }
+    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = undefined; }
   }
 
   stop(): void {
+    this.reachabilityProbe.stop();
     this.stopGitPolling();
   }
 }

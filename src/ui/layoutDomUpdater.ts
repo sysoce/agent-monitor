@@ -2,6 +2,7 @@ import type { AppState } from './types';
 import { renderNavHeader } from './components/navHeader';
 import { renderComposerView } from './components/composerView';
 import { updateComposerDOM } from './composerDomUpdater';
+import { updateSettingsModalDOM, initModalSectionsCache } from './settingsModalDomUpdater';
 
 export function updateLayoutDOM(
   app: HTMLElement,
@@ -26,7 +27,10 @@ export function updateLayoutDOM(
     const mainEl = app.querySelector<HTMLElement>('.app-main');
     if (mainEl) mainEl.dataset.renderedHtml = mainHtml;
     const modalEl = app.querySelector<HTMLElement>('#modal-container');
-    if (modalEl) modalEl.dataset.renderedHtml = settingsModalHtml;
+    if (modalEl) {
+      modalEl.dataset.renderedHtml = settingsModalHtml;
+      if (settingsModalHtml) initModalSectionsCache(modalEl, state);
+    }
     return true;
   }
 
@@ -66,22 +70,31 @@ export function updateLayoutDOM(
   const modalContainer = existingLayout.querySelector<HTMLElement>('#modal-container');
   if (modalContainer) {
     if (modalContainer.dataset.renderedHtml !== settingsModalHtml) {
-      modalContainer.innerHTML = settingsModalHtml;
-      modalContainer.dataset.renderedHtml = settingsModalHtml;
+      const existingModal = modalContainer.querySelector<HTMLElement>('#settings-modal, #qr-modal');
+      if (settingsModalHtml && existingModal) {
+        updateSettingsModalDOM(state, existingModal);
+        modalContainer.dataset.renderedHtml = settingsModalHtml;
+      } else {
+        modalContainer.innerHTML = settingsModalHtml;
+        modalContainer.dataset.renderedHtml = settingsModalHtml;
+        if (settingsModalHtml) initModalSectionsCache(modalContainer, state);
+      }
     }
   } else {
     const modalEl = existingLayout.querySelector<HTMLElement>('#settings-modal, #qr-modal');
     if (settingsModalHtml) {
       if (modalEl) {
         if (modalEl.dataset.renderedHtml !== settingsModalHtml) {
-          modalEl.outerHTML = settingsModalHtml;
-          const newModal = existingLayout.querySelector<HTMLElement>('#settings-modal, #qr-modal');
-          if (newModal) newModal.dataset.renderedHtml = settingsModalHtml;
+          updateSettingsModalDOM(state, modalEl);
+          modalEl.dataset.renderedHtml = settingsModalHtml;
         }
       } else {
         existingLayout.insertAdjacentHTML('beforeend', settingsModalHtml);
         const newModal = existingLayout.querySelector<HTMLElement>('#settings-modal, #qr-modal');
-        if (newModal) newModal.dataset.renderedHtml = settingsModalHtml;
+        if (newModal) {
+          newModal.dataset.renderedHtml = settingsModalHtml;
+          initModalSectionsCache(newModal, state);
+        }
       }
     } else if (modalEl) {
       modalEl.remove();

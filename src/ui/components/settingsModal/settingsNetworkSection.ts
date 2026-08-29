@@ -55,9 +55,10 @@ export function renderSettingsNetworkSection(state: AppState): string {
     : `
         <div class="network-ip-empty">
           <p>No active local network interfaces detected from server.</p>
-          <p class="network-ip-hint">Local connection URL: <code>${escapeHtml(typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200')}</code></p>
+          <p class="network-ip-hint">Local connection URL: <code>${escapeHtml(currentBaseUrl || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200'))}</code></p>
         </div>
       `;
+
 
   return `
     <div class="settings-section settings-section--network" id="settings-section-network">

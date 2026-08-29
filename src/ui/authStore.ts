@@ -29,6 +29,17 @@ export function clearStoredToken(): void {
   } catch {}
 }
 
+declare const __DEFAULT_SERVER_URL__: string | undefined;
+
+export function getDefaultServerUrl(): string {
+  try {
+    if (typeof __DEFAULT_SERVER_URL__ !== 'undefined' && __DEFAULT_SERVER_URL__) {
+      return __DEFAULT_SERVER_URL__;
+    }
+  } catch {}
+  return '';
+}
+
 export function getServerBaseUrl(): string {
   try {
     const fromUrl = new URLSearchParams(window.location.search).get('server');
@@ -38,7 +49,12 @@ export function getServerBaseUrl(): string {
       return clean;
     }
     const stored = localStorage.getItem(SERVER_KEY);
+    if (stored === 'none') {
+      return '';
+    }
     if (stored) return stored.replace(/\/+$/, '');
+    const def = getDefaultServerUrl();
+    if (def) return def.replace(/\/+$/, '');
   } catch {}
   return '';
 }
@@ -58,13 +74,14 @@ export function hasLiveServer(): boolean {
 
 export function setServerBaseUrl(url: string): void {
   try {
-    localStorage.setItem(SERVER_KEY, url.replace(/\/+$/, ''));
+    const clean = url.trim().replace(/\/+$/, '');
+    localStorage.setItem(SERVER_KEY, clean || 'none');
   } catch {}
 }
 
 export function clearServerBaseUrl(): void {
   try {
-    localStorage.removeItem(SERVER_KEY);
+    localStorage.setItem(SERVER_KEY, 'none');
   } catch {}
 }
 
@@ -73,3 +90,4 @@ export function buildApiUrl(pathname: string): string {
   const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`;
   return base ? `${base}${normalized}` : normalized;
 }
+
