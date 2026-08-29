@@ -6755,7 +6755,11 @@ input:checked + .slider:before {
     return window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev") || window.location.hostname.endsWith(".vercel.app") || window.location.hostname.endsWith(".netlify.app");
   }
   function hasLiveServer() {
-    return Boolean(getServerBaseUrl()) || !isStaticDeployment();
+    const base = getServerBaseUrl();
+    if (isStaticDeployment()) {
+      return Boolean(base);
+    }
+    return true;
   }
   function setServerBaseUrl(url) {
     try {
@@ -7088,7 +7092,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.12" : "1.0.12";
+  var CLIENT_VERSION = true ? "1.0.13" : "1.0.13";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7224,10 +7228,33 @@ input:checked + .slider:before {
         if (s.id === sid || s.isGenerating) s.isGenerating = false;
       }
     }
+    if (sid) {
+      const detailToApply = matched || state2.cachedSessionDetails?.[sid];
+      if (detailToApply) {
+        state2.activeSession = mergeSessionDetail(state2.activeSession, detailToApply, payload.inbox);
+        state2.plans = detailToApply.plans || [];
+        state2.isLoadingSession = false;
+      } else if (!state2.activeSession || state2.activeSession.id !== sid) {
+        const sum = state2.sessions.find((s) => s.id === sid);
+        state2.activeSession = {
+          id: sid,
+          title: sum?.title || sid,
+          mode: "agent",
+          createdAt: sum?.createdAt || Date.now(),
+          updatedAt: sum?.updatedAt || Date.now(),
+          messages: [],
+          filesChanged: [],
+          artifacts: [],
+          subagents: [],
+          plans: sum?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || []
+        };
+        state2.plans = state2.activeSession.plans || [];
+        state2.isLoadingSession = false;
+      } else {
+        state2.isLoadingSession = false;
+      }
+    }
     if (matched && sid) {
-      state2.activeSession = mergeSessionDetail(state2.activeSession, matched, payload.inbox);
-      state2.plans = matched.plans || [];
-      state2.isLoadingSession = false;
       if (isAbortedRecently && state2.activeSession) {
         state2.activeSession.isGenerating = false;
       }
@@ -8180,12 +8207,26 @@ input:checked + .slider:before {
         if (sid) state2.activeSessionId = sid;
       }
       if (state2.syncMode === "git-backup" || !hasLiveServer()) {
-        if (state2.activeSessionId && state2.cachedSessionDetails?.[state2.activeSessionId]) {
-          state2.activeSession = state2.cachedSessionDetails[state2.activeSessionId];
-        } else if (!state2.activeSessionId && state2.sessions.length > 0) {
+        if (!state2.activeSessionId && state2.sessions.length > 0) {
           state2.activeSessionId = (state2.sessions.find((s) => s.messageCount > 0) || state2.sessions[0])?.id;
-          if (state2.activeSessionId && state2.cachedSessionDetails?.[state2.activeSessionId]) {
+        }
+        if (state2.activeSessionId) {
+          if (state2.cachedSessionDetails?.[state2.activeSessionId]) {
             state2.activeSession = state2.cachedSessionDetails[state2.activeSessionId];
+          } else if (!state2.activeSession || state2.activeSession.id !== state2.activeSessionId) {
+            const s = state2.sessions.find((sess) => sess.id === state2.activeSessionId);
+            state2.activeSession = {
+              id: state2.activeSessionId,
+              title: s?.title || state2.activeSessionId,
+              mode: "agent",
+              createdAt: s?.createdAt || Date.now(),
+              updatedAt: s?.updatedAt || Date.now(),
+              messages: [],
+              filesChanged: [],
+              artifacts: [],
+              subagents: [],
+              plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || []
+            };
           }
         }
         state2.isLoadingSessions = false;
@@ -8369,6 +8410,7 @@ input:checked + .slider:before {
             this.syncMachine.handlePrimarySseFailure();
           } else if (s === "connected") {
             this.syncMachine.restorePrimaryLive();
+            void this.reloadData(false);
           }
           if (changed) this.render();
         },
@@ -10264,7 +10306,7 @@ ${thought.trim()}` : thought.trim();
     }
     const session = state2.activeSession;
     if (!session) {
-      if (state2.isLoadingSession || state2.activeSessionId) {
+      if (state2.isLoadingSession) {
         return `<div class="chat-container"><div class="chat-scroll" id="chat-messages-container">${renderSessionLoadingIndicator()}</div></div>`;
       }
       return `<div class="chat-container"><div class="chat-scroll" id="chat-messages-container"><div class="conversation-empty"><div class="empty-icon">\u{1F4AC}</div><div class="empty-title">Ask Agent to build or change code</div><div class="empty-hint">Type an instruction below to start this session.</div></div></div></div>`;

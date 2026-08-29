@@ -68,8 +68,19 @@ export function isStaticDeployment(): boolean {
     window.location.hostname.endsWith('.netlify.app');
 }
 
+export function isMixedContentBlocked(url?: string): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.location.protocol !== 'https:') return false;
+  if (!url) return false;
+  return url.startsWith('http://') || url.startsWith('ws://');
+}
+
 export function hasLiveServer(): boolean {
-  return Boolean(getServerBaseUrl()) || !isStaticDeployment();
+  const base = getServerBaseUrl();
+  if (isStaticDeployment()) {
+    return Boolean(base);
+  }
+  return true;
 }
 
 export function setServerBaseUrl(url: string): void {

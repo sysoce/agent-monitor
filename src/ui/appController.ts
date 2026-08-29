@@ -113,6 +113,7 @@ export class AppController {
           this.syncMachine.handlePrimarySseFailure();
         } else if (s === 'connected') {
           this.syncMachine.restorePrimaryLive();
+          void this.reloadData(false);
         }
         if (changed) this.render();
       },

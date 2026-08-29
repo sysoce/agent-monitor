@@ -66,10 +66,34 @@ export function applyGistSyncPayload(state: AppState, payload: SyncGistPayload):
     }
   }
 
+  if (sid) {
+    const detailToApply = matched || state.cachedSessionDetails?.[sid];
+    if (detailToApply) {
+      state.activeSession = mergeSessionDetail(state.activeSession, detailToApply, payload.inbox);
+      state.plans = detailToApply.plans || [];
+      state.isLoadingSession = false;
+    } else if (!state.activeSession || state.activeSession.id !== sid) {
+      const sum = state.sessions.find((s) => s.id === sid);
+      state.activeSession = {
+        id: sid,
+        title: sum?.title || sid,
+        mode: 'agent',
+        createdAt: sum?.createdAt || Date.now(),
+        updatedAt: sum?.updatedAt || Date.now(),
+        messages: [],
+        filesChanged: [],
+        artifacts: [],
+        subagents: [],
+        plans: sum?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || [],
+      };
+      state.plans = state.activeSession.plans || [];
+      state.isLoadingSession = false;
+    } else {
+      state.isLoadingSession = false;
+    }
+  }
+
   if (matched && sid) {
-    state.activeSession = mergeSessionDetail(state.activeSession, matched, payload.inbox);
-    state.plans = matched.plans || [];
-    state.isLoadingSession = false;
     if (isAbortedRecently && state.activeSession) {
       state.activeSession.isGenerating = false;
     }

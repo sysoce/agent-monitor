@@ -35,7 +35,7 @@ export async function loadRecentSessionDetails(
   workspaceRoot: string,
   sessions: Array<{ id: string }>,
   extraId?: string,
-  limit = 3
+  limit = 10
 ): Promise<Record<string, any>> {
   const details: Record<string, any> = {};
   const targetIds = new Set(sessions.slice(0, limit).map((s) => s.id));

@@ -14,12 +14,26 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
     }
 
     if (state.syncMode === 'git-backup' || !hasLiveServer()) {
-      if (state.activeSessionId && state.cachedSessionDetails?.[state.activeSessionId]) {
-        state.activeSession = state.cachedSessionDetails[state.activeSessionId];
-      } else if (!state.activeSessionId && state.sessions.length > 0) {
+      if (!state.activeSessionId && state.sessions.length > 0) {
         state.activeSessionId = (state.sessions.find((s) => s.messageCount > 0) || state.sessions[0])?.id;
-        if (state.activeSessionId && state.cachedSessionDetails?.[state.activeSessionId]) {
+      }
+      if (state.activeSessionId) {
+        if (state.cachedSessionDetails?.[state.activeSessionId]) {
           state.activeSession = state.cachedSessionDetails[state.activeSessionId];
+        } else if (!state.activeSession || state.activeSession.id !== state.activeSessionId) {
+          const s = state.sessions.find((sess) => sess.id === state.activeSessionId);
+          state.activeSession = {
+            id: state.activeSessionId,
+            title: s?.title || state.activeSessionId,
+            mode: 'agent',
+            createdAt: s?.createdAt || Date.now(),
+            updatedAt: s?.updatedAt || Date.now(),
+            messages: [],
+            filesChanged: [],
+            artifacts: [],
+            subagents: [],
+            plans: s?.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path, updatedAt: Date.now(), sizeBytes: 0 })) || [],
+          };
         }
       }
       state.isLoadingSessions = false;

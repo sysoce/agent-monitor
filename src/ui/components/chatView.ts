@@ -33,7 +33,7 @@ export function renderChatView(state: AppState): string {
 
   const session = state.activeSession;
   if (!session) {
-    if (state.isLoadingSession || state.activeSessionId) {
+    if (state.isLoadingSession) {
       return `<div class="chat-container"><div class="chat-scroll" id="chat-messages-container">${renderSessionLoadingIndicator()}</div></div>`;
     }
     return `<div class="chat-container"><div class="chat-scroll" id="chat-messages-container"><div class="conversation-empty"><div class="empty-icon">💬</div><div class="empty-title">Ask Agent to build or change code</div><div class="empty-hint">Type an instruction below to start this session.</div></div></div></div>`;
