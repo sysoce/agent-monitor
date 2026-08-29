@@ -2,84 +2,48 @@ import type { GistSyncConfig, SyncGistPayload, SyncInboxMessage, SyncOutboxState
 import { encryptSyncData, decryptSyncData } from './syncCrypto';
 import { compressPayload, decompressPayload } from './payloadCompressor';
 import type { SessionSummary } from '../server/types';
+import { createRateLimitState, updateRateLimitFromResponse, buildGistHeaders, parseGistError, type RateLimitState } from './gistHttp';
 
 export class GistClient {
   private readonly baseUrl: string;
-  private rateLimitReset = 0;
-  private isRateLimited = false;
-  private consecutiveFailures = 0;
+  private readonly rateLimit: RateLimitState = createRateLimitState();
   private cachedPayload: SyncGistPayload | null = null;
 
   constructor(private readonly config: GistSyncConfig, baseUrl = 'https://api.github.com') {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
+  get rateLimitReset(): number { return this.rateLimit.rateLimitReset; }
+  set rateLimitReset(val: number) { this.rateLimit.rateLimitReset = val; }
+  get isRateLimited(): boolean { return this.rateLimit.isRateLimited; }
+  set isRateLimited(val: boolean) { this.rateLimit.isRateLimited = val; }
+
+  private updateRateLimit(res: Response | { status: number; headers: { get: (k: string) => string | null } }): void {
+    updateRateLimitFromResponse(this.rateLimit, res as any);
+  }
+
   isBlockedByRateLimit(): boolean {
-    if (this.isRateLimited && Date.now() < this.rateLimitReset) return true;
-    this.isRateLimited = false;
+    if (this.rateLimit.isRateLimited && Date.now() < this.rateLimit.rateLimitReset) return true;
+    this.rateLimit.isRateLimited = false;
     return false;
   }
 
-  private updateRateLimit(res: Response): void {
-    const retryAfter = res.headers.get('retry-after');
-    const remaining = res.headers.get('x-ratelimit-remaining');
-    const reset = res.headers.get('x-ratelimit-reset');
-
-    if (retryAfter) {
-      const seconds = parseInt(retryAfter, 10) || 60;
-      this.rateLimitReset = Date.now() + seconds * 1000;
-      this.isRateLimited = true;
-      this.consecutiveFailures++;
-      return;
-    }
-
-    if (res.status === 403 || res.status === 429 || res.status === 409) {
-      this.consecutiveFailures++;
-      const backoffSeconds = Math.min(120, 30 * Math.pow(2, Math.min(this.consecutiveFailures - 1, 3)));
-      if (remaining && parseInt(remaining, 10) === 0 && reset) {
-        this.rateLimitReset = parseInt(reset, 10) * 1000;
-      } else {
-        this.rateLimitReset = Date.now() + backoffSeconds * 1000;
-      }
-      this.isRateLimited = true;
-    } else if (remaining && parseInt(remaining, 10) === 0 && reset) {
-      this.rateLimitReset = parseInt(reset, 10) * 1000;
-      this.isRateLimited = true;
-    } else if (res.ok && remaining && parseInt(remaining, 10) > 0) {
-      this.isRateLimited = false;
-      this.consecutiveFailures = 0;
-    }
-  }
-
-  private headers(etag?: string): Record<string, string> {
-    const h: Record<string, string> = {
-      Authorization: `Bearer ${this.config.token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
+  getRateLimitInfo(): { remaining: number; limit: number; resetTime: number; isBlocked: boolean } {
+    return {
+      remaining: this.rateLimit.remaining,
+      limit: this.rateLimit.limit,
+      resetTime: this.rateLimit.rateLimitReset,
+      isBlocked: this.isBlockedByRateLimit(),
     };
-    if (typeof window === 'undefined') {
-      h['User-Agent'] = 'AgentMonitor-Sync';
-    }
-    if (etag) h['If-None-Match'] = etag;
-    return h;
-  }
-
-  private async parseErrorMessage(res: Response, fallback: string): Promise<string> {
-    try {
-      const body = (await res.json()) as { message?: string };
-      if (body?.message) return `${res.status} (${body.message})`;
-    } catch {}
-    return `${res.status} ${res.statusText}`.trim() || fallback;
   }
 
   async fetchSyncState(etag?: string): Promise<{ data: SyncGistPayload | null; etag?: string; notModified: boolean }> {
     if (this.isBlockedByRateLimit()) return { data: null, etag, notModified: true };
-    const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: this.headers(etag) });
+    const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, { headers: buildGistHeaders(this.config.token, etag) });
     this.updateRateLimit(res);
 
     if (res.status === 304) return { data: null, etag, notModified: true };
-    if (!res.ok) throw new Error(`GitHub Gist API error: ${await this.parseErrorMessage(res, 'Gist error')}`);
+    if (!res.ok) throw new Error(`GitHub Gist API error: ${await parseGistError(res, 'Gist error')}`);
 
     const newEtag = res.headers.get('etag') || undefined;
     const json = (await res.json()) as { files?: Record<string, { content?: string; truncated?: boolean; raw_url?: string }> };
@@ -95,7 +59,7 @@ export class GistClient {
 
     try {
       const decrypted = decryptSyncData(raw, this.config.password);
-      const decompressed = decompressPayload(decrypted);
+      const decompressed = await decompressPayload(decrypted);
       const p = JSON.parse(decompressed) as SyncGistPayload;
       const data: SyncGistPayload = {
         inbox: Array.isArray(p?.inbox) ? p.inbox : [], sessions: Array.isArray(p?.sessions) ? p.sessions : [],
@@ -105,7 +69,10 @@ export class GistClient {
       };
       this.cachedPayload = data;
       return { data, etag: newEtag, notModified: false };
-    } catch {
+    } catch (err: any) {
+      if (raw.startsWith('enc:') || raw.startsWith('cz:')) {
+        throw new Error(`Failed to decrypt/parse Gist payload: ${err?.message || 'Invalid password or format'}`);
+      }
       return { data: { inbox: [], sessions: [], version: 1, updatedAt: Date.now(), sessionDetails: {} }, etag: newEtag, notModified: false };
     }
   }
@@ -137,19 +104,21 @@ export class GistClient {
   }
 
   private async saveSyncPayload(payload: SyncGistPayload): Promise<void> {
-    if (this.isBlockedByRateLimit()) return;
+    if (this.isBlockedByRateLimit()) {
+      const waitMin = Math.max(1, Math.ceil((this.rateLimit.rateLimitReset - Date.now()) / 60000));
+      throw new Error(`GitHub API rate limit exceeded. Reset in ${waitMin}m. Please use local LAN / Live connection.`);
+    }
     const jsonStr = JSON.stringify(payload);
-    const compressed = compressPayload(jsonStr);
+    const compressed = await compressPayload(jsonStr);
     const content = encryptSyncData(compressed, this.config.password);
     const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
       method: 'PATCH',
-      headers: this.headers(),
+      headers: buildGistHeaders(this.config.token),
       body: JSON.stringify({ files: { 'agent-sync.json': { content } } }),
     });
     this.updateRateLimit(res);
     if (!res.ok) {
-      if (res.status === 403 || res.status === 429) return;
-      const err = await this.parseErrorMessage(res, 'Failed to update Gist');
+      const err = await parseGistError(res, 'Failed to update Gist');
       throw new Error(`Failed to update Gist: ${err}`);
     }
     this.cachedPayload = payload;

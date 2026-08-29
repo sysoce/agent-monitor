@@ -22,6 +22,7 @@ export class AppController {
       onModeChange: (m) => { this.state.syncMode = m; this.render(); },
       onStatusChange: (s) => { this.state.syncStatus = s; this.render(); },
       onDataUpdate: (p) => { if (applyGistSyncPayload(this.state, p)) this.syncMachine.setAwaitingResponse(false); this.render(); },
+      onError: (err) => { this.state.errorMessage = err || undefined; this.render(); },
     });
   }
 

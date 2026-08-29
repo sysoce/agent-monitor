@@ -6,6 +6,7 @@ export interface SyncStateMachineCallbacks {
   onModeChange: (mode: TransportMode) => void;
   onStatusChange: (status: SyncStatus) => void;
   onDataUpdate: (payload: SyncGistPayload) => void;
+  onError?: (error?: string) => void;
 }
 
 export class SyncStateMachine {
@@ -52,7 +53,10 @@ export class SyncStateMachine {
       this.mode = 'git-backup';
       this.callbacks.onModeChange('git-backup');
       this.callbacks.onStatusChange('connected');
+      this.callbacks.onError?.('');
       this.restartGitPolling();
+    } else {
+      this.callbacks.onError?.('Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.');
     }
   }
 
@@ -74,6 +78,7 @@ export class SyncStateMachine {
     this.mode = 'live-sse';
     this.callbacks.onModeChange('live-sse');
     this.callbacks.onStatusChange('connected');
+    this.callbacks.onError?.('');
   }
 
   async pushInboxMessage(msg: SyncInboxMessage): Promise<void> {
@@ -108,12 +113,15 @@ export class SyncStateMachine {
       if (res.etag) this.lastEtag = res.etag;
       if (res.notModified) {
         this.callbacks.onStatusChange('connected');
+        this.callbacks.onError?.('');
       } else if (res.data) {
         this.callbacks.onStatusChange('connected');
+        this.callbacks.onError?.('');
         this.callbacks.onDataUpdate(res.data);
       }
-    } catch {
+    } catch (err: any) {
       this.callbacks.onStatusChange('disconnected');
+      this.callbacks.onError?.(err?.message || 'Gist sync connection failed');
     }
   }
 

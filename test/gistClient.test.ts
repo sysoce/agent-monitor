@@ -117,7 +117,7 @@ test('GistClient pushInboxMessage updates Gist with encrypted payload', async ()
     await client.pushInboxMessage(newMsg);
     assert.ok(receivedPatchBody);
     const rawContent = receivedPatchBody.files['agent-sync.json'].content;
-    const jsonStr = rawContent.startsWith('cz:') ? decompressPayload(rawContent) : rawContent;
+    const jsonStr = rawContent.startsWith('cz:') ? await decompressPayload(rawContent) : rawContent;
     const content = JSON.parse(jsonStr);
     assert.equal(content.inbox.length, 2);
     assert.equal(content.inbox[1].content, 'what is the weather?');
