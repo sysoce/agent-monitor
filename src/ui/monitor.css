@@ -143,6 +143,12 @@ body {
   animation: pulse-dot 2s infinite ease-in-out;
 }
 
+.status-p2p .status-dot {
+  background: #4ec9b0;
+  box-shadow: 0 0 6px rgba(78, 201, 176, 0.6);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
 .status-offline .status-dot {
   background: #888888;
 }

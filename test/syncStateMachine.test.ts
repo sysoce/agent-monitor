@@ -14,7 +14,7 @@ test('SyncStateMachine initializes in live-sse mode and transitions on status up
 
   // Set active turn (waiting for agent response)
   sm.setAwaitingResponse(true);
-  assert.equal(sm.getPollInterval(), 2500, 'Should use 2.5-second active poll during turn');
+  assert.equal(sm.getPollInterval(), 6000, 'Should use 6-second active poll during turn');
 
   sm.setAwaitingResponse(false);
   assert.equal(sm.getPollInterval(), 15000, 'Should return to gentle interval when idle');

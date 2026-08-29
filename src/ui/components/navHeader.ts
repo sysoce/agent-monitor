@@ -2,16 +2,36 @@ import type { AppState } from '../types';
 import { escapeHtml } from './markdown';
 import { CLIENT_VERSION } from '../version';
 
-export function renderNavHeader(state: AppState): string {
+export function getNavHeaderStatus(state: AppState): { statusColor: string; statusLabel: string; statusClass: string } {
+  const isP2P = state.syncMode === 'p2p';
   const isGit = state.syncMode === 'git-backup';
   const isConnected = state.syncStatus === 'connected';
-  const isSyncing = state.syncStatus === 'syncing';
+  const isSyncing = state.syncStatus === 'syncing' || state.syncStatus === 'connecting';
   const host = state.hostPresence;
-  const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 90_000 : false;
+  const isHostOnline = host ? Date.now() - host.lastActiveAt < 90_000 : false;
 
-  const statusColor = isGit ? (isHostOnline ? '#4ec9b0' : '#c586c0') : isConnected ? '#4ec9b0' : isSyncing ? '#cca700' : '#f14c4c';
-  const statusLabel = isGit ? (isHostOnline ? 'P2P / Gist (Online)' : 'P2P / Gist') : isConnected ? 'Live SSE' : isSyncing ? 'Syncing' : 'Offline';
-  const statusClass = isGit ? 'status-git-backup' : isConnected ? 'status-live' : isSyncing ? 'status-syncing' : 'status-offline';
+  if (isP2P) {
+    const statusClass = 'status-p2p';
+    const statusColor = isConnected ? '#4ec9b0' : isSyncing ? '#cca700' : '#f14c4c';
+    const statusLabel = isConnected ? 'P2P (Online)' : isSyncing ? 'P2P (Connecting)' : 'P2P (Offline)';
+    return { statusColor, statusLabel, statusClass };
+  }
+
+  if (isGit) {
+    const statusClass = 'status-git-backup';
+    const statusColor = isConnected ? (isHostOnline ? '#4ec9b0' : '#c586c0') : isSyncing ? '#cca700' : '#f14c4c';
+    const statusLabel = isConnected ? (isHostOnline ? 'Gist Sync (Online)' : 'Gist Sync') : isSyncing ? 'Gist Syncing' : 'Gist Offline';
+    return { statusColor, statusLabel, statusClass };
+  }
+
+  const statusClass = isConnected ? 'status-live' : isSyncing ? 'status-syncing' : 'status-offline';
+  const statusColor = isConnected ? '#4ec9b0' : isSyncing ? '#cca700' : '#f14c4c';
+  const statusLabel = isConnected ? 'Live SSE' : isSyncing ? 'Syncing' : 'Offline';
+  return { statusColor, statusLabel, statusClass };
+}
+
+export function renderNavHeader(state: AppState): string {
+  const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state);
 
   const sessionTitle = state.activeSession?.title?.trim();
   const sessionId = state.activeSession?.id || state.activeSessionId;
@@ -33,7 +53,7 @@ export function renderNavHeader(state: AppState): string {
             <span class="btn-settings-icon">⚙️</span>
             <span class="btn-settings-text">Settings</span>
           </button>
-          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / P2P Gist mode">
+          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Connection Mode (Live SSE / P2P / Gist Sync)">
             <span class="status-dot" style="background-color: ${statusColor}"></span>
             <span class="status-text">${statusLabel}</span>
           </button>

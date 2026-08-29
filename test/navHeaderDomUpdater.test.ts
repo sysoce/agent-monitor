@@ -117,3 +117,41 @@ test('updateNavHeaderDOM updates status pill and tab badges in-place without rep
   assert.equal(sidebarTabBtn.isActive, false);
   assert.equal(chatTabBtn.isActive, true);
 });
+
+test('updateNavHeaderDOM updates p2p and git-backup status pills correctly', () => {
+  const dotEl: any = { style: { backgroundColor: '' } };
+  const statusTextEl: any = { textContent: '' };
+  const statusPill: any = {
+    className: '',
+    querySelector(sel: string) {
+      if (sel === '.status-dot') return dotEl;
+      if (sel === '.status-text') return statusTextEl;
+      return null;
+    },
+  };
+  const headerEl: any = {
+    querySelector(sel: string) {
+      if (sel === '#btn-toggle-sync') return statusPill;
+      return null;
+    },
+  };
+  const container: any = {
+    querySelector(sel: string) {
+      if (sel === '.app-header') return headerEl;
+      return null;
+    },
+    set innerHTML(_val: string) {},
+  };
+
+  // P2P mode
+  const p2pState = createMockState({ syncMode: 'p2p', syncStatus: 'connected' });
+  updateNavHeaderDOM(p2pState, container);
+  assert.equal(statusPill.className, 'status-pill status-p2p');
+  assert.equal(statusTextEl.textContent, 'P2P (Online)');
+
+  // Git-backup mode
+  const gitState = createMockState({ syncMode: 'git-backup', syncStatus: 'connected' });
+  updateNavHeaderDOM(gitState, container);
+  assert.equal(statusPill.className, 'status-pill status-git-backup');
+  assert.equal(statusTextEl.textContent, 'Gist Sync');
+});

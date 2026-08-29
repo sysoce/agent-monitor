@@ -1,5 +1,5 @@
 import type { AppState } from './types';
-import { renderNavHeader } from './components/navHeader';
+import { renderNavHeader, getNavHeaderStatus } from './components/navHeader';
 
 export function updateNavHeaderDOM(state: AppState, container: HTMLElement): void {
   const headerEl = container.querySelector<HTMLElement>('.app-header');
@@ -10,15 +10,7 @@ export function updateNavHeaderDOM(state: AppState, container: HTMLElement): voi
     return;
   }
 
-  const isGit = state.syncMode === 'git-backup';
-  const isConnected = state.syncStatus === 'connected';
-  const isSyncing = state.syncStatus === 'syncing';
-  const host = state.hostPresence;
-  const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 90_000 : false;
-
-  const statusColor = isGit ? (isHostOnline ? '#4ec9b0' : '#c586c0') : isConnected ? '#4ec9b0' : isSyncing ? '#cca700' : '#f14c4c';
-  const statusLabel = isGit ? (isHostOnline ? 'P2P / Gist (Online)' : 'P2P / Gist') : isConnected ? 'Live SSE' : isSyncing ? 'Syncing' : 'Offline';
-  const statusClass = isGit ? 'status-git-backup' : isConnected ? 'status-live' : isSyncing ? 'status-syncing' : 'status-offline';
+  const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state);
 
   const syncBtn = headerEl.querySelector<HTMLElement>('#btn-toggle-sync');
   if (syncBtn) {

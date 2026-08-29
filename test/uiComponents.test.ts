@@ -49,7 +49,7 @@ const mockState: AppState = {
   isAuthenticated: true,
 };
 
-test('renderNavHeader renders brand, live status pill and active tabs', () => {
+test('renderNavHeader renders brand, live status pill and active tabs across 3 modes', () => {
   const html = renderNavHeader(mockState);
   assert.match(html, /Agent Monitor/);
   assert.match(html, /btn-toggle-sync/);
@@ -57,8 +57,12 @@ test('renderNavHeader renders brand, live status pill and active tabs', () => {
   assert.match(html, /data-tab="chat"[^>]*class="[^"]*active/);
 
   const gitHtml = renderNavHeader({ ...mockState, syncMode: 'git-backup' });
-  assert.match(gitHtml, /P2P \/ Gist/);
+  assert.match(gitHtml, /Gist Sync/);
   assert.match(gitHtml, /status-git-backup/);
+
+  const p2pHtml = renderNavHeader({ ...mockState, syncMode: 'p2p' });
+  assert.match(p2pHtml, /P2P/);
+  assert.match(p2pHtml, /status-p2p/);
 });
 
 test('renderSidebarView renders session cards with title and badges', () => {

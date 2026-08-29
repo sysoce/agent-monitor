@@ -1,10 +1,9 @@
 import type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup } from '../server/types';
+export type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup };
 import type { AttachmentItem } from '../types';
 import type { MentionSuggestionItem } from '../types';
 import type { ClientPresence } from '../sync/types';
 import type { NetworkAddressInfo } from '../server/networkAddress';
-
-export type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup };
 
 export type ActiveTab = 'sidebar' | 'chat' | 'plans';
 
@@ -41,7 +40,7 @@ export interface AppState {
   awaitingMessageTimestamp?: number;
   isAuthenticated: boolean;
   authError?: string;
-  syncMode?: 'live-sse' | 'git-backup' | 'offline';
+  syncMode?: 'live-sse' | 'git-backup' | 'p2p' | 'offline';
   composerDraft?: string;
   attachments?: AttachmentItem[];
   mentionSuggestions?: MentionSuggestionItem[];

@@ -106,3 +106,24 @@ test('LocalSyncWorker scheduleOutboxSync throttles rapid outbox updates', async 
   }
 });
 
+test('LocalSyncWorker pauses polling when gist client is blocked by rate limit', async () => {
+  let pollCount = 0;
+  const fakeGistClient = {
+    isBlockedByRateLimit() {
+      return true;
+    },
+    getRateLimitInfo() {
+      return { remaining: 0, limit: 5000, resetTime: Date.now() + 50000, isBlocked: true };
+    },
+    async fetchSyncState() {
+      pollCount++;
+      return { data: null, notModified: true };
+    },
+  } as unknown as GistClient;
+
+  const worker = new LocalSyncWorker('/tmp', fakeGistClient);
+  await worker.pollInboxOnce();
+  assert.equal(pollCount, 0, 'Should not execute network fetch when blocked by rate limit');
+  worker.stop();
+});
+

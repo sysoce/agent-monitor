@@ -49,7 +49,7 @@ export interface GistSyncConfig {
   serverUrl?: string;
 }
 
-export type TransportMode = 'live-sse' | 'git-backup' | 'offline';
+export type TransportMode = 'live-sse' | 'git-backup' | 'p2p' | 'offline';
 
 export interface SyncStatusEvent {
   mode: TransportMode;

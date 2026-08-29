@@ -2,9 +2,11 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { GistClient } from './gistClient';
 import type { SyncOutboxState } from './types';
-import { listSessions, getSessionDetail, stopSession } from '../server/sessionStore';
+import { listSessions, getSessionDetail } from '../server/sessionStore';
 import { sanitizeSessionForSync, loadRecentSessionDetails } from './syncSanitizer';
 import { computeSessionsFingerprint } from './syncFingerprint';
+import { computeHostPollInterval } from './syncPollingPolicy';
+import { drainIncomingMessages } from './syncDrainHelper';
 import { CLIENT_VERSION } from '../ui/version';
 
 export class LocalSyncWorker {
@@ -13,21 +15,23 @@ export class LocalSyncWorker {
   private lastEtag?: string;
   private isProcessing = false;
   private isSyncingOutbox = false;
+  private isPolling = false;
   private lastSessionsFingerprint = '';
   private lastOutboxSyncTime = 0;
+  private lastActivityAt = Date.now();
   private pendingActiveSessionId?: string;
 
-  constructor(
-    private readonly workspaceRoot: string,
-    private readonly gistClient: GistClient
-  ) {}
+  constructor(private readonly workspaceRoot: string, private readonly gistClient: GistClient) {}
 
   private async computeFingerprint(sessions: Array<{ id: string; updatedAt: number; messageCount: number }>): Promise<string> {
     return computeSessionsFingerprint(this.workspaceRoot, sessions);
   }
 
   async pollInboxOnce(): Promise<void> {
-    if (this.isProcessing || this.gistClient.isBlockedByRateLimit?.()) return;
+    if (this.isProcessing || this.gistClient.isBlockedByRateLimit?.()) {
+      if (this.isPolling) this.scheduleNextPoll();
+      return;
+    }
     this.isProcessing = true;
     try {
       const res = await this.gistClient.fetchSyncState(this.lastEtag);
@@ -40,17 +44,8 @@ export class LocalSyncWorker {
         this.scheduleOutboxSync(res.data?.inbox?.[0]?.sessionId);
       }
       if (res.notModified || !res.data || res.data.inbox.length === 0) return;
-      const processedIds: string[] = [], hasAbort = res.data.inbox.some((m) => m.action === 'abort' || (m.role as string) === 'abort');
-      for (const msg of res.data.inbox) {
-        if (msg.action === 'abort' || (msg.role as string) === 'abort') {
-          await stopSession(this.workspaceRoot, msg.sessionId);
-        } else {
-          const inDir = path.join(this.workspaceRoot, '.agent', 'sessions', msg.sessionId, 'incoming');
-          await fs.mkdir(inDir, { recursive: true });
-          await fs.writeFile(path.join(inDir, `${msg.timestamp}_${msg.id}.json`), JSON.stringify({ role: msg.role || 'user', content: msg.content, model: msg.model, mode: msg.mode, action: msg.action || 'message', timestamp: msg.timestamp, commandId: msg.commandId, allowed: msg.allowed, attachments: msg.attachments }), 'utf8');
-        }
-        processedIds.push(msg.id);
-      }
+      this.lastActivityAt = Date.now();
+      const { processedIds, hasAbort } = await drainIncomingMessages(this.workspaceRoot, res.data.inbox);
       const activeId = res.data.inbox[0]?.sessionId || sessions[0]?.id;
       if (activeId) this.pendingActiveSessionId = activeId;
       const recentDetails = await loadRecentSessionDetails(this.workspaceRoot, sessions, activeId);
@@ -67,27 +62,39 @@ export class LocalSyncWorker {
       const outbox: SyncOutboxState = { sessionId: activeId || '', updatedAt: Date.now(), session: activeDetail ? sanitizeSessionForSync(activeDetail) : undefined, plans: activeDetail?.plans || [] };
       this.lastSessionsFingerprint = await this.computeFingerprint(sessions);
       this.lastOutboxSyncTime = Date.now();
-      await this.gistClient.updateOutboxAndDrainInbox(outbox, processedIds, sessions, recentDetails, res.data, await this.getAppVersion());
+      await this.gistClient.updateOutboxAndDrainInbox(outbox, processedIds, sessions, recentDetails, res.data, CLIENT_VERSION);
     } catch (err) {
       console.error('[SyncWorker Poll Error]', err);
     } finally {
       this.isProcessing = false;
+      if (this.isPolling) this.scheduleNextPoll();
     }
   }
 
-  private async getAppVersion(): Promise<string> {
-    return CLIENT_VERSION;
+  private scheduleNextPoll(): void {
+    if (!this.isPolling) return;
+    if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = undefined; }
+    const rateInfo = this.gistClient.getRateLimitInfo?.();
+    if (rateInfo?.isBlocked) {
+      this.pollTimer = setTimeout(() => { void this.pollInboxOnce(); }, Math.max(5000, rateInfo.resetTime - Date.now() + 2000));
+      this.pollTimer.unref?.();
+      return;
+    }
+    void this.isGenerating(this.pendingActiveSessionId).then((isGen) => {
+      if (!this.isPolling) return;
+      const interval = computeHostPollInterval({ isGenerating: isGen, lastActivityAt: this.lastActivityAt, remainingQuota: rateInfo?.remaining });
+      this.pollTimer = setTimeout(() => { void this.pollInboxOnce(); }, interval);
+      this.pollTimer.unref?.();
+    });
   }
 
   async syncOutboxOnce(activeSessionId?: string, force = false): Promise<void> {
     if (this.isSyncingOutbox || this.gistClient.isBlockedByRateLimit?.()) return;
     const now = Date.now();
-    if (!force && now - this.lastOutboxSyncTime < 2500) {
+    if (!force && now - this.lastOutboxSyncTime < 4000) {
       if (!this.syncThrottleTimer) {
-        this.syncThrottleTimer = setTimeout(() => {
-          this.syncThrottleTimer = undefined;
-          void this.syncOutboxOnce(this.pendingActiveSessionId);
-        }, 2500 - (now - this.lastOutboxSyncTime));
+        this.syncThrottleTimer = setTimeout(() => { this.syncThrottleTimer = undefined; void this.syncOutboxOnce(this.pendingActiveSessionId); }, 4000 - (now - this.lastOutboxSyncTime));
+        this.syncThrottleTimer.unref?.();
       }
       return;
     }
@@ -100,9 +107,8 @@ export class LocalSyncWorker {
       this.lastSessionsFingerprint = await this.computeFingerprint(sessions);
       const recentDetails = await loadRecentSessionDetails(this.workspaceRoot, sessions, targetId);
       const detail = targetId ? (recentDetails[targetId] || await getSessionDetail(this.workspaceRoot, targetId)) : undefined;
-      const sanitizedDetail = detail ? sanitizeSessionForSync(detail) : undefined;
-      const outbox: SyncOutboxState = { sessionId: targetId || '', updatedAt: Date.now(), session: sanitizedDetail, plans: detail?.plans || [] };
-      await this.gistClient.updateOutboxAndDrainInbox(outbox, [], sessions, recentDetails, null, await this.getAppVersion());
+      const outbox: SyncOutboxState = { sessionId: targetId || '', updatedAt: Date.now(), session: detail ? sanitizeSessionForSync(detail) : undefined, plans: detail?.plans || [] };
+      await this.gistClient.updateOutboxAndDrainInbox(outbox, [], sessions, recentDetails, null, CLIENT_VERSION);
     } catch (err) {
       console.error('[SyncWorker Outbox Error]', err);
     } finally {
@@ -113,14 +119,12 @@ export class LocalSyncWorker {
   private async isGenerating(targetId?: string): Promise<boolean> {
     const sid = targetId || (await listSessions(this.workspaceRoot))[0]?.id;
     if (!sid) return false;
-    try {
-      const sDir = path.join(this.workspaceRoot, '.agent', 'sessions', sid);
-      const [active, draft] = await Promise.all([fs.stat(path.join(sDir, '.active')).catch(() => null), fs.stat(path.join(sDir, 'live_draft.json')).catch(() => null)]);
-      return Boolean(active?.isFile() || draft?.isFile());
-    } catch { return false; }
+    const sDir = path.join(this.workspaceRoot, '.agent', 'sessions', sid);
+    return Promise.all([fs.stat(path.join(sDir, '.active')).catch(() => null), fs.stat(path.join(sDir, 'live_draft.json')).catch(() => null)])
+      .then(([a, d]) => Boolean(a?.isFile() || d?.isFile())).catch(() => false);
   }
 
-  async scheduleOutboxSync(activeSessionId?: string, debounceMs = 1200): Promise<void> {
+  async scheduleOutboxSync(activeSessionId?: string, debounceMs = 1500): Promise<void> {
     if (activeSessionId) this.pendingActiveSessionId = activeSessionId;
     if (this.gistClient.isBlockedByRateLimit?.()) return;
     const targetId = this.pendingActiveSessionId;
@@ -130,20 +134,20 @@ export class LocalSyncWorker {
       return;
     }
     if (this.syncThrottleTimer) clearTimeout(this.syncThrottleTimer);
-    this.syncThrottleTimer = setTimeout(() => {
-      this.syncThrottleTimer = undefined;
-      void this.syncOutboxOnce(this.pendingActiveSessionId);
-    }, debounceMs);
+    this.syncThrottleTimer = setTimeout(() => { this.syncThrottleTimer = undefined; void this.syncOutboxOnce(this.pendingActiveSessionId); }, debounceMs);
+    this.syncThrottleTimer.unref?.();
   }
 
-  start(intervalMs = 6000): void {
+  start(): void {
     this.stop();
+    this.isPolling = true;
     void this.pollInboxOnce();
     void this.scheduleOutboxSync(undefined, 400);
-    this.pollTimer = setInterval(() => { void this.pollInboxOnce(); }, intervalMs);
   }
+
   stop(): void {
-    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = undefined; }
+    this.isPolling = false;
+    if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = undefined; }
     if (this.syncThrottleTimer) { clearTimeout(this.syncThrottleTimer); this.syncThrottleTimer = undefined; }
   }
 }

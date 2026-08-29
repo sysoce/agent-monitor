@@ -1,29 +1,23 @@
 import type { GistSyncConfig, SyncGistPayload, SyncInboxMessage, TransportMode } from '../sync/types';
 import { GistClient } from '../sync/gistClient';
 import { LiveReachabilityProbe } from './liveReachabilityProbe';
-import type { SyncStatus } from './types';
+import { computeClientPollInterval } from '../sync/syncPollingPolicy';
+import type { SyncStateMachineCallbacks, RateLimitInfo } from './syncStateMachineTypes';
 
-export interface SyncStateMachineCallbacks {
-  onModeChange: (mode: TransportMode) => void;
-  onStatusChange: (status: SyncStatus) => void;
-  onDataUpdate: (payload: SyncGistPayload) => void;
-  onError?: (error?: string) => void;
-  onLiveServerReachable?: () => void;
-}
+export type { SyncStateMachineCallbacks, RateLimitInfo };
 
 export class SyncStateMachine {
   private mode: TransportMode = 'live-sse';
   private gistConfig?: GistSyncConfig;
   private gistClient?: GistClient;
   private isAwaitingResponse = false;
+  private awaitingStartedAt?: number;
   private pollTimer?: any;
   private lastEtag?: string;
   private reachabilityProbe: LiveReachabilityProbe;
 
   constructor(private readonly callbacks: SyncStateMachineCallbacks) {
-    this.reachabilityProbe = new LiveReachabilityProbe({
-      onReachable: () => this.triggerLiveServerReachable(),
-    });
+    this.reachabilityProbe = new LiveReachabilityProbe({ onReachable: () => this.triggerLiveServerReachable() });
     if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
@@ -34,22 +28,18 @@ export class SyncStateMachine {
     }
   }
 
-  getMode(): TransportMode {
-    return this.mode;
-  }
+  getMode(): TransportMode { return this.mode; }
 
   getPollInterval(): number {
-    if (typeof document !== 'undefined' && document.hidden) {
-      return this.isAwaitingResponse ? 10000 : 30000;
-    }
-    return this.isAwaitingResponse ? 2500 : 15000;
+    const isHidden = typeof document !== 'undefined' && Boolean(document.hidden);
+    const rateInfo = this.gistClient?.getRateLimitInfo?.();
+    return computeClientPollInterval({ isAwaitingResponse: this.isAwaitingResponse, awaitingStartedAt: this.awaitingStartedAt, isHidden, remainingQuota: rateInfo?.remaining });
   }
 
   setAwaitingResponse(awaiting: boolean): void {
     this.isAwaitingResponse = awaiting;
-    if (this.mode === 'git-backup') {
-      this.restartGitPolling();
-    }
+    this.awaitingStartedAt = awaiting ? Date.now() : undefined;
+    if (this.mode === 'git-backup') this.restartGitPolling();
   }
 
   setGistConfig(config?: GistSyncConfig): void {
@@ -117,12 +107,19 @@ export class SyncStateMachine {
 
   async pollOnce(): Promise<void> {
     if (!this.gistClient || this.mode !== 'git-backup') return;
-    if (typeof this.gistClient.isBlockedByRateLimit === 'function' && this.gistClient.isBlockedByRateLimit()) {
+    const rateInfo = this.gistClient.getRateLimitInfo?.();
+    if (rateInfo) this.callbacks.onRateLimitChange?.(rateInfo);
+    if (rateInfo?.isBlocked) {
       this.callbacks.onStatusChange('syncing');
+      const waitMs = Math.max(3000, rateInfo.resetTime - Date.now() + 1000);
+      this.stopGitPolling();
+      this.pollTimer = setTimeout(() => this.restartGitPolling(), waitMs);
       return;
     }
     try {
       const res = await this.gistClient.fetchSyncState(this.lastEtag);
+      const updatedInfo = this.gistClient.getRateLimitInfo?.();
+      if (updatedInfo) this.callbacks.onRateLimitChange?.(updatedInfo);
       if (res.etag) this.lastEtag = res.etag;
       if (res.notModified) {
         this.callbacks.onStatusChange('connected');
@@ -139,7 +136,7 @@ export class SyncStateMachine {
   }
 
   stopGitPolling(): void {
-    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = undefined; }
+    if (this.pollTimer) { clearInterval(this.pollTimer); clearTimeout(this.pollTimer); this.pollTimer = undefined; }
   }
 
   stop(): void {

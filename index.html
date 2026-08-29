@@ -3651,6 +3651,11 @@ body {
   box-shadow: 0 0 6px rgba(197, 134, 192, 0.6);
   animation: pulse-dot 2s infinite ease-in-out;
 }
+.status-p2p .status-dot {
+  background: #4ec9b0;
+  box-shadow: 0 0 6px rgba(78, 201, 176, 0.6);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
 .status-offline .status-dot {
   background: #888888;
 }
@@ -7224,7 +7229,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.19" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.20" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -7999,6 +8004,31 @@ input:checked + .slider:before {
     }
   };
 
+  // src/sync/syncPollingPolicy.ts
+  var CLIENT_POLL_INTERVALS = {
+    ACTIVE_AWAITING_MS: 6e3,
+    FOREGROUND_IDLE_MS: 15e3,
+    BACKGROUND_MS: 45e3,
+    LOW_QUOTA_MS: 45e3,
+    AWAITING_TIMEOUT_MS: 9e4
+  };
+  function computeClientPollInterval(ctx) {
+    const { isAwaitingResponse, awaitingStartedAt, isHidden, remainingQuota } = ctx;
+    if (typeof remainingQuota === "number" && remainingQuota < 50) {
+      return CLIENT_POLL_INTERVALS.LOW_QUOTA_MS;
+    }
+    if (isHidden) {
+      return CLIENT_POLL_INTERVALS.BACKGROUND_MS;
+    }
+    if (isAwaitingResponse) {
+      const elapsed = awaitingStartedAt ? Date.now() - awaitingStartedAt : 0;
+      if (elapsed < CLIENT_POLL_INTERVALS.AWAITING_TIMEOUT_MS) {
+        return CLIENT_POLL_INTERVALS.ACTIVE_AWAITING_MS;
+      }
+    }
+    return CLIENT_POLL_INTERVALS.FOREGROUND_IDLE_MS;
+  }
+
   // src/ui/syncStateMachine.ts
   var SyncStateMachine = class {
     constructor(callbacks) {
@@ -8007,12 +8037,11 @@ input:checked + .slider:before {
       __publicField(this, "gistConfig");
       __publicField(this, "gistClient");
       __publicField(this, "isAwaitingResponse", false);
+      __publicField(this, "awaitingStartedAt");
       __publicField(this, "pollTimer");
       __publicField(this, "lastEtag");
       __publicField(this, "reachabilityProbe");
-      this.reachabilityProbe = new LiveReachabilityProbe({
-        onReachable: () => this.triggerLiveServerReachable()
-      });
+      this.reachabilityProbe = new LiveReachabilityProbe({ onReachable: () => this.triggerLiveServerReachable() });
       if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden) {
@@ -8026,16 +8055,14 @@ input:checked + .slider:before {
       return this.mode;
     }
     getPollInterval() {
-      if (typeof document !== "undefined" && document.hidden) {
-        return this.isAwaitingResponse ? 1e4 : 3e4;
-      }
-      return this.isAwaitingResponse ? 2500 : 15e3;
+      const isHidden = typeof document !== "undefined" && Boolean(document.hidden);
+      const rateInfo = this.gistClient?.getRateLimitInfo?.();
+      return computeClientPollInterval({ isAwaitingResponse: this.isAwaitingResponse, awaitingStartedAt: this.awaitingStartedAt, isHidden, remainingQuota: rateInfo?.remaining });
     }
     setAwaitingResponse(awaiting) {
       this.isAwaitingResponse = awaiting;
-      if (this.mode === "git-backup") {
-        this.restartGitPolling();
-      }
+      this.awaitingStartedAt = awaiting ? Date.now() : void 0;
+      if (this.mode === "git-backup") this.restartGitPolling();
     }
     setGistConfig(config) {
       this.gistConfig = config;
@@ -8097,12 +8124,19 @@ input:checked + .slider:before {
     }
     async pollOnce() {
       if (!this.gistClient || this.mode !== "git-backup") return;
-      if (typeof this.gistClient.isBlockedByRateLimit === "function" && this.gistClient.isBlockedByRateLimit()) {
+      const rateInfo = this.gistClient.getRateLimitInfo?.();
+      if (rateInfo) this.callbacks.onRateLimitChange?.(rateInfo);
+      if (rateInfo?.isBlocked) {
         this.callbacks.onStatusChange("syncing");
+        const waitMs = Math.max(3e3, rateInfo.resetTime - Date.now() + 1e3);
+        this.stopGitPolling();
+        this.pollTimer = setTimeout(() => this.restartGitPolling(), waitMs);
         return;
       }
       try {
         const res = await this.gistClient.fetchSyncState(this.lastEtag);
+        const updatedInfo = this.gistClient.getRateLimitInfo?.();
+        if (updatedInfo) this.callbacks.onRateLimitChange?.(updatedInfo);
         if (res.etag) this.lastEtag = res.etag;
         if (res.notModified) {
           this.callbacks.onStatusChange("connected");
@@ -8120,6 +8154,7 @@ input:checked + .slider:before {
     stopGitPolling() {
       if (this.pollTimer) {
         clearInterval(this.pollTimer);
+        clearTimeout(this.pollTimer);
         this.pollTimer = void 0;
       }
     }
@@ -8149,6 +8184,12 @@ input:checked + .slider:before {
         if (applyGistSyncPayload(state2, p)) machine.setAwaitingResponse(false);
         render2();
       },
+      onRateLimitChange: (info) => {
+        if (state2.rateLimitRemaining !== info.remaining) {
+          state2.rateLimitRemaining = info.remaining;
+          render2();
+        }
+      },
       onError: (err) => {
         const msg = err || void 0;
         if (state2.errorMessage !== msg) {
@@ -8174,18 +8215,32 @@ input:checked + .slider:before {
       startSse();
     }
   }
-  function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
-    const isGit = state2.syncMode === "git-backup";
-    if (isGit) {
-      if (!hasLiveServer()) return;
-      if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", "live-sse");
+  function setSyncModeAction(targetMode, state2, syncMachine, startSse, sseCleanup) {
+    if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", targetMode);
+    if (targetMode === "live-sse") {
       syncMachine.stop();
       startSse();
-    } else {
-      if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", "git-backup");
+    } else if (targetMode === "git-backup") {
       sseCleanup?.();
       syncMachine.forceGitBackupMode();
+    } else if (targetMode === "p2p") {
+      sseCleanup?.();
+      syncMachine.stop();
+      state2.syncMode = "p2p";
+      state2.syncStatus = "connected";
     }
+  }
+  function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
+    const current = state2.syncMode || "live-sse";
+    let next = "live-sse";
+    if (current === "live-sse") {
+      next = loadCachedGistConfig() ? "git-backup" : "p2p";
+    } else if (current === "git-backup") {
+      next = "p2p";
+    } else {
+      next = hasLiveServer() ? "live-sse" : "git-backup";
+    }
+    setSyncModeAction(next, state2, syncMachine, startSse, sseCleanup);
   }
 
   // src/ui/tabStore.ts
@@ -11633,21 +11688,23 @@ ${thought.trim()}` : thought.trim();
 
   // src/ui/components/settingsModal/settingsSyncSection.ts
   function renderSettingsSyncSection(state2) {
+    const isP2P = state2.syncMode === "p2p";
     const isGit = state2.syncMode === "git-backup";
     const isConnected = state2.syncStatus === "connected";
-    const isSyncing = state2.syncStatus === "syncing";
+    const isSyncing = state2.syncStatus === "syncing" || state2.syncStatus === "connecting";
     const gistConfig = loadCachedGistConfig();
     const hasGist = Boolean(gistConfig?.gistId || state2.serverSetupInfo?.gistId);
     const host = state2.hostPresence;
     const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
-    const modeBadge = isGit ? "\u{1F517} Peer-to-Peer / Gist Sync" : "\u26A1 Live SSE (Direct LAN)";
-    const statusLabel = isGit ? isHostOnline ? "Host Online" : "Standby / Syncing" : isConnected ? "Connected (Live)" : isSyncing ? "Connecting..." : "Disconnected";
+    const modeBadge = isP2P ? "\u{1F517} WebRTC Peer-to-Peer" : isGit ? "\u{1F4E6} GitHub Gist Sync" : "\u26A1 Live SSE (Direct LAN)";
+    const statusLabel = isP2P ? isConnected ? "Peer Connected" : isSyncing ? "Connecting..." : "Peer Offline" : isGit ? isHostOnline ? "Host Online" : isConnected ? "Connected (Standby)" : isSyncing ? "Syncing..." : "Disconnected" : isConnected ? "Connected (Live)" : isSyncing ? "Connecting..." : "Disconnected";
+    const quotaText = state2.rateLimitRemaining !== void 0 ? `${state2.rateLimitRemaining.toLocaleString()} / 5,000 remaining` : "5,000 / 5,000 (Safe)";
     return `
     <div class="settings-section settings-section--sync" id="settings-section-sync">
       <div class="settings-section-header">
         <h4 class="settings-section-title">\u{1F504} Connection & Sync Mode</h4>
         <p class="settings-section-subtitle">
-          Toggle between direct local LAN SSE streaming and remote Peer-to-Peer / Gist synchronization.
+          Select between Live SSE (Direct LAN), WebRTC Peer-to-Peer, and GitHub Gist Sync.
         </p>
       </div>
 
@@ -11659,20 +11716,29 @@ ${thought.trim()}` : thought.trim();
           </div>
           <div class="settings-sync-row">
             <span class="settings-sync-label">Connection Status:</span>
-            <span class="settings-sync-status status-${isGit ? "git" : isConnected ? "online" : "offline"}">
+            <span class="settings-sync-status status-${isP2P ? "p2p" : isGit ? "git" : isConnected ? "online" : "offline"}">
               <span class="status-dot"></span>
               ${escapeHtml2(statusLabel)}
             </span>
           </div>
+          ${hasGist ? `
           <div class="settings-sync-row">
             <span class="settings-sync-label">GitHub Gist ID:</span>
-            <span class="settings-sync-val font-mono">${hasGist ? escapeHtml2(gistConfig?.gistId || state2.serverSetupInfo?.gistId || "Configured") : '<span class="text-muted">None (Local LAN only)</span>'}</span>
+            <span class="settings-sync-val font-mono">${escapeHtml2(gistConfig?.gistId || state2.serverSetupInfo?.gistId || "Configured")}</span>
           </div>
+          <div class="settings-sync-row">
+            <span class="settings-sync-label">GitHub API Quota:</span>
+            <span class="settings-sync-val ${state2.rateLimitRemaining !== void 0 && state2.rateLimitRemaining < 100 ? "text-warning" : "text-success"}">${escapeHtml2(quotaText)}</span>
+          </div>` : `
+          <div class="settings-sync-row">
+            <span class="settings-sync-label">GitHub Gist ID:</span>
+            <span class="settings-sync-val font-mono"><span class="text-muted">None (Direct mode)</span></span>
+          </div>`}
         </div>
 
         <div class="settings-sync-actions">
-          <button type="button" class="btn btn-secondary settings-btn-toggle-sync" id="btn-settings-toggle-sync">
-            ${isGit ? "\u26A1 Switch to Live SSE Mode" : "\u{1F517} Switch to Peer-to-Peer Mode"}
+          <button type="button" class="btn btn-secondary settings-btn-toggle-sync" id="btn-settings-toggle-sync" data-current-mode="${escapeHtml2(state2.syncMode || "live-sse")}">
+            ${isP2P ? "\u26A1 Switch to Live SSE Mode" : isGit ? "\u{1F517} Switch to Peer-to-Peer Mode" : "\u{1F4E6} Switch to GitHub Gist Mode"}
           </button>
         </div>
       </div>
@@ -11759,15 +11825,32 @@ ${thought.trim()}` : thought.trim();
   }
 
   // src/ui/components/navHeader.ts
-  function renderNavHeader(state2) {
+  function getNavHeaderStatus(state2) {
+    const isP2P = state2.syncMode === "p2p";
     const isGit = state2.syncMode === "git-backup";
     const isConnected = state2.syncStatus === "connected";
-    const isSyncing = state2.syncStatus === "syncing";
+    const isSyncing = state2.syncStatus === "syncing" || state2.syncStatus === "connecting";
     const host = state2.hostPresence;
-    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
-    const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
-    const statusLabel = isGit ? isHostOnline ? "P2P / Gist (Online)" : "P2P / Gist" : isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
-    const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
+    const isHostOnline = host ? Date.now() - host.lastActiveAt < 9e4 : false;
+    if (isP2P) {
+      const statusClass2 = "status-p2p";
+      const statusColor2 = isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
+      const statusLabel2 = isConnected ? "P2P (Online)" : isSyncing ? "P2P (Connecting)" : "P2P (Offline)";
+      return { statusColor: statusColor2, statusLabel: statusLabel2, statusClass: statusClass2 };
+    }
+    if (isGit) {
+      const statusClass2 = "status-git-backup";
+      const statusColor2 = isConnected ? isHostOnline ? "#4ec9b0" : "#c586c0" : isSyncing ? "#cca700" : "#f14c4c";
+      const statusLabel2 = isConnected ? isHostOnline ? "Gist Sync (Online)" : "Gist Sync" : isSyncing ? "Gist Syncing" : "Gist Offline";
+      return { statusColor: statusColor2, statusLabel: statusLabel2, statusClass: statusClass2 };
+    }
+    const statusClass = isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
+    const statusColor = isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
+    const statusLabel = isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
+    return { statusColor, statusLabel, statusClass };
+  }
+  function renderNavHeader(state2) {
+    const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state2);
     const sessionTitle = state2.activeSession?.title?.trim();
     const sessionId = state2.activeSession?.id || state2.activeSessionId;
     const chatTabLabel = sessionTitle && sessionId ? `${sessionTitle} (${sessionId})` : sessionTitle || sessionId || "Chat";
@@ -11785,7 +11868,7 @@ ${thought.trim()}` : thought.trim();
             <span class="btn-settings-icon">\u2699\uFE0F</span>
             <span class="btn-settings-text">Settings</span>
           </button>
-          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / P2P Gist mode">
+          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Connection Mode (Live SSE / P2P / Gist Sync)">
             <span class="status-dot" style="background-color: ${statusColor}"></span>
             <span class="status-text">${statusLabel}</span>
           </button>
@@ -12328,14 +12411,7 @@ ${thought.trim()}` : thought.trim();
       if (container.dataset) container.dataset.renderedHtml = nextHtml;
       return;
     }
-    const isGit = state2.syncMode === "git-backup";
-    const isConnected = state2.syncStatus === "connected";
-    const isSyncing = state2.syncStatus === "syncing";
-    const host = state2.hostPresence;
-    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
-    const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
-    const statusLabel = isGit ? isHostOnline ? "P2P / Gist (Online)" : "P2P / Gist" : isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
-    const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
+    const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state2);
     const syncBtn = headerEl.querySelector("#btn-toggle-sync");
     if (syncBtn) {
       const expectedClass = `status-pill ${statusClass}`;
