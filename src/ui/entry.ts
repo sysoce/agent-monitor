@@ -90,6 +90,7 @@ function render() {
     onLoginSuccess: async () => {},
     onLogout: () => controller.handleLogout(),
     onToggleSyncMode: () => controller.toggleSyncMode(),
+    onSetSyncMode: (mode) => controller.setSyncMode(mode),
     onRender: render,
   });
 
@@ -97,11 +98,6 @@ function render() {
   restoreFocusState(focusSnapshot);
   if (mainUpdated) {
     hydrateAllDiagrams(app);
-  }
-
-  if (typeof window !== 'undefined') {
-    (window as any).__state = state;
-    (window as any).renderApp = render;
   }
 }
 
@@ -112,5 +108,3 @@ if (typeof document !== 'undefined' && document.readyState === 'loading') {
 } else {
   void controller.init();
 }
-
-

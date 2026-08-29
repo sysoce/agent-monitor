@@ -20,23 +20,27 @@ test('SyncStateMachine initializes in p2p default mode and transitions on status
   assert.equal(sm.getPollInterval(), 15000, 'Should return to gentle interval when idle');
 });
 
-test('SyncStateMachine triggers failover to git-backup when primary SSE fails', () => {
+test('SyncStateMachine preserves live-sse mode when SSE connection drops and does not silently trigger git-backup', () => {
   let activeMode = '';
+  let activeStatus = '';
   const sm = new SyncStateMachine({
     onModeChange: (m) => { activeMode = m; },
-    onStatusChange: () => {},
+    onStatusChange: (s) => { activeStatus = s; },
     onDataUpdate: () => {},
   });
 
   sm.setGistConfig({ token: 'test-pat', gistId: 'gist-123' });
-  sm.handlePrimarySseFailure();
+  sm.forceLiveSseMode();
+  assert.equal(activeMode, 'live-sse');
 
-  assert.equal(activeMode, 'git-backup');
-  assert.equal(sm.getMode(), 'git-backup');
+  // When SSE fails in live-sse mode, it transitions status to disconnected but stays in live-sse
+  sm.handlePrimarySseFailure();
+  assert.equal(sm.getMode(), 'live-sse');
+  assert.equal(activeStatus, 'disconnected');
   sm.stop();
 });
 
-test('SyncStateMachine allows manual toggle across p2p, git-backup, and live-sse', () => {
+test('SyncStateMachine allows explicit switching across p2p, git-backup, and live-sse', () => {
   let activeMode = '';
   const sm = new SyncStateMachine({
     onModeChange: (m) => { activeMode = m; },
@@ -50,7 +54,7 @@ test('SyncStateMachine allows manual toggle across p2p, git-backup, and live-sse
   assert.equal(activeMode, 'git-backup');
   assert.equal(sm.getMode(), 'git-backup');
 
-  sm.restorePrimaryLive();
+  sm.forceLiveSseMode();
   assert.equal(activeMode, 'live-sse');
   assert.equal(sm.getMode(), 'live-sse');
 

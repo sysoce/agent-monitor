@@ -1,12 +1,13 @@
 import type { AppState } from './types';
 import type { SessionDetail } from '../server/types';
+import type { TransportMode } from '../sync/types';
 import { fetchSessionDetail, verifyAuthStatus, resolveSessionApproval } from './apiClient';
 import { clearStoredToken, hasLiveServer } from './authStore';
 import { initSseClient } from './sseClient';
 import { SyncStateMachine } from './syncStateMachine';
-import { syncSessionPlans, selectPlanDetail, applyGistSyncPayload, loadCachedGistConfig } from './sessionPlanSync';
+import { syncSessionPlans, selectPlanDetail } from './sessionPlanSync';
 import { stopCurrentSession, buildPlanHandoffPrompt, submitMessageFlow } from './messageSender';
-import { createAppSyncMachine, applyPersistedSyncMode, toggleSyncModeAction } from './appSyncMode';
+import { createAppSyncMachine, applyPersistedSyncMode, toggleSyncModeAction, setSyncModeAction } from './appSyncMode';
 import { mergeSessionDetail } from './sessionMerge';
 import { saveActiveTab, saveActiveSessionId } from './tabStore';
 import { checkAndApplyUrlConfig } from './urlConfigLoader';
@@ -24,7 +25,6 @@ export class AppController {
   constructor(private state: AppState, private render: () => void) {
     this.syncMachine = createAppSyncMachine(this.state, this.render, () => this.startSse());
   }
-
 
   async selectSession(id: string): Promise<void> {
     const s = this.state.sessions.find((sess) => sess.id === id), cached = this.state.cachedSessionDetails?.[id];
@@ -71,6 +71,7 @@ export class AppController {
   handleLoginSuccess(): void { void this.reloadData(true); applyPersistedSyncMode(this.syncMachine, () => this.startSse()); }
   handleSelectModel(modelId: string): void { this.state.selectedModel = modelId; this.render(); }
   toggleSyncMode(): void { toggleSyncModeAction(this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || undefined); this.render(); }
+  setSyncMode(mode: TransportMode): void { setSyncModeAction(mode, this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || undefined); this.render(); }
   handleStopSession(): void {
     this.state.lastAbortedAt = Date.now();
     this.state.lastAbortedSessionId = this.state.activeSessionId;
@@ -120,8 +121,6 @@ export class AppController {
         const changed = this.state.syncStatus !== s;
         this.state.syncStatus = s;
         if (s === 'disconnected') {
-          this.sseCleanup?.();
-          this.sseCleanup = null;
           this.syncMachine.handlePrimarySseFailure();
         } else if (s === 'connected') {
           this.syncMachine.restorePrimaryLive();

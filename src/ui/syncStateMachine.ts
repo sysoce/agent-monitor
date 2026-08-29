@@ -56,6 +56,15 @@ export class SyncStateMachine {
     this.callbacks.onError?.('');
   }
 
+  forceLiveSseMode(): void {
+    this.stopGitPolling();
+    this.reachabilityProbe.stop();
+    this.mode = 'live-sse';
+    this.callbacks.onModeChange('live-sse');
+    this.callbacks.onStatusChange('connecting');
+    this.callbacks.onError?.('');
+  }
+
   forceGitBackupMode(): void {
     if (this.gistConfig) {
       this.mode = 'git-backup';
@@ -70,6 +79,11 @@ export class SyncStateMachine {
   }
 
   handlePrimarySseFailure(): void {
+    if (this.mode === 'live-sse') {
+      this.callbacks.onStatusChange('disconnected');
+      return;
+    }
+    if (this.mode === 'p2p') return;
     if (this.gistConfig) {
       this.mode = 'git-backup';
       this.callbacks.onModeChange('git-backup');

@@ -2,8 +2,8 @@ import test from 'node:test';
 import * as assert from 'node:assert/strict';
 import { SyncStateMachine } from '../src/ui/syncStateMachine';
 
-test('SyncStateMachine falls back to git-backup on SSE failure and triggers onLiveServerReachable on recovery', () => {
-  let mode = 'live-sse';
+test('SyncStateMachine triggers onLiveServerReachable on recovery in git-backup mode', () => {
+  let mode = 'p2p';
   let status = 'connected';
   let recovered = false;
 
@@ -15,11 +15,9 @@ test('SyncStateMachine falls back to git-backup on SSE failure and triggers onLi
   });
 
   machine.setGistConfig({ token: 'tok_123', gistId: 'gist_123' });
-
-  // Simulate SSE failure
-  machine.handlePrimarySseFailure();
+  machine.forceGitBackupMode();
   assert.equal(mode, 'git-backup');
-  assert.equal(status, 'syncing');
+  assert.equal(status, 'connected');
 
   // Trigger reachability callback
   machine.triggerLiveServerReachable();

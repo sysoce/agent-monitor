@@ -5,6 +5,7 @@ import { loadCachedGistConfig } from '../../sessionPlanSync';
 export function renderSettingsSyncSection(state: AppState): string {
   const isP2P = state.syncMode === 'p2p';
   const isGit = state.syncMode === 'git-backup';
+  const isSSE = state.syncMode === 'live-sse';
   const isConnected = state.syncStatus === 'connected';
   const isSyncing = state.syncStatus === 'syncing' || state.syncStatus === 'connecting';
   const gistConfig = loadCachedGistConfig();
@@ -33,11 +34,29 @@ export function renderSettingsSyncSection(state: AppState): string {
       <div class="settings-section-header">
         <h4 class="settings-section-title">🔄 Connection & Sync Mode</h4>
         <p class="settings-section-subtitle">
-          Select between Live SSE (Direct LAN), WebRTC Peer-to-Peer, and GitHub Gist Sync.
+          Select between WebRTC Peer-to-Peer, Live SSE (Direct LAN), and GitHub Gist Sync.
         </p>
       </div>
 
       <div class="settings-sync-card">
+        <div class="settings-sync-modes-grid">
+          <button type="button" class="btn settings-mode-btn ${isP2P ? 'active' : ''}" data-set-sync-mode="p2p" title="Ultra-fast direct WebRTC peer connection (Default)">
+            <span class="settings-mode-icon">🔗</span>
+            <span class="settings-mode-title">WebRTC P2P</span>
+            <span class="settings-mode-desc">Default Direct</span>
+          </button>
+          <button type="button" class="btn settings-mode-btn ${isSSE ? 'active' : ''}" data-set-sync-mode="live-sse" title="Direct LAN HTTP & Server-Sent Events stream">
+            <span class="settings-mode-icon">⚡</span>
+            <span class="settings-mode-title">Live SSE</span>
+            <span class="settings-mode-desc">LAN Stream</span>
+          </button>
+          <button type="button" class="btn settings-mode-btn ${isGit ? 'active' : ''}" data-set-sync-mode="git-backup" title="Asynchronous encrypted GitHub Gist mailbox relay">
+            <span class="settings-mode-icon">📦</span>
+            <span class="settings-mode-title">GitHub Gist</span>
+            <span class="settings-mode-desc">Cloud Relay</span>
+          </button>
+        </div>
+
         <div class="settings-sync-info">
           <div class="settings-sync-row">
             <span class="settings-sync-label">Active Mode:</span>
@@ -67,12 +86,6 @@ export function renderSettingsSyncSection(state: AppState): string {
             <span class="settings-sync-val font-mono"><span class="text-muted">None (Direct mode)</span></span>
           </div>`
           }
-        </div>
-
-        <div class="settings-sync-actions">
-          <button type="button" class="btn btn-secondary settings-btn-toggle-sync" id="btn-settings-toggle-sync" data-current-mode="${escapeHtml(state.syncMode || 'live-sse')}">
-            ${isP2P ? '⚡ Switch to Live SSE Mode' : isGit ? '🔗 Switch to Peer-to-Peer Mode' : '📦 Switch to GitHub Gist Mode'}
-          </button>
         </div>
       </div>
     </div>

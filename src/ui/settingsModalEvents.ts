@@ -1,4 +1,5 @@
 import type { AppState } from './types';
+import type { TransportMode } from '../sync/types';
 import type { QrTarget } from './components/settingsModal/types';
 import type { EventHandlerCallbacks } from './eventHandlers';
 import { buildApiUrl, setServerBaseUrl, clearServerBaseUrl, hasLiveServer } from './authStore';
@@ -108,6 +109,12 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   }
   if (target.closest('#btn-copy-qr-link')) { void copyQrLink(state, callbacks.onRender); return true; }
   if (target.closest('#btn-copy-setup-hash')) { void copySetupHash(state, callbacks.onRender); return true; }
+  const setSyncModeBtn = target.closest<HTMLElement>('[data-set-sync-mode]');
+  if (setSyncModeBtn) {
+    const targetMode = setSyncModeBtn.getAttribute('data-set-sync-mode') as TransportMode;
+    if (targetMode) callbacks.onSetSyncMode?.(targetMode);
+    return true;
+  }
   if (target.closest('#btn-settings-toggle-sync')) { callbacks.onToggleSyncMode?.(); return true; }
   if (target.closest('#btn-settings-logout')) { callbacks.onLogout?.(); closeSettingsModal(state, callbacks.onRender); return true; }
   return false;

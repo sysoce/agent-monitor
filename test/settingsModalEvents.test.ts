@@ -97,6 +97,24 @@ test('handleSettingsModalClick handles LAN IP selection button', () => {
   assert.equal(rendered, true);
 });
 
+test('handleSettingsModalClick handles set sync mode button', () => {
+  const state = createMockState();
+  let selectedMode = '';
+  const target = {
+    closest: (selector: string) => selector.includes('[data-set-sync-mode]') ? {
+      getAttribute: (attr: string) => attr === 'data-set-sync-mode' ? 'live-sse' : null,
+    } : null,
+    id: '',
+  } as unknown as HTMLElement;
+
+  const handled = handleSettingsModalClick(state, target, {
+    onSetSyncMode: (m: string) => { selectedMode = m; },
+    onRender: () => {},
+  } as any);
+  assert.equal(handled, true);
+  assert.equal(selectedMode, 'live-sse');
+});
+
 test('saveCustomServerUrl saves server url and triggers feedback', () => {
   const state = createMockState();
   let rendered = false;

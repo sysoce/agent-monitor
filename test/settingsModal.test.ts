@@ -47,7 +47,7 @@ test('renderSettingsModal returns empty string when closed', () => {
   assert.equal(renderSettingsModal(state), '');
 });
 
-test('renderSettingsModal renders full modal with all sections when open', () => {
+test('renderSettingsModal renders full modal with all sections and 3 sync modes when open', () => {
   const state = createMockState({
     isSettingsModalOpen: true,
     qrModalTarget: 'lan',
@@ -73,7 +73,9 @@ test('renderSettingsModal renders full modal with all sections when open', () =>
   assert.ok(html.includes('192.168.1.50:4200'));
   assert.ok(html.includes('100.80.20.10:4200'));
   assert.ok(html.includes('Tailscale'));
-  assert.ok(html.includes('id="btn-settings-toggle-sync"'));
+  assert.ok(html.includes('data-set-sync-mode="p2p"'));
+  assert.ok(html.includes('data-set-sync-mode="live-sse"'));
+  assert.ok(html.includes('data-set-sync-mode="git-backup"'));
   assert.ok(html.includes('id="toggle-auto-update"'));
   assert.ok(html.includes('id="btn-settings-logout"'));
 });

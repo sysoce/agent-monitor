@@ -1,6 +1,6 @@
 {
   "name": "agent-monitor",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Mobile-first PWA and real-time live monitoring dashboard for autonomous AI coding agents",
   "main": "dist/server/server.js",
   "types": "dist/server/server.d.ts",

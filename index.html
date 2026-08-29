@@ -6600,11 +6600,61 @@ input:checked + .slider:before {
 .settings-sync-status.status-online {
   color: #4ec9b0;
 }
+.settings-sync-status.status-p2p {
+  color: #4ec9b0;
+}
 .settings-sync-status.status-git {
   color: #c586c0;
 }
 .settings-sync-status.status-offline {
   color: #888888;
+}
+.settings-sync-modes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.settings-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 6px;
+  background: #18181b;
+  border: 1px solid #303036;
+  border-radius: 6px;
+  color: #cccccc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.settings-mode-btn:hover {
+  background: #25252b;
+  border-color: #4a4a55;
+  color: #ffffff;
+}
+.settings-mode-btn.active {
+  background: #1e293b;
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+.settings-mode-icon {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.settings-mode-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.settings-mode-desc {
+  font-size: 9.5px;
+  color: #888888;
+  margin-top: 2px;
+}
+.settings-mode-btn.active .settings-mode-desc {
+  color: #93c5fd;
 }
 .settings-btn-toggle-sync {
   width: 100%;
@@ -7229,7 +7279,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.22" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.23" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8076,6 +8126,14 @@ input:checked + .slider:before {
       this.callbacks.onStatusChange("connected");
       this.callbacks.onError?.("");
     }
+    forceLiveSseMode() {
+      this.stopGitPolling();
+      this.reachabilityProbe.stop();
+      this.mode = "live-sse";
+      this.callbacks.onModeChange("live-sse");
+      this.callbacks.onStatusChange("connecting");
+      this.callbacks.onError?.("");
+    }
     forceGitBackupMode() {
       if (this.gistConfig) {
         this.mode = "git-backup";
@@ -8089,6 +8147,11 @@ input:checked + .slider:before {
       }
     }
     handlePrimarySseFailure() {
+      if (this.mode === "live-sse") {
+        this.callbacks.onStatusChange("disconnected");
+        return;
+      }
+      if (this.mode === "p2p") return;
       if (this.gistConfig) {
         this.mode = "git-backup";
         this.callbacks.onModeChange("git-backup");
@@ -8215,19 +8278,30 @@ input:checked + .slider:before {
     const cfg = loadCachedGistConfig();
     if (cfg) syncMachine.setGistConfig(cfg);
     const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-    const mode = saved || "p2p";
+    let mode = saved;
+    if (!mode) {
+      if (cfg?.gistId && !hasLiveServer()) {
+        mode = "git-backup";
+      } else {
+        mode = "p2p";
+      }
+    }
     if (mode === "p2p") {
       syncMachine.forceP2PMode();
     } else if (mode === "git-backup") {
       syncMachine.forceGitBackupMode();
-    } else {
+    } else if (mode === "live-sse") {
+      syncMachine.forceLiveSseMode();
       startSse();
+    } else {
+      syncMachine.forceP2PMode();
     }
   }
   function setSyncModeAction(targetMode, state2, syncMachine, startSse, sseCleanup) {
     if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", targetMode);
+    state2.syncMode = targetMode;
     if (targetMode === "live-sse") {
-      syncMachine.stop();
+      syncMachine.forceLiveSseMode();
       startSse();
     } else if (targetMode === "git-backup") {
       sseCleanup?.();
@@ -8235,7 +8309,6 @@ input:checked + .slider:before {
     } else if (targetMode === "p2p") {
       sseCleanup?.();
       syncMachine.forceP2PMode();
-      state2.syncMode = "p2p";
       state2.syncStatus = "connected";
     }
   }
@@ -8243,9 +8316,9 @@ input:checked + .slider:before {
     const current = state2.syncMode || "p2p";
     let next = "p2p";
     if (current === "p2p") {
-      next = hasLiveServer() ? "live-sse" : "git-backup";
+      next = "live-sse";
     } else if (current === "live-sse") {
-      next = loadCachedGistConfig() ? "git-backup" : "p2p";
+      next = "git-backup";
     } else {
       next = "p2p";
     }
@@ -8727,6 +8800,10 @@ input:checked + .slider:before {
       toggleSyncModeAction(this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || void 0);
       this.render();
     }
+    setSyncMode(mode) {
+      setSyncModeAction(mode, this.state, this.syncMachine, () => this.startSse(), this.sseCleanup || void 0);
+      this.render();
+    }
     handleStopSession() {
       this.state.lastAbortedAt = Date.now();
       this.state.lastAbortedSessionId = this.state.activeSessionId;
@@ -8778,8 +8855,6 @@ input:checked + .slider:before {
           const changed = this.state.syncStatus !== s;
           this.state.syncStatus = s;
           if (s === "disconnected") {
-            this.sseCleanup?.();
-            this.sseCleanup = null;
             this.syncMachine.handlePrimarySseFailure();
           } else if (s === "connected") {
             this.syncMachine.restorePrimaryLive();
@@ -11704,6 +11779,7 @@ ${thought.trim()}` : thought.trim();
   function renderSettingsSyncSection(state2) {
     const isP2P = state2.syncMode === "p2p";
     const isGit = state2.syncMode === "git-backup";
+    const isSSE = state2.syncMode === "live-sse";
     const isConnected = state2.syncStatus === "connected";
     const isSyncing = state2.syncStatus === "syncing" || state2.syncStatus === "connecting";
     const gistConfig = loadCachedGistConfig();
@@ -11718,11 +11794,29 @@ ${thought.trim()}` : thought.trim();
       <div class="settings-section-header">
         <h4 class="settings-section-title">\u{1F504} Connection & Sync Mode</h4>
         <p class="settings-section-subtitle">
-          Select between Live SSE (Direct LAN), WebRTC Peer-to-Peer, and GitHub Gist Sync.
+          Select between WebRTC Peer-to-Peer, Live SSE (Direct LAN), and GitHub Gist Sync.
         </p>
       </div>
 
       <div class="settings-sync-card">
+        <div class="settings-sync-modes-grid">
+          <button type="button" class="btn settings-mode-btn ${isP2P ? "active" : ""}" data-set-sync-mode="p2p" title="Ultra-fast direct WebRTC peer connection (Default)">
+            <span class="settings-mode-icon">\u{1F517}</span>
+            <span class="settings-mode-title">WebRTC P2P</span>
+            <span class="settings-mode-desc">Default Direct</span>
+          </button>
+          <button type="button" class="btn settings-mode-btn ${isSSE ? "active" : ""}" data-set-sync-mode="live-sse" title="Direct LAN HTTP & Server-Sent Events stream">
+            <span class="settings-mode-icon">\u26A1</span>
+            <span class="settings-mode-title">Live SSE</span>
+            <span class="settings-mode-desc">LAN Stream</span>
+          </button>
+          <button type="button" class="btn settings-mode-btn ${isGit ? "active" : ""}" data-set-sync-mode="git-backup" title="Asynchronous encrypted GitHub Gist mailbox relay">
+            <span class="settings-mode-icon">\u{1F4E6}</span>
+            <span class="settings-mode-title">GitHub Gist</span>
+            <span class="settings-mode-desc">Cloud Relay</span>
+          </button>
+        </div>
+
         <div class="settings-sync-info">
           <div class="settings-sync-row">
             <span class="settings-sync-label">Active Mode:</span>
@@ -11748,12 +11842,6 @@ ${thought.trim()}` : thought.trim();
             <span class="settings-sync-label">GitHub Gist ID:</span>
             <span class="settings-sync-val font-mono"><span class="text-muted">None (Direct mode)</span></span>
           </div>`}
-        </div>
-
-        <div class="settings-sync-actions">
-          <button type="button" class="btn btn-secondary settings-btn-toggle-sync" id="btn-settings-toggle-sync" data-current-mode="${escapeHtml2(state2.syncMode || "live-sse")}">
-            ${isP2P ? "\u26A1 Switch to Live SSE Mode" : isGit ? "\u{1F517} Switch to Peer-to-Peer Mode" : "\u{1F4E6} Switch to GitHub Gist Mode"}
-          </button>
         </div>
       </div>
     </div>
@@ -13153,6 +13241,12 @@ ${thought.trim()}` : thought.trim();
       void copySetupHash(state2, callbacks.onRender);
       return true;
     }
+    const setSyncModeBtn = target.closest("[data-set-sync-mode]");
+    if (setSyncModeBtn) {
+      const targetMode = setSyncModeBtn.getAttribute("data-set-sync-mode");
+      if (targetMode) callbacks.onSetSyncMode?.(targetMode);
+      return true;
+    }
     if (target.closest("#btn-settings-toggle-sync")) {
       callbacks.onToggleSyncMode?.();
       return true;
@@ -13913,16 +14007,13 @@ ${thought.trim()}` : thought.trim();
       },
       onLogout: () => controller.handleLogout(),
       onToggleSyncMode: () => controller.toggleSyncMode(),
+      onSetSyncMode: (mode) => controller.setSyncMode(mode),
       onRender: render
     });
     restoreScrollState(focusSnapshot, state.activeTab);
     restoreFocusState(focusSnapshot);
     if (mainUpdated) {
       hydrateAllDiagrams(app);
-    }
-    if (typeof window !== "undefined") {
-      window.__state = state;
-      window.renderApp = render;
     }
   }
   if (typeof document !== "undefined" && document.readyState === "loading") {

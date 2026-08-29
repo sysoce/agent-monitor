@@ -1,4 +1,5 @@
 import type { AppState } from './types';
+import type { TransportMode } from '../sync/types';
 import { handleDelegatedClick } from './eventDelegation';
 import { filterSessionCardsInPlace } from './sessionFilter';
 import { setupMentionInput, bindMentionActions } from './mentionEvents';
@@ -24,6 +25,7 @@ export interface EventHandlerCallbacks {
   onLoginSuccess: () => Promise<void> | void;
   onLogout?: () => void;
   onToggleSyncMode?: () => void;
+  onSetSyncMode?: (mode: TransportMode) => void;
   onRender: () => void;
 }
 
