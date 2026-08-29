@@ -3612,6 +3612,44 @@ body {
   align-items: center;
   gap: 8px;
 }
+.connection-indicator-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  color: #cccccc;
+  line-height: 1.2;
+}
+.connection-indicator-pill.pill-tailscale {
+  background: rgba(94, 234, 212, 0.08);
+  border-color: rgba(94, 234, 212, 0.25);
+  color: #5eead4;
+}
+.connection-indicator-pill.pill-lan {
+  background: rgba(78, 201, 176, 0.08);
+  border-color: rgba(78, 201, 176, 0.25);
+  color: #4ec9b0;
+}
+.connection-type-icon {
+  font-size: 10px;
+}
+.connection-type-tag {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.85;
+}
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -7279,7 +7317,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.24" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.25" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -12557,6 +12595,66 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
+  // src/ui/components/connectionEndpointInfo.ts
+  function detectIsTailscale(hostOrIp) {
+    if (!hostOrIp) return false;
+    const clean = hostOrIp.toLowerCase().trim();
+    if (clean.startsWith("100.")) return true;
+    if (clean.includes("tailscale") || clean.endsWith(".ts.net")) return true;
+    return false;
+  }
+  function extractHostFromUrl(rawUrl) {
+    if (!rawUrl) return "";
+    try {
+      const parsed = new URL(rawUrl.startsWith("http") ? rawUrl : `http://${rawUrl}`);
+      return parsed.hostname;
+    } catch {
+      const match = rawUrl.match(/^(?:https?:\/\/)?([^:/#?]+)/i);
+      return match ? match[1] : rawUrl;
+    }
+  }
+  function getConnectionEndpointInfo(state2) {
+    let host = "";
+    let fullUrl = "";
+    if (state2.selectedLanIp) {
+      fullUrl = state2.selectedLanIp;
+      host = extractHostFromUrl(state2.selectedLanIp);
+    } else {
+      const serverBase = getServerBaseUrl();
+      if (serverBase) {
+        fullUrl = serverBase;
+        host = extractHostFromUrl(serverBase);
+      } else if (state2.serverSetupInfo?.lanUrl) {
+        fullUrl = state2.serverSetupInfo.lanUrl;
+        host = extractHostFromUrl(state2.serverSetupInfo.lanUrl);
+      } else if (typeof window !== "undefined" && !isStaticDeployment() && window.location.hostname) {
+        host = window.location.hostname;
+        fullUrl = window.location.origin;
+      }
+    }
+    if (!host && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) {
+      const firstNet = state2.serverSetupInfo.networks[0];
+      host = firstNet.address;
+      fullUrl = firstNet.url;
+    }
+    if (!host) {
+      return { ip: "", connectionType: "", isTailscale: false, displayText: "" };
+    }
+    const matchingNet = state2.serverSetupInfo?.networks?.find(
+      (n) => n.address === host || extractHostFromUrl(n.url) === host
+    );
+    const isTailscale = matchingNet?.isTailscale ?? detectIsTailscale(host);
+    const connectionType = isTailscale ? "Tailscale" : "LAN";
+    const displayText = `${host} (${connectionType})`;
+    return {
+      ip: host,
+      connectionType,
+      isTailscale,
+      fullUrl,
+      displayText
+    };
+  }
+
   // src/ui/components/navHeader.ts
   function getNavHeaderStatus(state2) {
     const isP2P = state2.syncMode === "p2p";
@@ -12584,6 +12682,7 @@ ${thought.trim()}` : thought.trim();
   }
   function renderNavHeader(state2) {
     const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state2);
+    const endpoint = getConnectionEndpointInfo(state2);
     const sessionTitle = state2.activeSession?.title?.trim();
     const sessionId = state2.activeSession?.id || state2.activeSessionId;
     const chatTabLabel = sessionTitle && sessionId ? `${sessionTitle} (${sessionId})` : sessionTitle || sessionId || "Chat";
@@ -12597,6 +12696,13 @@ ${thought.trim()}` : thought.trim();
           <span class="brand-version">v${escapeHtml2(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
+          ${endpoint.displayText ? `
+            <span class="connection-indicator-pill ${endpoint.isTailscale ? "pill-tailscale" : "pill-lan"}" id="indicator-connection-endpoint" title="Connection: ${escapeHtml2(endpoint.fullUrl || endpoint.ip)}">
+              <span class="connection-type-icon">${endpoint.isTailscale ? "\u{1F512}" : "\u{1F3E0}"}</span>
+              <span class="connection-ip-text">${escapeHtml2(endpoint.ip)}</span>
+              <span class="connection-type-tag">(${escapeHtml2(endpoint.connectionType)})</span>
+            </span>
+          ` : ""}
           <button type="button" id="btn-open-settings" class="btn-settings-pill" title="Settings & Device Connect">
             <span class="btn-settings-icon">\u2699\uFE0F</span>
             <span class="btn-settings-text">Settings</span>
@@ -13145,6 +13251,32 @@ ${thought.trim()}` : thought.trim();
       return;
     }
     const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state2);
+    const endpoint = getConnectionEndpointInfo(state2);
+    const endpointEl = headerEl.querySelector("#indicator-connection-endpoint");
+    if (endpointEl) {
+      if (!endpoint.displayText) {
+        if (typeof endpointEl.remove === "function") endpointEl.remove();
+      } else {
+        const expectedClass = `connection-indicator-pill ${endpoint.isTailscale ? "pill-tailscale" : "pill-lan"}`;
+        if (endpointEl.className !== expectedClass) endpointEl.className = expectedClass;
+        const ipText = endpointEl.querySelector(".connection-ip-text");
+        if (ipText && ipText.textContent !== endpoint.ip) ipText.textContent = endpoint.ip;
+        const typeTag = endpointEl.querySelector(".connection-type-tag");
+        const expectedTag = `(${endpoint.connectionType})`;
+        if (typeTag && typeTag.textContent !== expectedTag) typeTag.textContent = expectedTag;
+      }
+    } else if (endpoint.displayText) {
+      const actionsEl = headerEl.querySelector(".header-actions");
+      if (actionsEl && typeof actionsEl.insertAdjacentHTML === "function") {
+        actionsEl.insertAdjacentHTML("afterbegin", `
+        <span class="connection-indicator-pill ${endpoint.isTailscale ? "pill-tailscale" : "pill-lan"}" id="indicator-connection-endpoint" title="Connection: ${escapeHtml2(endpoint.fullUrl || endpoint.ip)}">
+          <span class="connection-type-icon">${endpoint.isTailscale ? "\u{1F512}" : "\u{1F3E0}"}</span>
+          <span class="connection-ip-text">${escapeHtml2(endpoint.ip)}</span>
+          <span class="connection-type-tag">(${escapeHtml2(endpoint.connectionType)})</span>
+        </span>
+      `);
+      }
+    }
     const syncBtn = headerEl.querySelector("#btn-toggle-sync");
     if (syncBtn) {
       const expectedClass = `status-pill ${statusClass}`;

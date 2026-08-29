@@ -1,6 +1,9 @@
 import type { AppState } from '../types';
 import { escapeHtml } from './markdown';
 import { CLIENT_VERSION } from '../version';
+import { getConnectionEndpointInfo } from './connectionEndpointInfo';
+
+export { getConnectionEndpointInfo };
 
 export function getNavHeaderStatus(state: AppState): { statusColor: string; statusLabel: string; statusClass: string } {
   const isP2P = state.syncMode === 'p2p';
@@ -32,6 +35,7 @@ export function getNavHeaderStatus(state: AppState): { statusColor: string; stat
 
 export function renderNavHeader(state: AppState): string {
   const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state);
+  const endpoint = getConnectionEndpointInfo(state);
 
   const sessionTitle = state.activeSession?.title?.trim();
   const sessionId = state.activeSession?.id || state.activeSessionId;
@@ -49,6 +53,17 @@ export function renderNavHeader(state: AppState): string {
           <span class="brand-version">v${escapeHtml(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
+          ${
+            endpoint.displayText
+              ? `
+            <span class="connection-indicator-pill ${endpoint.isTailscale ? 'pill-tailscale' : 'pill-lan'}" id="indicator-connection-endpoint" title="Connection: ${escapeHtml(endpoint.fullUrl || endpoint.ip)}">
+              <span class="connection-type-icon">${endpoint.isTailscale ? '🔒' : '🏠'}</span>
+              <span class="connection-ip-text">${escapeHtml(endpoint.ip)}</span>
+              <span class="connection-type-tag">(${escapeHtml(endpoint.connectionType)})</span>
+            </span>
+          `
+              : ''
+          }
           <button type="button" id="btn-open-settings" class="btn-settings-pill" title="Settings & Device Connect">
             <span class="btn-settings-icon">⚙️</span>
             <span class="btn-settings-text">Settings</span>

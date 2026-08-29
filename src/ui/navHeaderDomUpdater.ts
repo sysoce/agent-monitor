@@ -1,5 +1,6 @@
 import type { AppState } from './types';
-import { renderNavHeader, getNavHeaderStatus } from './components/navHeader';
+import { renderNavHeader, getNavHeaderStatus, getConnectionEndpointInfo } from './components/navHeader';
+import { escapeHtml } from './components/markdown';
 
 export function updateNavHeaderDOM(state: AppState, container: HTMLElement): void {
   const headerEl = container.querySelector<HTMLElement>('.app-header');
@@ -11,6 +12,33 @@ export function updateNavHeaderDOM(state: AppState, container: HTMLElement): voi
   }
 
   const { statusColor, statusLabel, statusClass } = getNavHeaderStatus(state);
+  const endpoint = getConnectionEndpointInfo(state);
+
+  const endpointEl = headerEl.querySelector<HTMLElement>('#indicator-connection-endpoint');
+  if (endpointEl) {
+    if (!endpoint.displayText) {
+      if (typeof endpointEl.remove === 'function') endpointEl.remove();
+    } else {
+      const expectedClass = `connection-indicator-pill ${endpoint.isTailscale ? 'pill-tailscale' : 'pill-lan'}`;
+      if (endpointEl.className !== expectedClass) endpointEl.className = expectedClass;
+      const ipText = endpointEl.querySelector<HTMLElement>('.connection-ip-text');
+      if (ipText && ipText.textContent !== endpoint.ip) ipText.textContent = endpoint.ip;
+      const typeTag = endpointEl.querySelector<HTMLElement>('.connection-type-tag');
+      const expectedTag = `(${endpoint.connectionType})`;
+      if (typeTag && typeTag.textContent !== expectedTag) typeTag.textContent = expectedTag;
+    }
+  } else if (endpoint.displayText) {
+    const actionsEl = headerEl.querySelector<HTMLElement>('.header-actions');
+    if (actionsEl && typeof actionsEl.insertAdjacentHTML === 'function') {
+      actionsEl.insertAdjacentHTML('afterbegin', `
+        <span class="connection-indicator-pill ${endpoint.isTailscale ? 'pill-tailscale' : 'pill-lan'}" id="indicator-connection-endpoint" title="Connection: ${escapeHtml(endpoint.fullUrl || endpoint.ip)}">
+          <span class="connection-type-icon">${endpoint.isTailscale ? '🔒' : '🏠'}</span>
+          <span class="connection-ip-text">${escapeHtml(endpoint.ip)}</span>
+          <span class="connection-type-tag">(${escapeHtml(endpoint.connectionType)})</span>
+        </span>
+      `);
+    }
+  }
 
   const syncBtn = headerEl.querySelector<HTMLElement>('#btn-toggle-sync');
   if (syncBtn) {

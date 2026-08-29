@@ -97,6 +97,42 @@ body {
   align-items: center;
   gap: 8px;
 }
+.connection-indicator-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  color: #cccccc;
+  line-height: 1.2;
+}
+
+.connection-indicator-pill.pill-tailscale {
+  background: rgba(94, 234, 212, 0.08);
+  border-color: rgba(94, 234, 212, 0.25);
+  color: #5eead4;
+}
+
+.connection-indicator-pill.pill-lan {
+  background: rgba(78, 201, 176, 0.08);
+  border-color: rgba(78, 201, 176, 0.25);
+  color: #4ec9b0;
+}
+
+.connection-type-icon {
+  font-size: 10px;
+}
+
+.connection-type-tag {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.85;
+}
 
 .status-pill {
   display: inline-flex;
