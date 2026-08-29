@@ -3086,30 +3086,33 @@ input:checked + .slider:before {
   animation: stream-dot-pulse 1.4s infinite ease-in-out both;
 }
 
-/* ---------------- QR Code Mobile Pairing & Modal ---------------- */
+/* ---------------- Settings & Device Connect Modal ---------------- */
+.btn-settings-pill,
 .btn-qr-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(14, 99, 156, 0.2);
-  border: 1px solid rgba(14, 99, 156, 0.45);
-  color: #4fc1ff;
-  padding: 3px 9px;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  color: #e6e6e6;
+  padding: 3px 10px;
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
+.btn-settings-pill:hover,
 .btn-qr-pill:hover {
-  background: rgba(14, 99, 156, 0.4);
-  border-color: #0e639c;
+  background: #2e2e30;
+  border-color: #555555;
   color: #ffffff;
 }
 
+.btn-settings-icon,
 .btn-qr-icon {
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .sidebar-actions-row {
@@ -3118,31 +3121,57 @@ input:checked + .slider:before {
   width: 100%;
 }
 
-.sidebar-qr-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  background: #252526;
-  color: #cccccc;
-  border: 1px solid #3c3c3c;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.sidebar-qr-btn:hover {
-  background: #2d2d30;
-  color: #ffffff;
-  border-color: #0e639c;
-}
-
+.settings-modal-card,
 .qr-modal-card {
-  max-width: 440px;
+  max-width: 500px;
   width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-section-header {
+  margin-bottom: 2px;
+}
+
+.settings-section-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-section-subtitle {
+  font-size: 12px;
+  color: #999999;
+  margin: 0;
+  line-height: 1.45;
 }
 
 .qr-tabs-container {
@@ -3152,7 +3181,7 @@ input:checked + .slider:before {
   padding: 4px;
   border-radius: 8px;
   border: 1px solid #27272a;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 
 .qr-tab-btn {
@@ -3182,27 +3211,28 @@ input:checked + .slider:before {
   background: #ffffff;
   padding: 12px;
   border-radius: 10px;
-  display: inline-block;
+  display: block;
   margin: 8px auto;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  width: fit-content;
 }
 
 .qr-svg-container svg {
   display: block;
-  max-width: 210px;
-  max-height: 210px;
+  max-width: 190px;
+  max-height: 190px;
   width: 100%;
   height: auto;
 }
 
 .qr-url-row {
-  margin: 10px 0;
+  margin: 6px 0;
 }
 
 .qr-link-input {
   width: 100%;
   box-sizing: border-box;
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, monospace;
   font-size: 11px;
   text-align: center;
   background: #141414;
@@ -3215,27 +3245,13 @@ input:checked + .slider:before {
 .qr-action-buttons {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .qr-btn-action {
   flex: 1;
   font-size: 12px;
   padding: 8px 10px;
-}
-
-.qr-download-row {
-  margin-top: 8px;
-}
-
-.qr-btn-download {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 11.5px;
-  padding: 8px 10px;
-  text-align: center;
-  text-decoration: none;
 }
 
 .qr-install-tips {
@@ -3245,7 +3261,7 @@ input:checked + .slider:before {
   padding: 10px 14px;
   font-size: 11.5px;
   line-height: 1.5;
-  margin-top: 14px;
+  margin-top: 8px;
   border-left: 3px solid #0e639c;
   color: #cccccc;
 }
@@ -3254,4 +3270,226 @@ input:checked + .slider:before {
   margin: 4px 0 0 0;
   padding-left: 18px;
 }
+
+/* ---------------- Network IP List ---------------- */
+.network-ip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.network-ip-item {
+  background: #202024;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: all 0.15s ease;
+}
+
+.network-ip-item.selected {
+  border-color: #388bfd;
+  background: #1c2333;
+}
+
+.network-ip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.network-ip-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.network-ip-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.network-ip-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.badge-lan {
+  background: rgba(78, 201, 176, 0.15);
+  color: #4ec9b0;
+  border: 1px solid rgba(78, 201, 176, 0.3);
+}
+
+.badge-tailscale {
+  background: rgba(197, 134, 192, 0.15);
+  color: #c586c0;
+  border: 1px solid rgba(197, 134, 192, 0.3);
+}
+
+.network-ip-active-tag {
+  font-size: 10px;
+  background: rgba(56, 139, 253, 0.2);
+  color: #58a6ff;
+  border: 1px solid rgba(56, 139, 253, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.network-ip-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.network-btn-use-qr,
+.network-btn-copy {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+.network-btn-use-qr.active {
+  background: #0e639c;
+  color: #ffffff;
+  border-color: #0e639c;
+}
+
+.network-ip-address-text {
+  font-size: 11.5px;
+  color: #a0a0a0;
+}
+
+.network-ip-address-text code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #e6e6e6;
+}
+
+.network-ip-empty {
+  font-size: 12px;
+  color: #888888;
+  padding: 10px;
+  background: #1c1c1f;
+  border-radius: 6px;
+  border: 1px dashed #333338;
+}
+
+/* ---------------- Settings Sync & App Cards ---------------- */
+.settings-sync-card,
+.settings-app-card {
+  background: #202024;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-sync-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-sync-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.settings-sync-label {
+  color: #888888;
+}
+
+.settings-sync-val {
+  color: #ffffff;
+}
+
+.settings-sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.settings-sync-status.status-online { color: #4ec9b0; }
+.settings-sync-status.status-git { color: #c586c0; }
+.settings-sync-status.status-offline { color: #888888; }
+
+.settings-btn-toggle-sync {
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.settings-auto-update-row,
+.settings-download-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-auto-update-label,
+.settings-download-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.settings-row-desc {
+  font-size: 11.5px;
+  color: #888888;
+}
+
+.settings-version-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-version-label {
+  color: #888888;
+}
+
+.settings-version-val {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.settings-btn-download {
+  padding: 6px 10px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.settings-logout-row {
+  margin-top: 4px;
+}
+
+.settings-btn-logout {
+  width: 100%;
+  padding: 7px;
+  font-size: 12px;
+}
+
 

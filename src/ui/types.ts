@@ -3,6 +3,8 @@ import type { AttachmentItem } from '../types';
 import type { MentionSuggestionItem } from '../types';
 import type { ClientPresence } from '../sync/types';
 
+import type { NetworkAddressInfo } from '../server/networkAddress';
+
 export type ActiveTab = 'sidebar' | 'chat' | 'plans';
 
 export type SyncStatus = 'connected' | 'syncing' | 'disconnected' | 'connecting';
@@ -49,9 +51,12 @@ export interface AppState {
   hostPresence?: ClientPresence;
   lastSyncedAt?: number;
   rateLimitRemaining?: number;
+  isSettingsModalOpen?: boolean;
   isQrModalOpen?: boolean;
   qrModalTarget?: 'gh_pages' | 'lan' | 'download';
   qrCopyFeedback?: 'link' | 'hash';
+  settingsCopyFeedback?: string;
+  selectedLanIp?: string;
   serverSetupInfo?: {
     githubPagesUrl?: string;
     lanUrl?: string;
@@ -59,5 +64,7 @@ export interface AppState {
     hasSyncConfig?: boolean;
     gistId?: string;
     version?: string;
+    networks?: NetworkAddressInfo[];
   };
 }
+

@@ -33,7 +33,7 @@ test('renderNavHeader shows host presence when in git-backup mode', () => {
 
   const html = renderNavHeader(state);
   assert.ok(html.includes('status-git-backup'));
-  assert.ok(html.includes('Host Online') || html.includes('Git Backup'));
+  assert.ok(html.includes('Online') || html.includes('P2P') || html.includes('Git Backup'));
 });
 
 test('renderConnectionNotice stays clean without banner when awaiting response', () => {

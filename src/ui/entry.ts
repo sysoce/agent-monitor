@@ -6,7 +6,7 @@ import { renderChatView } from './components/chatView';
 import { renderPlanView } from './components/planView';
 import { renderComposerView } from './components/composerView';
 import { renderLoginView } from './components/loginView';
-import { renderQrModal } from './components/qrModal';
+import { renderSettingsModal } from './components/settingsModal';
 import { bindLoginEvents, bindAppEvents } from './eventHandlers';
 import { captureFocusState, restoreFocusState, restoreScrollState } from './domFocusPreserver';
 import { getSavedTab } from './tabStore';
@@ -73,7 +73,7 @@ function render() {
   else if (state.activeTab === 'chat') mainHtml = renderChatView(state);
   else if (state.activeTab === 'plans') mainHtml = renderPlanView(state);
 
-  const qrModalHtml = renderQrModal(state);
+  const settingsModalHtml = renderSettingsModal(state);
   const existingLayout = app.querySelector('.app-layout');
   let mainUpdated = false;
   if (!existingLayout) {
@@ -82,7 +82,7 @@ function render() {
         ${renderNavHeader(state)}
         <main class="app-main">${mainHtml}</main>
         ${renderComposerView(state)}
-        ${qrModalHtml}
+        ${settingsModalHtml}
       </div>
     `;
     mainUpdated = true;
@@ -110,15 +110,15 @@ function render() {
       existingLayout.insertAdjacentHTML('beforeend', newComposerHtml);
     }
 
-    const qrModalEl = existingLayout.querySelector('#qr-modal');
-    if (qrModalHtml) {
-      if (qrModalEl) {
-        qrModalEl.outerHTML = qrModalHtml;
+    const modalEl = existingLayout.querySelector('#settings-modal, #qr-modal');
+    if (settingsModalHtml) {
+      if (modalEl) {
+        modalEl.outerHTML = settingsModalHtml;
       } else {
-        existingLayout.insertAdjacentHTML('beforeend', qrModalHtml);
+        existingLayout.insertAdjacentHTML('beforeend', settingsModalHtml);
       }
-    } else if (qrModalEl) {
-      qrModalEl.remove();
+    } else if (modalEl) {
+      modalEl.remove();
     }
   }
 

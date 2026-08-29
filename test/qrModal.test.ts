@@ -52,8 +52,8 @@ test('renderQrModal renders modal with QR SVG and tabs when open', () => {
   });
 
   const html = renderQrModal(state);
-  assert.ok(html.includes('id="qr-modal"'));
-  assert.ok(html.includes('Connect Phone'));
+  assert.ok(html.includes('id="settings-modal"'));
+  assert.ok(html.includes('Connect'));
   assert.ok(html.includes('id="qr-tab-gh"'));
   assert.ok(html.includes('id="qr-tab-lan"'));
   assert.ok(html.includes('id="qr-tab-dl"'));
@@ -63,16 +63,10 @@ test('renderQrModal renders modal with QR SVG and tabs when open', () => {
   assert.ok(html.includes('https://sysoce.github.io/agent-monitor/#setup=abc'));
 });
 
-test('renderNavHeader renders Connect Phone QR button', () => {
+test('renderNavHeader renders Settings button', () => {
   const state = createMockState();
   const html = renderNavHeader(state);
-  assert.ok(html.includes('id="btn-show-qr"'));
-  assert.ok(html.includes('Connect Phone'));
+  assert.ok(html.includes('id="btn-open-settings"'));
+  assert.ok(html.includes('Settings'));
 });
 
-test('renderSidebarView renders Connect Phone QR button', () => {
-  const state = createMockState();
-  const html = renderSidebarView(state);
-  assert.ok(html.includes('id="btn-sidebar-qr"'));
-  assert.ok(html.includes('Pair Phone'));
-});

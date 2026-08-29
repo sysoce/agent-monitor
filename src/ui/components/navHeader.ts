@@ -10,7 +10,7 @@ export function renderNavHeader(state: AppState): string {
   const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 90_000 : false;
 
   const statusColor = isGit ? (isHostOnline ? '#4ec9b0' : '#c586c0') : isConnected ? '#4ec9b0' : isSyncing ? '#cca700' : '#f14c4c';
-  const statusLabel = isGit ? (isHostOnline ? 'Git Backup (Host Online)' : 'Git Backup') : isConnected ? 'Live' : isSyncing ? 'Syncing' : 'Offline';
+  const statusLabel = isGit ? (isHostOnline ? 'P2P / Gist (Online)' : 'P2P / Gist') : isConnected ? 'Live SSE' : isSyncing ? 'Syncing' : 'Offline';
   const statusClass = isGit ? 'status-git-backup' : isConnected ? 'status-live' : isSyncing ? 'status-syncing' : 'status-offline';
 
   const sessionTitle = state.activeSession?.title?.trim();
@@ -29,11 +29,11 @@ export function renderNavHeader(state: AppState): string {
           <span class="brand-version">v${escapeHtml(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
-          <button type="button" id="btn-show-qr" class="btn-qr-pill" title="Pair mobile phone via QR code">
-            <span class="btn-qr-icon">📱</span>
-            <span class="btn-qr-text">Connect Phone</span>
+          <button type="button" id="btn-open-settings" class="btn-settings-pill" title="Settings & Device Connect">
+            <span class="btn-settings-icon">⚙️</span>
+            <span class="btn-settings-text">Settings</span>
           </button>
-          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / Git Backup mode">
+          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / P2P Gist mode">
             <span class="status-dot" style="background-color: ${statusColor}"></span>
             <span class="status-text">${statusLabel}</span>
           </button>
@@ -58,11 +58,11 @@ export function renderNavHeader(state: AppState): string {
         <button
           type="button"
           data-tab="chat"
-          class="tab-btn tab-btn--chat ${state.activeTab === 'chat' ? 'active' : ''}"
+          class="tab-btn ${state.activeTab === 'chat' ? 'active' : ''}"
           role="tab"
           aria-selected="${state.activeTab === 'chat'}"
         >
-          <span class="tab-title-text" title="${escapeHtml(chatTabLabel)}">${escapeHtml(chatTabLabel)}</span>
+          <span>${escapeHtml(chatTabLabel)}</span>
           ${chatMsgCount > 0 ? `<span class="tab-badge">${chatMsgCount}</span>` : ''}
         </button>
       </nav>

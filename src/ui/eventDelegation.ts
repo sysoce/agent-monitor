@@ -2,7 +2,7 @@ import type { AppState, ActiveTab } from './types';
 import type { EventHandlerCallbacks } from './eventHandlers';
 import { saveActiveTab } from './tabStore';
 import { handleModelPickerClick } from './modelPickerEvents';
-import { handleQrModalClick } from './qrModalEvents';
+import { handleSettingsModalClick } from './settingsModalEvents';
 import {
   handleCopyAction,
   handlePlanClick,
@@ -89,7 +89,7 @@ export function handleDelegatedClick(target: HTMLElement | null, state: AppState
     }
     return true;
   }
-  if (handleQrModalClick(state, target, callbacks.onRender)) return true;
+  if (handleSettingsModalClick(state, target, callbacks)) return true;
   if (handleModelPickerClick(target, state, callbacks)) return true;
   if (handlePlanClick(target, state, callbacks)) return true;
   if (handleControlClick(target, state, callbacks)) return true;

@@ -4,7 +4,6 @@ import { renderSessionDetailView } from './sessionDetailView';
 import { isPlanFilePath } from '../../utils/planExtractor';
 import { renderConnectionNotice } from './connectionNotice';
 import { renderMonitorSidebarStats } from './sidebarStatsCard';
-import { renderSidebarAutoUpdate } from './sidebarAutoUpdate';
 
 function formatRelativeTime(ts: number): string {
   const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
@@ -53,10 +52,6 @@ export function renderSidebarView(state: AppState): string {
             <span class="btn-icon">+</span>
             <span>New Session</span>
           </button>
-          <button type="button" class="btn btn-secondary sidebar-qr-btn" id="btn-sidebar-qr" title="Pair Phone via QR Code">
-            <span class="btn-icon">📱</span>
-            <span>Pair Phone</span>
-          </button>
         </div>
         <div class="search-bar">
           <span class="search-icon">🔍</span>
@@ -72,7 +67,6 @@ export function renderSidebarView(state: AppState): string {
       </div>
 
       ${renderMonitorSidebarStats(state)}
-      ${renderSidebarAutoUpdate(state)}
 
       <div class="section-divider">
         <span>${q ? `FOUND (${filtered.length})` : `RECENT SESSIONS (${displaySessions.length})`}</span>

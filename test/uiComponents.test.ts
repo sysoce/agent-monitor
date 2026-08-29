@@ -57,7 +57,7 @@ test('renderNavHeader renders brand, live status pill and active tabs', () => {
   assert.match(html, /data-tab="chat"[^>]*class="[^"]*active/);
 
   const gitHtml = renderNavHeader({ ...mockState, syncMode: 'git-backup' });
-  assert.match(gitHtml, /Git Backup/);
+  assert.match(gitHtml, /P2P \/ Gist/);
   assert.match(gitHtml, /status-git-backup/);
 });
 

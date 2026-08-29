@@ -46,15 +46,10 @@ export async function handleSetupRoute(
       gistId: syncConfig?.gistId || '',
       password: password || syncConfig?.password || '',
     });
-
     const githubPagesUrl = `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
     const lanUrl = `${bestAddress.url}/#setup=${payload}`;
 
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-      'Access-Control-Allow-Origin': '*',
-    });
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({
       githubPagesUrl,
       lanUrl,
@@ -62,6 +57,7 @@ export async function handleSetupRoute(
       hasSyncConfig: Boolean(syncConfig?.gistId),
       gistId: syncConfig?.gistId || '',
       version: '1.0.0',
+      networks,
     }));
     return true;
   }

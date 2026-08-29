@@ -6298,56 +6298,81 @@ input:checked + .slider:before {
   box-shadow: 0 0 6px #22c55e;
   animation: stream-dot-pulse 1.4s infinite ease-in-out both;
 }
+.btn-settings-pill,
 .btn-qr-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(14, 99, 156, 0.2);
-  border: 1px solid rgba(14, 99, 156, 0.45);
-  color: #4fc1ff;
-  padding: 3px 9px;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  color: #e6e6e6;
+  padding: 3px 10px;
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
 }
+.btn-settings-pill:hover,
 .btn-qr-pill:hover {
-  background: rgba(14, 99, 156, 0.4);
-  border-color: #0e639c;
+  background: #2e2e30;
+  border-color: #555555;
   color: #ffffff;
 }
+.btn-settings-icon,
 .btn-qr-icon {
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .sidebar-actions-row {
   display: flex;
   gap: 8px;
   width: 100%;
 }
-.sidebar-qr-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  background: #252526;
-  color: #cccccc;
-  border: 1px solid #3c3c3c;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.sidebar-qr-btn:hover {
-  background: #2d2d30;
-  color: #ffffff;
-  border-color: #0e639c;
-}
+.settings-modal-card,
 .qr-modal-card {
-  max-width: 440px;
+  max-width: 500px;
   width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+.settings-modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+.settings-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.settings-section-header {
+  margin-bottom: 2px;
+}
+.settings-section-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-section-subtitle {
+  font-size: 12px;
+  color: #999999;
+  margin: 0;
+  line-height: 1.45;
 }
 .qr-tabs-container {
   display: flex;
@@ -6356,7 +6381,7 @@ input:checked + .slider:before {
   padding: 4px;
   border-radius: 8px;
   border: 1px solid #27272a;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 .qr-tab-btn {
   flex: 1;
@@ -6382,24 +6407,28 @@ input:checked + .slider:before {
   background: #ffffff;
   padding: 12px;
   border-radius: 10px;
-  display: inline-block;
+  display: block;
   margin: 8px auto;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  width: fit-content;
 }
 .qr-svg-container svg {
   display: block;
-  max-width: 210px;
-  max-height: 210px;
+  max-width: 190px;
+  max-height: 190px;
   width: 100%;
   height: auto;
 }
 .qr-url-row {
-  margin: 10px 0;
+  margin: 6px 0;
 }
 .qr-link-input {
   width: 100%;
   box-sizing: border-box;
-  font-family: monospace;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    monospace;
   font-size: 11px;
   text-align: center;
   background: #141414;
@@ -6411,24 +6440,12 @@ input:checked + .slider:before {
 .qr-action-buttons {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .qr-btn-action {
   flex: 1;
   font-size: 12px;
   padding: 8px 10px;
-}
-.qr-download-row {
-  margin-top: 8px;
-}
-.qr-btn-download {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 11.5px;
-  padding: 8px 10px;
-  text-align: center;
-  text-decoration: none;
 }
 .qr-install-tips {
   text-align: left;
@@ -6437,13 +6454,207 @@ input:checked + .slider:before {
   padding: 10px 14px;
   font-size: 11.5px;
   line-height: 1.5;
-  margin-top: 14px;
+  margin-top: 8px;
   border-left: 3px solid #0e639c;
   color: #cccccc;
 }
 .qr-install-tips ol {
   margin: 4px 0 0 0;
   padding-left: 18px;
+}
+.network-ip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.network-ip-item {
+  background: #202024;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: all 0.15s ease;
+}
+.network-ip-item.selected {
+  border-color: #388bfd;
+  background: #1c2333;
+}
+.network-ip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.network-ip-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.network-ip-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+.network-ip-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.badge-lan {
+  background: rgba(78, 201, 176, 0.15);
+  color: #4ec9b0;
+  border: 1px solid rgba(78, 201, 176, 0.3);
+}
+.badge-tailscale {
+  background: rgba(197, 134, 192, 0.15);
+  color: #c586c0;
+  border: 1px solid rgba(197, 134, 192, 0.3);
+}
+.network-ip-active-tag {
+  font-size: 10px;
+  background: rgba(56, 139, 253, 0.2);
+  color: #58a6ff;
+  border: 1px solid rgba(56, 139, 253, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.network-ip-actions {
+  display: flex;
+  gap: 6px;
+}
+.network-btn-use-qr,
+.network-btn-copy {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+.network-btn-use-qr.active {
+  background: #0e639c;
+  color: #ffffff;
+  border-color: #0e639c;
+}
+.network-ip-address-text {
+  font-size: 11.5px;
+  color: #a0a0a0;
+}
+.network-ip-address-text code {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    monospace;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #e6e6e6;
+}
+.network-ip-empty {
+  font-size: 12px;
+  color: #888888;
+  padding: 10px;
+  background: #1c1c1f;
+  border-radius: 6px;
+  border: 1px dashed #333338;
+}
+.settings-sync-card,
+.settings-app-card {
+  background: #202024;
+  border: 1px solid #303036;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-sync-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-sync-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.settings-sync-label {
+  color: #888888;
+}
+.settings-sync-val {
+  color: #ffffff;
+}
+.settings-sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.settings-sync-status.status-online {
+  color: #4ec9b0;
+}
+.settings-sync-status.status-git {
+  color: #c586c0;
+}
+.settings-sync-status.status-offline {
+  color: #888888;
+}
+.settings-btn-toggle-sync {
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+}
+.settings-auto-update-row,
+.settings-download-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.settings-auto-update-label,
+.settings-download-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-row-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+.settings-row-desc {
+  font-size: 11.5px;
+  color: #888888;
+}
+.settings-version-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.settings-version-label {
+  color: #888888;
+}
+.settings-version-val {
+  color: #ffffff;
+  font-weight: 600;
+}
+.settings-btn-download {
+  padding: 6px 10px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.settings-logout-row {
+  margin-top: 4px;
+}
+.settings-btn-logout {
+  width: 100%;
+  padding: 7px;
+  font-size: 12px;
 }
 
   </style>
@@ -8588,7 +8799,7 @@ input:checked + .slider:before {
     const host = state2.hostPresence;
     const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
     const statusColor = isGit ? isHostOnline ? "#4ec9b0" : "#c586c0" : isConnected ? "#4ec9b0" : isSyncing ? "#cca700" : "#f14c4c";
-    const statusLabel = isGit ? isHostOnline ? "Git Backup (Host Online)" : "Git Backup" : isConnected ? "Live" : isSyncing ? "Syncing" : "Offline";
+    const statusLabel = isGit ? isHostOnline ? "P2P / Gist (Online)" : "P2P / Gist" : isConnected ? "Live SSE" : isSyncing ? "Syncing" : "Offline";
     const statusClass = isGit ? "status-git-backup" : isConnected ? "status-live" : isSyncing ? "status-syncing" : "status-offline";
     const sessionTitle = state2.activeSession?.title?.trim();
     const sessionId = state2.activeSession?.id || state2.activeSessionId;
@@ -8603,11 +8814,11 @@ input:checked + .slider:before {
           <span class="brand-version">v${escapeHtml2(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
-          <button type="button" id="btn-show-qr" class="btn-qr-pill" title="Pair mobile phone via QR code">
-            <span class="btn-qr-icon">\u{1F4F1}</span>
-            <span class="btn-qr-text">Connect Phone</span>
+          <button type="button" id="btn-open-settings" class="btn-settings-pill" title="Settings & Device Connect">
+            <span class="btn-settings-icon">\u2699\uFE0F</span>
+            <span class="btn-settings-text">Settings</span>
           </button>
-          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / Git Backup mode">
+          <button type="button" id="btn-toggle-sync" class="status-pill ${statusClass}" title="Click to toggle Live SSE / P2P Gist mode">
             <span class="status-dot" style="background-color: ${statusColor}"></span>
             <span class="status-text">${statusLabel}</span>
           </button>
@@ -8628,11 +8839,11 @@ input:checked + .slider:before {
         <button
           type="button"
           data-tab="chat"
-          class="tab-btn tab-btn--chat ${state2.activeTab === "chat" ? "active" : ""}"
+          class="tab-btn ${state2.activeTab === "chat" ? "active" : ""}"
           role="tab"
           aria-selected="${state2.activeTab === "chat"}"
         >
-          <span class="tab-title-text" title="${escapeHtml2(chatTabLabel)}">${escapeHtml2(chatTabLabel)}</span>
+          <span>${escapeHtml2(chatTabLabel)}</span>
           ${chatMsgCount > 0 ? `<span class="tab-badge">${chatMsgCount}</span>` : ""}
         </button>
       </nav>
@@ -8932,28 +9143,6 @@ input:checked + .slider:before {
   `;
   }
 
-  // src/ui/components/sidebarAutoUpdate.ts
-  function renderSidebarAutoUpdate(state2) {
-    const autoUpdate = state2.autoUpdateEnabled ?? isAutoUpdateEnabled();
-    return `
-    <div class="sidebar-auto-update" role="region" aria-label="Auto Update Settings">
-      <div class="sidebar-auto-update-label">
-        <span class="sidebar-auto-update-title">Auto-update <span class="sidebar-version-tag">v${CLIENT_VERSION}</span></span>
-        <span class="sidebar-auto-update-desc">Automatically download new releases</span>
-      </div>
-      <label class="switch" for="toggle-auto-update" aria-label="Toggle Auto-update">
-        <input
-          type="checkbox"
-          id="toggle-auto-update"
-          class="btn-toggle-auto-update"
-          ${autoUpdate ? "checked" : ""}
-        />
-        <span class="slider round"></span>
-      </label>
-    </div>
-  `;
-  }
-
   // src/ui/components/sidebarView.ts
   function formatRelativeTime(ts) {
     const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
@@ -8997,10 +9186,6 @@ input:checked + .slider:before {
             <span class="btn-icon">+</span>
             <span>New Session</span>
           </button>
-          <button type="button" class="btn btn-secondary sidebar-qr-btn" id="btn-sidebar-qr" title="Pair Phone via QR Code">
-            <span class="btn-icon">\u{1F4F1}</span>
-            <span>Pair Phone</span>
-          </button>
         </div>
         <div class="search-bar">
           <span class="search-icon">\u{1F50D}</span>
@@ -9016,7 +9201,6 @@ input:checked + .slider:before {
       </div>
 
       ${renderMonitorSidebarStats(state2)}
-      ${renderSidebarAutoUpdate(state2)}
 
       <div class="section-divider">
         <span>${q ? `FOUND (${filtered.length})` : `RECENT SESSIONS (${displaySessions.length})`}</span>
@@ -10412,6 +10596,35 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
+  // src/ui/components/settingsModal/types.ts
+  function buildSettingsQrUrl(opts) {
+    const payload = opts.payload || "";
+    if (opts.target === "lan") {
+      if (opts.selectedLanIp) {
+        return `${opts.selectedLanIp}/#setup=${payload}`;
+      }
+      if (opts.customLanUrl) return opts.customLanUrl;
+      const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200");
+      return `${origin}/#setup=${payload}`;
+    }
+    if (opts.target === "download") {
+      const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200");
+      return `${origin}/download#setup=${payload}`;
+    }
+    if (opts.customGhPagesUrl) return opts.customGhPagesUrl;
+    return `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
+  }
+  function getCurrentClientPayload(state2) {
+    if (state2.serverSetupInfo?.setupPayload) return state2.serverSetupInfo.setupPayload;
+    const cfg = loadCachedGistConfig();
+    const token = getStoredToken();
+    return encodeSetupPayload({
+      gistId: cfg?.gistId || "",
+      token: cfg?.token || "",
+      password: token || ""
+    });
+  }
+
   // src/qr/qrEncoder.ts
   var EXP = new Array(256);
   var LOG = new Array(256);
@@ -10561,42 +10774,18 @@ ${thought.trim()}` : thought.trim();
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" width="${totalSize}" height="${totalSize}"><rect width="100%" height="100%" fill="#ffffff"/>${rects.join("")}</svg>`;
   }
 
-  // src/ui/components/qrModal.ts
-  function buildQrSetupUrl(opts) {
-    const payload = opts.payload || "";
-    if (opts.target === "lan") {
-      if (opts.customLanUrl) return opts.customLanUrl;
-      const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200");
-      return `${origin}/#setup=${payload}`;
-    }
-    if (opts.target === "download") {
-      const origin = opts.origin || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200");
-      return `${origin}/download#setup=${payload}`;
-    }
-    if (opts.customGhPagesUrl) return opts.customGhPagesUrl;
-    return `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
-  }
-  function getCurrentClientPayload(state2) {
-    if (state2.serverSetupInfo?.setupPayload) return state2.serverSetupInfo.setupPayload;
-    const cfg = loadCachedGistConfig();
-    const token = getStoredToken();
-    return encodeSetupPayload({
-      gistId: cfg?.gistId || "",
-      token: cfg?.token || "",
-      password: token || ""
-    });
-  }
-  function renderQrModal(state2) {
-    if (!state2.isQrModalOpen) return "";
+  // src/ui/components/settingsModal/settingsQrSection.ts
+  function renderSettingsQrSection(state2) {
     const target = state2.qrModalTarget || "gh_pages";
     const payload = getCurrentClientPayload(state2);
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4200";
-    const activeUrl = buildQrSetupUrl({
+    const activeUrl = buildSettingsQrUrl({
       target,
       payload,
       origin,
       customGhPagesUrl: state2.serverSetupInfo?.githubPagesUrl,
-      customLanUrl: state2.serverSetupInfo?.lanUrl
+      customLanUrl: state2.serverSetupInfo?.lanUrl,
+      selectedLanIp: state2.selectedLanIp
     });
     let qrSvg = "";
     try {
@@ -10604,66 +10793,243 @@ ${thought.trim()}` : thought.trim();
       qrSvg = renderQrToSvg(matrix, 4, 10);
     } catch {
     }
-    const copyStatus = state2.qrCopyFeedback || "";
+    const copyStatus = state2.settingsCopyFeedback || state2.qrCopyFeedback || "";
     return `
-    <div class="update-modal-backdrop qr-modal-backdrop" id="qr-modal" role="dialog" aria-modal="true">
-      <div class="update-modal qr-modal-card">
-        <div class="update-modal-header">
-          <div class="update-modal-badge update-modal-badge--info">
-            <span>\u{1F4F1}</span>
-            <span>Connect Phone</span>
+    <div class="settings-section settings-section--qr" id="settings-section-qr">
+      <div class="settings-section-header">
+        <h4 class="settings-section-title">\u{1F4F1} Connect Device & QR Share</h4>
+        <p class="settings-section-subtitle">Scan with your phone camera to pair and monitor agents live.</p>
+      </div>
+
+      <div class="qr-tabs-container">
+        <button type="button" id="qr-tab-gh" class="qr-tab-btn ${target === "gh_pages" ? "active" : ""}">
+          \u{1F310} GitHub Pages
+        </button>
+        <button type="button" id="qr-tab-lan" class="qr-tab-btn ${target === "lan" ? "active" : ""}">
+          \u{1F3E0} Local LAN
+        </button>
+        <button type="button" id="qr-tab-dl" class="qr-tab-btn ${target === "download" ? "active" : ""}">
+          \u{1F4E5} Offline App
+        </button>
+      </div>
+
+      <div class="qr-svg-container" id="qr-svg-box">
+        ${qrSvg}
+      </div>
+
+      <div class="qr-url-row">
+        <input class="search-input qr-link-input" id="mobile-link-url" readonly value="${escapeHtml2(activeUrl)}" />
+      </div>
+
+      <div class="qr-action-buttons">
+        <button type="button" class="btn btn-primary qr-btn-action" id="btn-copy-qr-link">
+          ${copyStatus === "link" ? "\u2705 Copied Link!" : "\u{1F4CB} Copy Link"}
+        </button>
+        <button type="button" class="btn btn-secondary qr-btn-action" id="btn-copy-setup-hash">
+          ${copyStatus === "hash" ? "\u2705 Copied Hash!" : "\u{1F511} Copy Setup Hash"}
+        </button>
+      </div>
+
+      <div class="qr-install-tips">
+        <strong>\u{1F4A1} Install as a Phone App:</strong>
+        <ol>
+          <li>Scan the QR code with Safari (iOS) or Chrome (Android).</li>
+          <li>Tap <strong>Share &rarr; Add to Home Screen</strong> (iOS) or <strong>&vellip; &rarr; Install app</strong> (Android).</li>
+          <li>Launch from your home screen for instant fullscreen monitoring!</li>
+        </ol>
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/settingsModal/settingsNetworkSection.ts
+  function renderSettingsNetworkSection(state2) {
+    const networks = state2.serverSetupInfo?.networks || [];
+    const payload = getCurrentClientPayload(state2);
+    const copyFeedback = state2.settingsCopyFeedback || "";
+    const selectedLan = state2.selectedLanIp;
+    const renderedList = networks.length > 0 ? networks.map((net) => {
+      const fullSetupUrl = `${net.url}/#setup=${payload}`;
+      const isSelected = selectedLan === net.url || !selectedLan && net.url === state2.serverSetupInfo?.lanUrl?.split("/#")[0];
+      const isCopied = copyFeedback === `ip-${net.address}`;
+      return `
+          <div class="network-ip-item ${isSelected ? "selected" : ""}" data-ip-url="${escapeHtml2(net.url)}">
+            <div class="network-ip-header">
+              <div class="network-ip-title-group">
+                <span class="network-ip-name">${escapeHtml2(net.name)}</span>
+                <span class="network-ip-badge ${net.isTailscale ? "badge-tailscale" : "badge-lan"}">
+                  ${net.isTailscale ? "\u{1F512} Tailscale" : "\u{1F3E0} Local LAN"}
+                </span>
+                ${isSelected ? '<span class="network-ip-active-tag">Active QR</span>' : ""}
+              </div>
+              <div class="network-ip-actions">
+                <button
+                  type="button"
+                  class="btn btn-secondary network-btn-use-qr ${isSelected ? "active" : ""}"
+                  data-use-ip="${escapeHtml2(net.url)}"
+                  title="Generate QR code for this network IP"
+                >
+                  ${isSelected ? "\u2713 In QR" : "\u{1F4F2} Use in QR"}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-secondary network-btn-copy"
+                  data-copy-ip-url="${escapeHtml2(fullSetupUrl)}"
+                  data-ip-address="${escapeHtml2(net.address)}"
+                  title="Copy direct connection URL"
+                >
+                  ${isCopied ? "\u2705 Copied!" : "\u{1F4CB} Copy URL"}
+                </button>
+              </div>
+            </div>
+            <div class="network-ip-address-text">
+              <code>${escapeHtml2(net.url)}</code>
+            </div>
           </div>
-          <button type="button" class="btn-close-modal" id="btn-close-qr" title="Close QR Modal">\u2715</button>
+        `;
+    }).join("") : `
+        <div class="network-ip-empty">
+          <p>No active local network interfaces detected from server.</p>
+          <p class="network-ip-hint">Local connection URL: <code>${escapeHtml2(typeof window !== "undefined" ? window.location.origin : "http://localhost:4200")}</code></p>
         </div>
-        <div class="update-modal-body" style="text-align:center;">
-          <h3 class="update-modal-title">Pair Mobile / Web Device</h3>
-          <p class="update-modal-subtitle">
-            Scan with your phone camera to open and communicate via Git Sync over any network.
-          </p>
+      `;
+    return `
+    <div class="settings-section settings-section--network" id="settings-section-network">
+      <div class="settings-section-header">
+        <h4 class="settings-section-title">\u{1F310} Local Network & IP Addresses</h4>
+        <p class="settings-section-subtitle">
+          Connect directly via local Wi-Fi, LAN, or Tailscale for zero-latency <strong>Live SSE streaming</strong> without cloud sync.
+        </p>
+      </div>
 
-          <div class="qr-tabs-container">
-            <button type="button" id="qr-tab-gh" class="qr-tab-btn ${target === "gh_pages" ? "active" : ""}">
-              \u{1F310} GitHub Pages
+      <div class="network-ip-list">
+        ${renderedList}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/settingsModal/settingsSyncSection.ts
+  function renderSettingsSyncSection(state2) {
+    const isGit = state2.syncMode === "git-backup";
+    const isConnected = state2.syncStatus === "connected";
+    const isSyncing = state2.syncStatus === "syncing";
+    const gistConfig = loadCachedGistConfig();
+    const hasGist = Boolean(gistConfig?.gistId || state2.serverSetupInfo?.gistId);
+    const host = state2.hostPresence;
+    const isHostOnline = isGit && host ? Date.now() - host.lastActiveAt < 9e4 : false;
+    const modeBadge = isGit ? "\u{1F517} Peer-to-Peer / Gist Sync" : "\u26A1 Live SSE (Direct LAN)";
+    const statusLabel = isGit ? isHostOnline ? "Host Online" : "Standby / Syncing" : isConnected ? "Connected (Live)" : isSyncing ? "Connecting..." : "Disconnected";
+    return `
+    <div class="settings-section settings-section--sync" id="settings-section-sync">
+      <div class="settings-section-header">
+        <h4 class="settings-section-title">\u{1F504} Connection & Sync Mode</h4>
+        <p class="settings-section-subtitle">
+          Toggle between direct local LAN SSE streaming and remote Peer-to-Peer / Gist synchronization.
+        </p>
+      </div>
+
+      <div class="settings-sync-card">
+        <div class="settings-sync-info">
+          <div class="settings-sync-row">
+            <span class="settings-sync-label">Active Mode:</span>
+            <span class="settings-sync-val font-semibold">${escapeHtml2(modeBadge)}</span>
+          </div>
+          <div class="settings-sync-row">
+            <span class="settings-sync-label">Connection Status:</span>
+            <span class="settings-sync-status status-${isGit ? "git" : isConnected ? "online" : "offline"}">
+              <span class="status-dot"></span>
+              ${escapeHtml2(statusLabel)}
+            </span>
+          </div>
+          <div class="settings-sync-row">
+            <span class="settings-sync-label">GitHub Gist ID:</span>
+            <span class="settings-sync-val font-mono">${hasGist ? escapeHtml2(gistConfig?.gistId || state2.serverSetupInfo?.gistId || "Configured") : '<span class="text-muted">None (Local LAN only)</span>'}</span>
+          </div>
+        </div>
+
+        <div class="settings-sync-actions">
+          <button type="button" class="btn btn-secondary settings-btn-toggle-sync" id="btn-settings-toggle-sync">
+            ${isGit ? "\u26A1 Switch to Live SSE Mode" : "\u{1F517} Switch to Peer-to-Peer Mode"}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/settingsModal/settingsAppSection.ts
+  function renderSettingsAppSection(state2) {
+    const autoUpdate = state2.autoUpdateEnabled ?? isAutoUpdateEnabled();
+    return `
+    <div class="settings-section settings-section--app" id="settings-section-app">
+      <div class="settings-section-header">
+        <h4 class="settings-section-title">\u{1F6E0}\uFE0F App Preferences & Tools</h4>
+        <p class="settings-section-subtitle">Manage client updates and offline bundles.</p>
+      </div>
+
+      <div class="settings-app-card">
+        <div class="settings-auto-update-row">
+          <div class="settings-auto-update-label">
+            <span class="settings-row-title">Automatic Updates</span>
+            <span class="settings-row-desc">Automatically download new versions when available</span>
+          </div>
+          <label class="switch" for="toggle-auto-update" aria-label="Toggle Auto-update">
+            <input
+              type="checkbox"
+              id="toggle-auto-update"
+              class="btn-toggle-auto-update"
+              ${autoUpdate ? "checked" : ""}
+            />
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div class="settings-download-row">
+          <div class="settings-download-info">
+            <span class="settings-row-title">Standalone Offline Bundle</span>
+            <span class="settings-row-desc">Single-file HTML dashboard with full offline support</span>
+          </div>
+          <a class="btn btn-secondary settings-btn-download" id="btn-download-app-bundle" href="/download" download="agent-monitor.html">
+            \u{1F4E5} Download HTML
+          </a>
+        </div>
+
+        <div class="settings-version-row">
+          <span class="settings-version-label">Agent Monitor Version:</span>
+          <span class="settings-version-val">v${escapeHtml2(CLIENT_VERSION)}</span>
+        </div>
+
+        ${state2.isAuthenticated ? `
+          <div class="settings-logout-row">
+            <button type="button" class="btn btn-danger settings-btn-logout" id="btn-settings-logout">
+              \u{1F512} Lock / Logout Session
             </button>
-            <button type="button" id="qr-tab-lan" class="qr-tab-btn ${target === "lan" ? "active" : ""}">
-              \u{1F3E0} Local LAN
-            </button>
-            <button type="button" id="qr-tab-dl" class="qr-tab-btn ${target === "download" ? "active" : ""}">
-              \u{1F4E5} Offline App
-            </button>
           </div>
+        ` : ""}
+      </div>
+    </div>
+  `;
+  }
 
-          <div class="qr-svg-container" id="qr-svg-box">
-            ${qrSvg}
+  // src/ui/components/settingsModal/settingsModal.ts
+  function renderSettingsModal(state2) {
+    if (!state2.isSettingsModalOpen && !state2.isQrModalOpen) return "";
+    return `
+    <div class="update-modal-backdrop settings-modal-backdrop" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-heading">
+      <div class="update-modal settings-modal-card">
+        <div class="update-modal-header settings-modal-header">
+          <div class="update-modal-badge update-modal-badge--info">
+            <span>\u2699\uFE0F</span>
+            <span id="settings-modal-heading">Settings & Connect</span>
           </div>
-
-          <div class="qr-url-row">
-            <input class="search-input qr-link-input" id="mobile-link-url" readonly value="${escapeHtml2(activeUrl)}" />
-          </div>
-
-          <div class="qr-action-buttons">
-            <button type="button" class="btn btn-primary qr-btn-action" id="btn-copy-qr-link">
-              ${copyStatus === "link" ? "\u2705 Copied Link!" : "\u{1F4CB} Copy Link"}
-            </button>
-            <button type="button" class="btn btn-secondary qr-btn-action" id="btn-copy-setup-hash">
-              ${copyStatus === "hash" ? "\u2705 Copied Hash!" : "\u{1F511} Copy Setup Hash"}
-            </button>
-          </div>
-
-          <div class="qr-download-row">
-            <a class="btn btn-secondary qr-btn-download" id="btn-download-app-bundle" href="/download" download="agent-monitor.html">
-              \u{1F4E5} Download Standalone agent-monitor.html
-            </a>
-          </div>
-
-          <div class="qr-install-tips">
-            <strong>\u{1F4A1} Install as a Phone App:</strong>
-            <ol>
-              <li>Scan the QR code with Safari (iOS) or Chrome (Android).</li>
-              <li>Tap <strong>Share &rarr; Add to Home Screen</strong> (iOS) or <strong>&vellip; &rarr; Install app</strong> (Android).</li>
-              <li>Launch from your home screen for instant fullscreen monitoring!</li>
-            </ol>
-          </div>
+          <button type="button" class="btn-close-modal" id="btn-close-settings" title="Close Settings">\u2715</button>
+        </div>
+        <div class="update-modal-body settings-modal-body">
+          ${renderSettingsQrSection(state2)}
+          ${renderSettingsNetworkSection(state2)}
+          ${renderSettingsSyncSection(state2)}
+          ${renderSettingsAppSection(state2)}
         </div>
       </div>
     </div>
@@ -10754,55 +11120,64 @@ ${thought.trim()}` : thought.trim();
     setupModelSearchInput(state2, callbacks);
   }
 
-  // src/ui/qrModalEvents.ts
+  // src/ui/settingsModalEvents.ts
   async function fetchServerSetupInfo(state2, onRender) {
-    if (state2.serverSetupInfo) return;
+    if (state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
     try {
       const res = await fetch("/api/setup-info");
       if (res.ok) {
-        const data = await res.json();
-        state2.serverSetupInfo = data;
+        state2.serverSetupInfo = await res.json();
         onRender();
       }
     } catch {
     }
   }
-  function openQrModal(state2, onRender) {
+  function openSettingsModal(state2, onRender) {
+    state2.isSettingsModalOpen = true;
     state2.isQrModalOpen = true;
     state2.qrModalTarget = state2.qrModalTarget || "gh_pages";
+    state2.settingsCopyFeedback = void 0;
     state2.qrCopyFeedback = void 0;
     onRender();
     void fetchServerSetupInfo(state2, onRender);
   }
-  function closeQrModal(state2, onRender) {
+  function closeSettingsModal(state2, onRender) {
+    state2.isSettingsModalOpen = false;
     state2.isQrModalOpen = false;
+    state2.settingsCopyFeedback = void 0;
     state2.qrCopyFeedback = void 0;
     onRender();
   }
   function selectQrTab(state2, target, onRender) {
     state2.qrModalTarget = target;
+    state2.settingsCopyFeedback = void 0;
     state2.qrCopyFeedback = void 0;
     onRender();
   }
+  function selectLanIp(state2, ipUrl, onRender) {
+    state2.selectedLanIp = ipUrl;
+    state2.qrModalTarget = "lan";
+    onRender();
+  }
   async function copyQrLink(state2, onRender) {
-    const target = state2.qrModalTarget || "gh_pages";
-    const payload = getCurrentClientPayload(state2);
-    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4200";
-    const url = buildQrSetupUrl({
-      target,
-      payload,
-      origin,
+    const url = buildSettingsQrUrl({
+      target: state2.qrModalTarget || "gh_pages",
+      payload: getCurrentClientPayload(state2),
+      origin: typeof window !== "undefined" ? window.location.origin : "http://localhost:4200",
       customGhPagesUrl: state2.serverSetupInfo?.githubPagesUrl,
-      customLanUrl: state2.serverSetupInfo?.lanUrl
+      customLanUrl: state2.serverSetupInfo?.lanUrl,
+      selectedLanIp: state2.selectedLanIp
     });
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(url);
       }
+      state2.settingsCopyFeedback = "link";
       state2.qrCopyFeedback = "link";
       onRender();
       setTimeout(() => {
-        if (state2.qrCopyFeedback === "link") {
+        if (state2.settingsCopyFeedback === "link") {
+          state2.settingsCopyFeedback = void 0;
           state2.qrCopyFeedback = void 0;
           onRender();
         }
@@ -10811,16 +11186,17 @@ ${thought.trim()}` : thought.trim();
     }
   }
   async function copySetupHash(state2, onRender) {
-    const payload = getCurrentClientPayload(state2);
-    const hash = `#setup=${payload}`;
+    const hash = `#setup=${getCurrentClientPayload(state2)}`;
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(hash);
       }
+      state2.settingsCopyFeedback = "hash";
       state2.qrCopyFeedback = "hash";
       onRender();
       setTimeout(() => {
-        if (state2.qrCopyFeedback === "hash") {
+        if (state2.settingsCopyFeedback === "hash") {
+          state2.settingsCopyFeedback = void 0;
           state2.qrCopyFeedback = void 0;
           onRender();
         }
@@ -10828,33 +11204,71 @@ ${thought.trim()}` : thought.trim();
     } catch {
     }
   }
-  function handleQrModalClick(state2, target, onRender) {
-    if (target.closest("#btn-show-qr") || target.closest("#btn-sidebar-qr")) {
-      openQrModal(state2, onRender);
+  async function copyIpUrl(state2, ipUrl, ipAddress, onRender) {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(ipUrl);
+      }
+      state2.settingsCopyFeedback = `ip-${ipAddress}`;
+      onRender();
+      setTimeout(() => {
+        if (state2.settingsCopyFeedback === `ip-${ipAddress}`) {
+          state2.settingsCopyFeedback = void 0;
+          onRender();
+        }
+      }, 2500);
+    } catch {
+    }
+  }
+  function handleSettingsModalClick(state2, target, callbacks) {
+    if (target.closest("#btn-open-settings, #btn-show-qr, #btn-sidebar-qr")) {
+      openSettingsModal(state2, callbacks.onRender);
       return true;
     }
-    if (target.closest("#btn-close-qr") || target.id === "qr-modal") {
-      closeQrModal(state2, onRender);
+    if (target.closest("#btn-close-settings, #btn-close-qr") || target.id === "settings-modal" || target.id === "qr-modal") {
+      closeSettingsModal(state2, callbacks.onRender);
       return true;
     }
     if (target.closest("#qr-tab-gh")) {
-      selectQrTab(state2, "gh_pages", onRender);
+      selectQrTab(state2, "gh_pages", callbacks.onRender);
       return true;
     }
     if (target.closest("#qr-tab-lan")) {
-      selectQrTab(state2, "lan", onRender);
+      selectQrTab(state2, "lan", callbacks.onRender);
       return true;
     }
     if (target.closest("#qr-tab-dl")) {
-      selectQrTab(state2, "download", onRender);
+      selectQrTab(state2, "download", callbacks.onRender);
+      return true;
+    }
+    const useIpBtn = target.closest("[data-use-ip]");
+    if (useIpBtn) {
+      const ipUrl = useIpBtn.getAttribute("data-use-ip") || "";
+      if (ipUrl) selectLanIp(state2, ipUrl, callbacks.onRender);
+      return true;
+    }
+    const copyIpBtn = target.closest("[data-copy-ip-url]");
+    if (copyIpBtn) {
+      const ipUrl = copyIpBtn.getAttribute("data-copy-ip-url") || "";
+      const ipAddr = copyIpBtn.getAttribute("data-ip-address") || "";
+      if (ipUrl) void copyIpUrl(state2, ipUrl, ipAddr, callbacks.onRender);
       return true;
     }
     if (target.closest("#btn-copy-qr-link")) {
-      void copyQrLink(state2, onRender);
+      void copyQrLink(state2, callbacks.onRender);
       return true;
     }
     if (target.closest("#btn-copy-setup-hash")) {
-      void copySetupHash(state2, onRender);
+      void copySetupHash(state2, callbacks.onRender);
+      return true;
+    }
+    if (target.closest("#btn-settings-toggle-sync")) {
+      callbacks.onToggleSyncMode?.();
+      return true;
+    }
+    if (target.closest("#btn-settings-logout")) {
+      callbacks.onLogout?.();
+      closeSettingsModal(state2, callbacks.onRender);
       return true;
     }
     return false;
@@ -11083,7 +11497,7 @@ ${thought.trim()}` : thought.trim();
       }
       return true;
     }
-    if (handleQrModalClick(state2, target, callbacks.onRender)) return true;
+    if (handleSettingsModalClick(state2, target, callbacks)) return true;
     if (handleModelPickerClick(target, state2, callbacks)) return true;
     if (handlePlanClick(target, state2, callbacks)) return true;
     if (handleControlClick(target, state2, callbacks)) return true;
@@ -11712,7 +12126,7 @@ ${thought.trim()}` : thought.trim();
     if (state.activeTab === "sidebar") mainHtml = renderSidebarView(state);
     else if (state.activeTab === "chat") mainHtml = renderChatView(state);
     else if (state.activeTab === "plans") mainHtml = renderPlanView(state);
-    const qrModalHtml = renderQrModal(state);
+    const settingsModalHtml = renderSettingsModal(state);
     const existingLayout = app.querySelector(".app-layout");
     let mainUpdated = false;
     if (!existingLayout) {
@@ -11721,7 +12135,7 @@ ${thought.trim()}` : thought.trim();
         ${renderNavHeader(state)}
         <main class="app-main">${mainHtml}</main>
         ${renderComposerView(state)}
-        ${qrModalHtml}
+        ${settingsModalHtml}
       </div>
     `;
       mainUpdated = true;
@@ -11746,15 +12160,15 @@ ${thought.trim()}` : thought.trim();
       } else if (!composerEl && newComposerHtml) {
         existingLayout.insertAdjacentHTML("beforeend", newComposerHtml);
       }
-      const qrModalEl = existingLayout.querySelector("#qr-modal");
-      if (qrModalHtml) {
-        if (qrModalEl) {
-          qrModalEl.outerHTML = qrModalHtml;
+      const modalEl = existingLayout.querySelector("#settings-modal, #qr-modal");
+      if (settingsModalHtml) {
+        if (modalEl) {
+          modalEl.outerHTML = settingsModalHtml;
         } else {
-          existingLayout.insertAdjacentHTML("beforeend", qrModalHtml);
+          existingLayout.insertAdjacentHTML("beforeend", settingsModalHtml);
         }
-      } else if (qrModalEl) {
-        qrModalEl.remove();
+      } else if (modalEl) {
+        modalEl.remove();
       }
     }
     bindAppEvents(state, {
