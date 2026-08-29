@@ -1,3 +1,5 @@
+import { getSessionDetail } from '../server/sessionStore';
+
 export function sanitizeSessionForSync(detail: any): any {
   if (!detail || !Array.isArray(detail.messages)) return detail;
   const messages = detail.messages.map((m: any) => {
@@ -27,4 +29,22 @@ export function sanitizeSessionForSync(detail: any): any {
     return sanitized;
   });
   return { ...detail, messages };
+}
+
+export async function loadRecentSessionDetails(
+  workspaceRoot: string,
+  sessions: Array<{ id: string }>,
+  extraId?: string,
+  limit = 3
+): Promise<Record<string, any>> {
+  const details: Record<string, any> = {};
+  const targetIds = new Set(sessions.slice(0, limit).map((s) => s.id));
+  if (extraId) targetIds.add(extraId);
+  for (const sid of targetIds) {
+    try {
+      const d = await getSessionDetail(workspaceRoot, sid);
+      if (d) details[sid] = sanitizeSessionForSync(d);
+    } catch {}
+  }
+  return details;
 }

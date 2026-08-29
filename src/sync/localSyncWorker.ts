@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import type { GistClient } from './gistClient';
 import type { SyncOutboxState } from './types';
 import { listSessions, getSessionDetail, stopSession } from '../server/sessionStore';
-import { sanitizeSessionForSync } from './syncSanitizer';
+import { sanitizeSessionForSync, loadRecentSessionDetails } from './syncSanitizer';
 import { computeSessionsFingerprint } from './syncFingerprint';
 import { CLIENT_VERSION } from '../ui/version';
 
@@ -16,7 +16,6 @@ export class LocalSyncWorker {
   private lastSessionsFingerprint = '';
   private lastOutboxSyncTime = 0;
   private pendingActiveSessionId?: string;
-  private cachedAppVersion?: string;
 
   constructor(
     private readonly workspaceRoot: string,
@@ -27,21 +26,8 @@ export class LocalSyncWorker {
     return computeSessionsFingerprint(this.workspaceRoot, sessions);
   }
 
-  private async loadRecentDetails(sessions: Array<{ id: string }>, extraId?: string, limit = 3): Promise<Record<string, any>> {
-    const details: Record<string, any> = {};
-    const targetIds = new Set(sessions.slice(0, limit).map((s) => s.id));
-    if (extraId) targetIds.add(extraId);
-    for (const sid of targetIds) {
-      try {
-        const d = await getSessionDetail(this.workspaceRoot, sid);
-        if (d) details[sid] = sanitizeSessionForSync(d);
-      } catch {}
-    }
-    return details;
-  }
-
   async pollInboxOnce(): Promise<void> {
-    if (this.isProcessing) return;
+    if (this.isProcessing || this.gistClient.isBlockedByRateLimit?.()) return;
     this.isProcessing = true;
     try {
       const res = await this.gistClient.fetchSyncState(this.lastEtag);
@@ -67,7 +53,7 @@ export class LocalSyncWorker {
       }
       const activeId = res.data.inbox[0]?.sessionId || sessions[0]?.id;
       if (activeId) this.pendingActiveSessionId = activeId;
-      const recentDetails = await this.loadRecentDetails(sessions, activeId);
+      const recentDetails = await loadRecentSessionDetails(this.workspaceRoot, sessions, activeId);
       if (hasAbort) {
         for (const sid of Object.keys(recentDetails)) if (recentDetails[sid]) recentDetails[sid].isGenerating = false;
       } else if (activeId && !recentDetails[activeId] && res.data.inbox[0]) {
@@ -93,16 +79,26 @@ export class LocalSyncWorker {
     return CLIENT_VERSION;
   }
 
-  async syncOutboxOnce(activeSessionId?: string): Promise<void> {
-    if (this.isSyncingOutbox) return;
+  async syncOutboxOnce(activeSessionId?: string, force = false): Promise<void> {
+    if (this.isSyncingOutbox || this.gistClient.isBlockedByRateLimit?.()) return;
+    const now = Date.now();
+    if (!force && now - this.lastOutboxSyncTime < 2500) {
+      if (!this.syncThrottleTimer) {
+        this.syncThrottleTimer = setTimeout(() => {
+          this.syncThrottleTimer = undefined;
+          void this.syncOutboxOnce(this.pendingActiveSessionId);
+        }, 2500 - (now - this.lastOutboxSyncTime));
+      }
+      return;
+    }
     this.isSyncingOutbox = true;
-    this.lastOutboxSyncTime = Date.now();
+    this.lastOutboxSyncTime = now;
     try {
       const allSessions = await listSessions(this.workspaceRoot);
       const sessions = allSessions.slice(0, 40);
       const targetId = activeSessionId || this.pendingActiveSessionId || sessions[0]?.id;
       this.lastSessionsFingerprint = await this.computeFingerprint(sessions);
-      const recentDetails = await this.loadRecentDetails(sessions, targetId);
+      const recentDetails = await loadRecentSessionDetails(this.workspaceRoot, sessions, targetId);
       const detail = targetId ? (recentDetails[targetId] || await getSessionDetail(this.workspaceRoot, targetId)) : undefined;
       const sanitizedDetail = detail ? sanitizeSessionForSync(detail) : undefined;
       const outbox: SyncOutboxState = { sessionId: targetId || '', updatedAt: Date.now(), session: sanitizedDetail, plans: detail?.plans || [] };
@@ -126,18 +122,24 @@ export class LocalSyncWorker {
 
   async scheduleOutboxSync(activeSessionId?: string, debounceMs = 1200): Promise<void> {
     if (activeSessionId) this.pendingActiveSessionId = activeSessionId;
+    if (this.gistClient.isBlockedByRateLimit?.()) return;
     const targetId = this.pendingActiveSessionId;
     if (!(await this.isGenerating(targetId))) {
       if (this.syncThrottleTimer) { clearTimeout(this.syncThrottleTimer); this.syncThrottleTimer = undefined; }
-      await this.syncOutboxOnce(targetId);
+      await this.syncOutboxOnce(targetId, true);
       return;
     }
     if (this.syncThrottleTimer) clearTimeout(this.syncThrottleTimer);
-    this.syncThrottleTimer = setTimeout(() => { this.syncThrottleTimer = undefined; void this.syncOutboxOnce(this.pendingActiveSessionId); }, debounceMs);
+    this.syncThrottleTimer = setTimeout(() => {
+      this.syncThrottleTimer = undefined;
+      void this.syncOutboxOnce(this.pendingActiveSessionId);
+    }, debounceMs);
   }
 
-  start(intervalMs = 4000): void {
-    this.stop(); void this.pollInboxOnce(); void this.scheduleOutboxSync();
+  start(intervalMs = 6000): void {
+    this.stop();
+    void this.pollInboxOnce();
+    void this.scheduleOutboxSync(undefined, 400);
     this.pollTimer = setInterval(() => { void this.pollInboxOnce(); }, intervalMs);
   }
   stop(): void {

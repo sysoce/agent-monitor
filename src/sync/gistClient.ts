@@ -129,10 +129,7 @@ export class GistClient {
   }
 
   private async saveSyncPayload(payload: SyncGistPayload): Promise<void> {
-    if (this.isBlockedByRateLimit()) {
-      const waitMin = Math.max(1, Math.ceil((this.rateLimitReset - Date.now()) / 60000));
-      throw new Error(`GitHub API rate limit exceeded. Reset in ${waitMin}m. Please use local LAN / Live connection.`);
-    }
+    if (this.isBlockedByRateLimit()) return;
     const content = encryptSyncData(JSON.stringify(payload), this.config.password);
     const res = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
       method: 'PATCH',
@@ -141,6 +138,7 @@ export class GistClient {
     });
     this.updateRateLimit(res);
     if (!res.ok) {
+      if (res.status === 403 || res.status === 429) return;
       const err = await this.parseErrorMessage(res, 'Failed to update Gist');
       throw new Error(`Failed to update Gist: ${err}`);
     }
