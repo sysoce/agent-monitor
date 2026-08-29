@@ -3492,4 +3492,156 @@ input:checked + .slider:before {
   font-size: 12px;
 }
 
+/* ---------------- Queued Messages Card ---------------- */
+.queued-messages {
+  background: var(--bg-surface, #212121);
+  border: 1px solid var(--border-default, #333333);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.queued-messages.hidden {
+  display: none;
+}
+
+.queued-messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.queued-messages-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.queued-messages-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+
+.queued-messages-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary, #ffffff);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.queued-messages-subtitle {
+  font-size: 11.5px;
+  color: var(--text-muted, #888888);
+}
+
+.queued-messages-toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #888888);
+  cursor: pointer;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.queued-messages-toggle:hover {
+  color: var(--text-primary, #ffffff);
+}
+
+.queued-chevron {
+  transition: transform 0.15s ease;
+}
+
+.queued-messages-toggle.collapsed .queued-chevron {
+  transform: rotate(-90deg);
+}
+
+.queued-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.queued-messages-list.hidden {
+  display: none;
+}
+
+.queued-message-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 2px;
+  font-size: 12.5px;
+}
+
+.queued-message-text {
+  flex: 1 1 auto;
+  color: var(--text-primary, #e6edf3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.queued-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.queued-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #888888);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.queued-action-btn:hover {
+  color: var(--text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.queued-action-btn.queued-action-send:hover {
+  color: #388bfd;
+}
+
+.queued-action-btn.queued-action-edit:hover {
+  color: #e6edf3;
+}
+
+.queued-action-btn.queued-action-delete:hover {
+  color: #f85149;
+}
+
+
 

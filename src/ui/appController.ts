@@ -12,6 +12,10 @@ import { saveActiveTab, saveActiveSessionId } from './tabStore';
 import { checkAndApplyUrlConfig } from './urlConfigLoader';
 import { reloadSessionData } from './sessionDataLoader';
 import { checkForUpdates } from './updateManager';
+import {
+  handleQueueOrSendMessage, handleSendNowQueuedMessage, handleEditQueuedMessage,
+  handleDeleteQueuedMessage, handleToggleQueuedCollapseAction, processNextQueuedMessageIfReady,
+} from './queuedMessagesOps';
 
 export class AppController {
   private sseCleanup: (() => void) | null = null;
@@ -85,10 +89,17 @@ export class AppController {
   }
 
   async handleSendMessage(): Promise<void> {
-    const input = document.getElementById('composer-input') as HTMLTextAreaElement | null, text = (input?.value || this.state.composerDraft || '').trim();
-    if (!text && (!this.state.attachments || this.state.attachments.length === 0)) return;
-    await submitMessageFlow(this.state, this.syncMachine, text, () => this.reloadData(false), this.render);
+    await handleQueueOrSendMessage(this.state, this.syncMachine, (init) => this.reloadData(init), this.render);
   }
+
+  async handleSendNowQueued(id: string): Promise<void> {
+    await handleSendNowQueuedMessage(this.state, this.syncMachine, id, () => this.handleStopSession(), (init) => this.reloadData(init), this.render);
+  }
+
+  handleEditQueued(id: string): void { handleEditQueuedMessage(this.state, id, this.render); }
+  handleDeleteQueued(id: string): void { handleDeleteQueuedMessage(this.state, id, this.render); }
+  handleToggleQueuedCollapse(): void { handleToggleQueuedCollapseAction(this.state, this.render); }
+
   async handleBuildPlan(planPath: string, planTitle?: string): Promise<void> {
     this.state.composerMode = 'agent';
     await submitMessageFlow(this.state, this.syncMachine, buildPlanHandoffPrompt(planPath, planTitle), () => this.reloadData(false), this.render);
@@ -98,6 +109,7 @@ export class AppController {
     await reloadSessionData(this.state, isInitial, () => {
       if (this.state.isAwaitingResponse === false) this.syncMachine.setAwaitingResponse(false);
       this.render();
+      void processNextQueuedMessageIfReady(this.state, this.syncMachine, (init) => this.reloadData(init), this.render);
     });
   }
 

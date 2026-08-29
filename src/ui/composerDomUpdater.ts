@@ -4,8 +4,23 @@ import { renderMentionDropdown } from './components/mentionDropdown';
 import { renderModelPickerDropdown } from './components/modelPickerDropdown';
 import { formatModelLabel } from '../utils/modelCatalogPresets';
 import { updateComposerButton } from './composerButton';
+import { renderQueuedMessagesCard } from './components/queuedMessagesCard';
 
 export function updateComposerDOM(state: AppState, composerEl: HTMLElement): void {
+  const queuedContainer = composerEl.querySelector('#queued-messages-container');
+  const nextQueuedHtml = renderQueuedMessagesCard(state);
+  if (nextQueuedHtml) {
+    if (!queuedContainer) {
+      if (typeof composerEl.insertAdjacentHTML === 'function') {
+        composerEl.insertAdjacentHTML('afterbegin', nextQueuedHtml);
+      }
+    } else if (queuedContainer.outerHTML !== nextQueuedHtml) {
+      queuedContainer.outerHTML = nextQueuedHtml;
+    }
+  } else if (queuedContainer && typeof queuedContainer.remove === 'function') {
+    queuedContainer.remove();
+  }
+
   const modeLabel = state.composerMode === 'agent' ? 'Agent' : state.composerMode === 'plan' ? 'Plan' : 'Ask';
   const modelLabel = formatModelLabel(state.selectedModel, state.availableModels);
 

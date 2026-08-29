@@ -6656,6 +6656,135 @@ input:checked + .slider:before {
   padding: 7px;
   font-size: 12px;
 }
+.queued-messages {
+  background: var(--bg-surface, #212121);
+  border: 1px solid var(--border-default, #333333);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.queued-messages.hidden {
+  display: none;
+}
+.queued-messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+.queued-messages-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.queued-messages-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+.queued-messages-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary, #ffffff);
+  font-size: 11px;
+  font-weight: 600;
+}
+.queued-messages-subtitle {
+  font-size: 11.5px;
+  color: var(--text-muted, #888888);
+}
+.queued-messages-toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #888888);
+  cursor: pointer;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+.queued-messages-toggle:hover {
+  color: var(--text-primary, #ffffff);
+}
+.queued-chevron {
+  transition: transform 0.15s ease;
+}
+.queued-messages-toggle.collapsed .queued-chevron {
+  transform: rotate(-90deg);
+}
+.queued-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.queued-messages-list.hidden {
+  display: none;
+}
+.queued-message-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 2px;
+  font-size: 12.5px;
+}
+.queued-message-text {
+  flex: 1 1 auto;
+  color: var(--text-primary, #e6edf3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.queued-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.queued-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #888888);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.queued-action-btn:hover {
+  color: var(--text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.08);
+}
+.queued-action-btn.queued-action-send:hover {
+  color: #388bfd;
+}
+.queued-action-btn.queued-action-edit:hover {
+  color: #e6edf3;
+}
+.queued-action-btn.queued-action-delete:hover {
+  color: #f85149;
+}
 
   </style>
   <script id="agent-monitor-bundle-fallback" type="text/plain">
@@ -7095,7 +7224,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.17" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.18" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8317,6 +8446,124 @@ input:checked + .slider:before {
     onDone();
   }
 
+  // src/ui/queuedMessagesStore.ts
+  function enqueueQueuedMessage(state2, text, attachments, mode, sessionId) {
+    const msg = {
+      id: `queued-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      sessionId: sessionId || state2.activeSessionId,
+      text,
+      attachments: attachments && attachments.length > 0 ? [...attachments] : void 0,
+      mode: mode || state2.composerMode || "agent",
+      createdAt: Date.now()
+    };
+    state2.queuedMessages = state2.queuedMessages || [];
+    state2.queuedMessages.push(msg);
+    return msg;
+  }
+  function dequeueNextQueuedMessage(state2, sessionId) {
+    if (!state2.queuedMessages || state2.queuedMessages.length === 0) return void 0;
+    const targetSession = sessionId || state2.activeSessionId;
+    if (!targetSession) {
+      return state2.queuedMessages.shift();
+    }
+    const idx = state2.queuedMessages.findIndex(
+      (m) => !m.sessionId || m.sessionId === targetSession
+    );
+    if (idx !== -1) {
+      return state2.queuedMessages.splice(idx, 1)[0];
+    }
+    return void 0;
+  }
+  function removeQueuedMessageById(state2, id) {
+    if (!state2.queuedMessages || state2.queuedMessages.length === 0) return void 0;
+    const idx = state2.queuedMessages.findIndex((m) => m.id === id);
+    if (idx !== -1) {
+      return state2.queuedMessages.splice(idx, 1)[0];
+    }
+    return void 0;
+  }
+  function getQueuedMessagesForSession(state2, sessionId) {
+    if (!state2.queuedMessages || state2.queuedMessages.length === 0) return [];
+    const targetSession = sessionId || state2.activeSessionId;
+    if (!targetSession) return [...state2.queuedMessages];
+    return state2.queuedMessages.filter(
+      (m) => !m.sessionId || m.sessionId === targetSession
+    );
+  }
+  function toggleQueuedCollapse(state2) {
+    state2.isQueuedMessagesCollapsed = !state2.isQueuedMessagesCollapsed;
+    return Boolean(state2.isQueuedMessagesCollapsed);
+  }
+
+  // src/ui/queuedMessagesOps.ts
+  function isAgentBusy(state2) {
+    return Boolean(
+      state2.activeSession?.isGenerating || state2.isSending || state2.isAwaitingResponse || state2.sessions.some((s) => s.id === state2.activeSessionId && s.isGenerating)
+    );
+  }
+  async function handleQueueOrSendMessage(state2, syncMachine, reloadData, render2) {
+    const input = typeof document !== "undefined" ? document.getElementById("composer-input") : null;
+    const text = (input?.value || state2.composerDraft || "").trim();
+    const hasContent = Boolean(text || state2.attachments && state2.attachments.length > 0);
+    if (!hasContent) return;
+    if (isAgentBusy(state2)) {
+      enqueueQueuedMessage(
+        state2,
+        text,
+        state2.attachments,
+        state2.composerMode,
+        state2.activeSessionId
+      );
+      state2.composerDraft = "";
+      state2.attachments = [];
+      if (input) {
+        input.value = "";
+        input.style.height = "auto";
+      }
+      render2();
+      return;
+    }
+    await submitMessageFlow(state2, syncMachine, text, () => reloadData(false), render2);
+  }
+  async function handleSendNowQueuedMessage(state2, syncMachine, id, stopSession2, reloadData, render2) {
+    const msg = removeQueuedMessageById(state2, id);
+    if (!msg) return;
+    if (isAgentBusy(state2)) {
+      stopSession2();
+    }
+    render2();
+    await submitMessageFlow(state2, syncMachine, msg.text, () => reloadData(false), render2);
+  }
+  function handleEditQueuedMessage(state2, id, render2) {
+    const msg = removeQueuedMessageById(state2, id);
+    if (!msg) return;
+    state2.composerDraft = msg.text;
+    state2.attachments = msg.attachments ? [...msg.attachments] : [];
+    if (typeof document !== "undefined") {
+      const input = document.getElementById("composer-input");
+      if (input) {
+        input.value = msg.text;
+        input.focus();
+      }
+    }
+    render2();
+  }
+  function handleDeleteQueuedMessage(state2, id, render2) {
+    removeQueuedMessageById(state2, id);
+    render2();
+  }
+  function handleToggleQueuedCollapseAction(state2, render2) {
+    toggleQueuedCollapse(state2);
+    render2();
+  }
+  async function processNextQueuedMessageIfReady(state2, syncMachine, reloadData, render2) {
+    if (isAgentBusy(state2)) return;
+    const next = dequeueNextQueuedMessage(state2, state2.activeSessionId);
+    if (!next) return;
+    render2();
+    await submitMessageFlow(state2, syncMachine, next.text, () => reloadData(false), render2);
+  }
+
   // src/ui/appController.ts
   var AppController = class {
     constructor(state2, render2) {
@@ -8423,9 +8670,19 @@ input:checked + .slider:before {
       this.render();
     }
     async handleSendMessage() {
-      const input = document.getElementById("composer-input"), text = (input?.value || this.state.composerDraft || "").trim();
-      if (!text && (!this.state.attachments || this.state.attachments.length === 0)) return;
-      await submitMessageFlow(this.state, this.syncMachine, text, () => this.reloadData(false), this.render);
+      await handleQueueOrSendMessage(this.state, this.syncMachine, (init) => this.reloadData(init), this.render);
+    }
+    async handleSendNowQueued(id) {
+      await handleSendNowQueuedMessage(this.state, this.syncMachine, id, () => this.handleStopSession(), (init) => this.reloadData(init), this.render);
+    }
+    handleEditQueued(id) {
+      handleEditQueuedMessage(this.state, id, this.render);
+    }
+    handleDeleteQueued(id) {
+      handleDeleteQueuedMessage(this.state, id, this.render);
+    }
+    handleToggleQueuedCollapse() {
+      handleToggleQueuedCollapseAction(this.state, this.render);
     }
     async handleBuildPlan(planPath, planTitle) {
       this.state.composerMode = "agent";
@@ -8435,6 +8692,7 @@ input:checked + .slider:before {
       await reloadSessionData(this.state, isInitial, () => {
         if (this.state.isAwaitingResponse === false) this.syncMachine.setAwaitingResponse(false);
         this.render();
+        void processNextQueuedMessageIfReady(this.state, this.syncMachine, (init) => this.reloadData(init), this.render);
       });
     }
     startSse() {
@@ -11953,6 +12211,53 @@ ${thought.trim()}` : thought.trim();
     if (stopIcon?.classList?.toggle) stopIcon.classList.toggle("hidden", !stopMode);
   }
 
+  // src/ui/components/queuedMessagesCard.ts
+  var SEND_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+  var EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>';
+  var DELETE_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M5 4V2h6v2M6 7v5M10 7v5M4 4l1 10h6l1-10"/></svg>';
+  function renderQueuedItem(msg) {
+    return `
+    <div class="queued-message-item" data-id="${escapeHtml2(msg.id)}">
+      <span class="queued-message-text" title="${escapeHtml2(msg.text)}">${escapeHtml2(msg.text)}</span>
+      <div class="queued-message-actions">
+        <button type="button" class="queued-action-btn queued-action-send" data-action="queued-send-now" data-id="${escapeHtml2(msg.id)}" title="Send Now" aria-label="Send now">
+          ${SEND_ICON}
+        </button>
+        <button type="button" class="queued-action-btn queued-action-edit" data-action="queued-edit" data-id="${escapeHtml2(msg.id)}" title="Edit" aria-label="Edit queued message">
+          ${EDIT_ICON}
+        </button>
+        <button type="button" class="queued-action-btn queued-action-delete" data-action="queued-delete" data-id="${escapeHtml2(msg.id)}" title="Delete" aria-label="Delete queued message">
+          ${DELETE_ICON}
+        </button>
+      </div>
+    </div>
+  `.trim();
+  }
+  function renderQueuedMessagesCard(state2) {
+    const queued = getQueuedMessagesForSession(state2, state2.activeSessionId);
+    if (queued.length === 0) return "";
+    const isCollapsed = Boolean(state2.isQueuedMessagesCollapsed);
+    return `
+    <div class="queued-messages" id="queued-messages-container">
+      <div class="queued-messages-header" id="queued-messages-header">
+        <div class="queued-messages-header-left">
+          <span class="queued-messages-title">Queued Messages</span>
+          <span class="queued-messages-badge" id="queued-messages-badge">${queued.length}</span>
+          <span class="queued-messages-subtitle">Sends after agent finishes working</span>
+        </div>
+        <button type="button" class="queued-messages-toggle ${isCollapsed ? "collapsed" : ""}" id="btn-queued-toggle" title="Toggle queued messages" aria-label="Toggle queued messages" aria-expanded="${isCollapsed ? "false" : "true"}">
+          <svg class="queued-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 6l4 4 4-4"/>
+          </svg>
+        </button>
+      </div>
+      <div class="queued-messages-list ${isCollapsed ? "hidden" : ""}" id="queued-messages-list">
+        ${queued.map((m) => renderQueuedItem(m)).join("")}
+      </div>
+    </div>
+  `.trim();
+  }
+
   // src/ui/components/composerView.ts
   function renderComposerView(state2) {
     if (state2.activeTab === "plans") return "";
@@ -11961,6 +12266,7 @@ ${thought.trim()}` : thought.trim();
     const attachments = state2.attachments || [];
     return `
     <footer class="app-composer composer">
+      ${renderQueuedMessagesCard(state2)}
       <input type="file" id="attach-file-input" style="display:none" multiple>
       <div class="composer-card composer-inner">
         <div id="mention-dropdown-container">
@@ -12304,6 +12610,19 @@ ${thought.trim()}` : thought.trim();
 
   // src/ui/composerDomUpdater.ts
   function updateComposerDOM(state2, composerEl) {
+    const queuedContainer = composerEl.querySelector("#queued-messages-container");
+    const nextQueuedHtml = renderQueuedMessagesCard(state2);
+    if (nextQueuedHtml) {
+      if (!queuedContainer) {
+        if (typeof composerEl.insertAdjacentHTML === "function") {
+          composerEl.insertAdjacentHTML("afterbegin", nextQueuedHtml);
+        }
+      } else if (queuedContainer.outerHTML !== nextQueuedHtml) {
+        queuedContainer.outerHTML = nextQueuedHtml;
+      }
+    } else if (queuedContainer && typeof queuedContainer.remove === "function") {
+      queuedContainer.remove();
+    }
     const modeLabel = state2.composerMode === "agent" ? "Agent" : state2.composerMode === "plan" ? "Plan" : "Ask";
     const modelLabel = formatModelLabel(state2.selectedModel, state2.availableModels);
     const mentionContainer = composerEl.querySelector("#mention-dropdown-container");
@@ -12966,6 +13285,30 @@ ${thought.trim()}` : thought.trim();
       }
       return true;
     }
+    const queuedAction = target.closest('[data-action^="queued-"]');
+    if (queuedAction) {
+      const action = queuedAction.getAttribute("data-action");
+      const id = queuedAction.getAttribute("data-id") || queuedAction.closest(".queued-message-item")?.getAttribute("data-id") || "";
+      if (id) {
+        if (action === "queued-send-now") {
+          void callbacks.onSendNowQueued?.(id);
+          return true;
+        }
+        if (action === "queued-edit") {
+          callbacks.onEditQueued?.(id);
+          return true;
+        }
+        if (action === "queued-delete") {
+          callbacks.onDeleteQueued?.(id);
+          return true;
+        }
+      }
+    }
+    const queuedToggle = target.closest("#btn-queued-toggle, #queued-messages-header");
+    if (queuedToggle) {
+      callbacks.onToggleQueuedCollapse?.();
+      return true;
+    }
     if (handleSettingsModalClick(state2, target, callbacks)) return true;
     if (handleModelPickerClick(target, state2, callbacks)) return true;
     if (handlePlanClick(target, state2, callbacks)) return true;
@@ -13460,6 +13803,10 @@ ${thought.trim()}` : thought.trim();
       onSelectSession: (id) => controller.selectSession(id),
       onNewSession: () => controller.handleNewSession(),
       onSendMessage: () => controller.handleSendMessage(),
+      onSendNowQueued: (id) => controller.handleSendNowQueued(id),
+      onEditQueued: (id) => controller.handleEditQueued(id),
+      onDeleteQueued: (id) => controller.handleDeleteQueued(id),
+      onToggleQueuedCollapse: () => controller.handleToggleQueuedCollapse(),
       onBuildPlan: (path, title) => controller.handleBuildPlan(path, title),
       onStopSession: () => controller.handleStopSession(),
       onResolveApproval: (cmdId, allowed) => controller.handleResolveApproval(cmdId, allowed),

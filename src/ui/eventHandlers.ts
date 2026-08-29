@@ -12,6 +12,10 @@ export interface EventHandlerCallbacks {
   onSelectSession: (id: string) => void | Promise<void>;
   onNewSession: () => void | Promise<void>;
   onSendMessage: () => Promise<void> | void;
+  onSendNowQueued?: (id: string) => Promise<void> | void;
+  onEditQueued?: (id: string) => void;
+  onDeleteQueued?: (id: string) => void;
+  onToggleQueuedCollapse?: () => void;
   onBuildPlan?: (planPath: string, planTitle?: string) => Promise<void> | void;
   onStopSession?: () => Promise<void> | void;
   onResolveApproval?: (commandId: string, allowed: boolean) => Promise<void> | void;

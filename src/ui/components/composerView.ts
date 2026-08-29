@@ -5,6 +5,7 @@ import { renderMentionDropdown } from './mentionDropdown';
 import { renderModelPickerDropdown } from './modelPickerDropdown';
 import { formatModelLabel } from '../../utils/modelCatalogPresets';
 import { renderComposerActionsHtml } from '../composerButton';
+import { renderQueuedMessagesCard } from './queuedMessagesCard';
 
 export function renderComposerView(state: AppState): string {
   if (state.activeTab === 'plans') return '';
@@ -15,6 +16,7 @@ export function renderComposerView(state: AppState): string {
 
   return `
     <footer class="app-composer composer">
+      ${renderQueuedMessagesCard(state)}
       <input type="file" id="attach-file-input" style="display:none" multiple>
       <div class="composer-card composer-inner">
         <div id="mention-dropdown-container">

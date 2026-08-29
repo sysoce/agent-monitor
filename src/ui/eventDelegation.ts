@@ -89,6 +89,32 @@ export function handleDelegatedClick(target: HTMLElement | null, state: AppState
     }
     return true;
   }
+  const queuedAction = target.closest<HTMLElement>('[data-action^="queued-"]');
+  if (queuedAction) {
+    const action = queuedAction.getAttribute('data-action');
+    const id = queuedAction.getAttribute('data-id') || queuedAction.closest('.queued-message-item')?.getAttribute('data-id') || '';
+    if (id) {
+      if (action === 'queued-send-now') {
+        void callbacks.onSendNowQueued?.(id);
+        return true;
+      }
+      if (action === 'queued-edit') {
+        callbacks.onEditQueued?.(id);
+        return true;
+      }
+      if (action === 'queued-delete') {
+        callbacks.onDeleteQueued?.(id);
+        return true;
+      }
+    }
+  }
+
+  const queuedToggle = target.closest<HTMLElement>('#btn-queued-toggle, #queued-messages-header');
+  if (queuedToggle) {
+    callbacks.onToggleQueuedCollapse?.();
+    return true;
+  }
+
   if (handleSettingsModalClick(state, target, callbacks)) return true;
   if (handleModelPickerClick(target, state, callbacks)) return true;
   if (handlePlanClick(target, state, callbacks)) return true;
