@@ -7095,7 +7095,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.16" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.17" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8281,11 +8281,11 @@ input:checked + .slider:before {
         if (!getSavedTab()) Object.assign(state2, { activeTab: "chat", activePlan: void 0, activePlanName: void 0 });
       }
       if (state2.activeSessionId) {
-        if (!state2.activeSession || state2.activeSession.messages.length === 0) state2.isLoadingSession = true;
+        if (!state2.activeSession || state2.activeSession.messages && state2.activeSession.messages.length === 0) state2.isLoadingSession = true;
         const d = await fetchSessionDetail(state2.activeSessionId).catch(() => void 0);
         state2.isLoadingSession = false;
         if (d) state2.activeSession = mergeSessionDetail(state2.activeSession, d, void 0, state2.lastAbortedAt);
-        if (state2.lastAbortedAt && state2.activeSession) {
+        if (state2.lastAbortedAt && state2.activeSession?.messages) {
           const hasNewTurn = state2.activeSession.messages.some((m) => m.role === "user" && Number(m.timestamp || 0) > (state2.lastAbortedAt || 0));
           if (!hasNewTurn) {
             state2.activeSession.isGenerating = false;
@@ -8993,6 +8993,14 @@ ${line.trim()}`;
     return false;
   }
 
+  // src/ui/markdown/planPathDetector.ts
+  function isPlanFilePath2(filePath) {
+    const norm = filePath.toLowerCase().replace(/\\/g, "/");
+    const isMd = norm.endsWith(".md") || norm.endsWith(".markdown");
+    if (!isMd) return false;
+    return norm.endsWith(".plan.md") || norm.includes(".agent/plans/") || norm.includes("/plans/") || norm.startsWith("plans/") || norm.endsWith("plan.md");
+  }
+
   // src/ui/markdown/languageSpecs.ts
   var JS_KEYWORDS = "const let var function return if else for while do break continue class extends new delete typeof instanceof in of this super import export from default async await yield try catch finally throw switch case void null undefined true false static get set";
   var TS_TYPES = "string number boolean any unknown never void object symbol bigint interface type enum namespace declare readonly keyof infer implements public private protected abstract";
@@ -9519,7 +9527,7 @@ ${line.trim()}`;
           return escapeHtml2(node.value).replace(
             /(^|[\s(>])([a-zA-Z0-9_\-./]*plan[a-zA-Z0-9_\-./]*\.md|[a-zA-Z0-9_\-./]+\.plan\.md)(?=[)\s.,;:<]|$)/gi,
             (_m, prefix, file) => {
-              if (isPlanFilePath(file)) {
+              if (isPlanFilePath2(file)) {
                 return `${prefix}<button type="button" class="plan-view-btn md-plan-link" data-plan-path="${file}">\u{1F4CB} ${file}</button>`;
               }
               return `${prefix}${file}`;
@@ -9542,7 +9550,7 @@ ${line.trim()}`;
           return `<img class="md-image" src="${escapeHtml2(node.src)}" alt="${escapeHtml2(node.alt)}" />`;
         case "link": {
           const cleanUrl = node.href.replace(/^file:\/\//, "");
-          if (isPlanFilePath(cleanUrl)) {
+          if (isPlanFilePath2(cleanUrl)) {
             return `<button type="button" class="plan-view-btn md-plan-link" data-plan-path="${escapeHtml2(cleanUrl)}">\u{1F4CB} ${renderInlineHtml(node.children)}</button>`;
           }
           const titleAttr = node.title ? ` title="${escapeHtml2(node.title)}"` : "";

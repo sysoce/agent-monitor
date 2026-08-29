@@ -10,6 +10,15 @@ export type ActiveTab = 'sidebar' | 'chat' | 'plans';
 
 export type SyncStatus = 'connected' | 'syncing' | 'disconnected' | 'connecting';
 
+export interface QueuedMessage {
+  id: string;
+  sessionId?: string;
+  text: string;
+  attachments?: AttachmentItem[];
+  mode?: 'agent' | 'plan' | 'ask';
+  createdAt: number;
+}
+
 export interface AppState {
   activeTab: ActiveTab;
   sessions: SessionSummary[];
@@ -52,6 +61,8 @@ export interface AppState {
   hostPresence?: ClientPresence;
   lastSyncedAt?: number;
   rateLimitRemaining?: number;
+  queuedMessages?: QueuedMessage[];
+  isQueuedMessagesCollapsed?: boolean;
   isSettingsModalOpen?: boolean;
   isQrModalOpen?: boolean;
   qrModalTarget?: 'gh_pages' | 'lan' | 'download';

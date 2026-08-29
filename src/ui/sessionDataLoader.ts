@@ -77,11 +77,11 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       if (!getSavedTab()) Object.assign(state, { activeTab: 'chat', activePlan: undefined, activePlanName: undefined });
     }
     if (state.activeSessionId) {
-      if (!state.activeSession || state.activeSession.messages.length === 0) state.isLoadingSession = true;
+      if (!state.activeSession || (state.activeSession.messages && state.activeSession.messages.length === 0)) state.isLoadingSession = true;
       const d = await fetchSessionDetail(state.activeSessionId).catch(() => undefined);
       state.isLoadingSession = false;
       if (d) state.activeSession = mergeSessionDetail(state.activeSession, d, undefined, state.lastAbortedAt);
-      if (state.lastAbortedAt && state.activeSession) {
+      if (state.lastAbortedAt && state.activeSession?.messages) {
         const hasNewTurn = state.activeSession.messages.some((m) => m.role === 'user' && Number((m as { timestamp?: number }).timestamp || 0) > (state.lastAbortedAt || 0));
         if (!hasNewTurn) {
           state.activeSession.isGenerating = false;
