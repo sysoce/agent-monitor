@@ -2405,11 +2405,20 @@ body {
   .app-header {
     padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 0 12px;
   }
-  .btn-qr-text {
+  .btn-qr-text,
+  .btn-settings-text {
     display: none;
   }
-  .btn-qr-pill {
+  .btn-qr-pill,
+  .btn-settings-pill {
     padding: 3px 6px;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+  .connection-indicator-pill {
+    padding: 3px 6px;
+    font-size: 10.5px;
   }
   .app-composer {
     padding: 8px 10px max(8px, env(safe-area-inset-bottom, 8px)) 10px;

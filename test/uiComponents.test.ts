@@ -51,7 +51,7 @@ const mockState: AppState = {
 
 test('renderNavHeader renders brand, live status pill and active tabs across 3 modes', () => {
   const html = renderNavHeader(mockState);
-  assert.match(html, /Agent Monitor/);
+  assert.match(html, /brand-version/);
   assert.match(html, /btn-toggle-sync/);
   assert.match(html, /Live/);
   assert.match(html, /data-tab="chat"[^>]*class="[^"]*active/);

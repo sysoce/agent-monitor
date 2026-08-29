@@ -5696,11 +5696,20 @@ body {
   .app-header {
     padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 0 12px;
   }
-  .btn-qr-text {
+  .btn-qr-text,
+  .btn-settings-text {
     display: none;
   }
-  .btn-qr-pill {
+  .btn-qr-pill,
+  .btn-settings-pill {
     padding: 3px 6px;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+  .connection-indicator-pill {
+    padding: 3px 6px;
+    font-size: 10.5px;
   }
   .app-composer {
     padding: 8px 10px max(8px, env(safe-area-inset-bottom, 8px)) 10px;
@@ -7317,7 +7326,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.25" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.26" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -12692,7 +12701,6 @@ ${thought.trim()}` : thought.trim();
       <div class="header-top">
         <div class="brand">
           <span class="brand-icon">\u26A1</span>
-          <span class="brand-name">Agent Monitor</span>
           <span class="brand-version">v${escapeHtml2(CLIENT_VERSION)}</span>
         </div>
         <div class="header-actions">
