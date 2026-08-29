@@ -75,7 +75,11 @@ export async function handleRequest(
   }
 
   const stopMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/stop$/);
-  if (stopMatch && req.method === 'POST') return sendJson(res, 200, { ok: await stopSession(workspaceRoot, stopMatch[1]!) }, req);
+  if (stopMatch && req.method === 'POST') {
+    const ok = await stopSession(workspaceRoot, stopMatch[1]!);
+    sse.broadcast('change', { timestamp: Date.now() });
+    return sendJson(res, 200, { ok }, req);
+  }
 
   const approvalMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/approvals$/);
   if (approvalMatch && req.method === 'POST') {

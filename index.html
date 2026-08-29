@@ -7229,7 +7229,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.20" : "1.0.14";
+  var CLIENT_VERSION = true ? "1.0.21" : "1.0.14";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8446,7 +8446,9 @@ input:checked + .slider:before {
         if (state2.activeSessionId && state2.activeSession) {
           const matching = sessions.find((s) => s.id === state2.activeSessionId);
           if (matching) {
-            if (state2.activeSession.isGenerating !== void 0) matching.isGenerating = state2.activeSession.isGenerating;
+            if (!state2.isSending) {
+              state2.activeSession.isGenerating = matching.isGenerating;
+            }
             matching.messageCount = Math.max(matching.messageCount || 0, state2.activeSession.messages?.length || 0);
             matching.updatedAt = Math.max(matching.updatedAt || 0, state2.activeSession.updatedAt || 0);
           }
@@ -8470,6 +8472,9 @@ input:checked + .slider:before {
         const d = await fetchSessionDetail(state2.activeSessionId).catch(() => void 0);
         state2.isLoadingSession = false;
         if (d) state2.activeSession = mergeSessionDetail(state2.activeSession, d, void 0, state2.lastAbortedAt);
+        if (state2.activeSession && !state2.activeSession.isGenerating && !state2.isSending) {
+          Object.assign(state2, { isAwaitingResponse: false, awaitingSessionId: void 0 });
+        }
         if (state2.lastAbortedAt && state2.activeSession?.messages) {
           const hasNewTurn = state2.activeSession.messages.some((m) => m.role === "user" && Number(m.timestamp || 0) > (state2.lastAbortedAt || 0));
           if (!hasNewTurn) {

@@ -57,7 +57,9 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       if (state.activeSessionId && state.activeSession) {
         const matching = sessions.find((s) => s.id === state.activeSessionId);
         if (matching) {
-          if (state.activeSession.isGenerating !== undefined) matching.isGenerating = state.activeSession.isGenerating;
+          if (!state.isSending) {
+            state.activeSession.isGenerating = matching.isGenerating;
+          }
           matching.messageCount = Math.max(matching.messageCount || 0, state.activeSession.messages?.length || 0);
           matching.updatedAt = Math.max(matching.updatedAt || 0, state.activeSession.updatedAt || 0);
         }
@@ -81,6 +83,9 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       const d = await fetchSessionDetail(state.activeSessionId).catch(() => undefined);
       state.isLoadingSession = false;
       if (d) state.activeSession = mergeSessionDetail(state.activeSession, d, undefined, state.lastAbortedAt);
+      if (state.activeSession && !state.activeSession.isGenerating && !state.isSending) {
+        Object.assign(state, { isAwaitingResponse: false, awaitingSessionId: undefined });
+      }
       if (state.lastAbortedAt && state.activeSession?.messages) {
         const hasNewTurn = state.activeSession.messages.some((m) => m.role === 'user' && Number((m as { timestamp?: number }).timestamp || 0) > (state.lastAbortedAt || 0));
         if (!hasNewTurn) {
