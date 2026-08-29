@@ -1,13 +1,14 @@
 import type { AppState } from './types';
 import type { QrTarget } from './components/settingsModal/types';
 import type { EventHandlerCallbacks } from './eventHandlers';
-import { buildApiUrl, setServerBaseUrl, clearServerBaseUrl } from './authStore';
+import { buildApiUrl, setServerBaseUrl, clearServerBaseUrl, hasLiveServer } from './authStore';
 import { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
 
 export { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
 
 export async function fetchServerSetupInfo(state: AppState, onRender: () => void, force = false): Promise<void> {
   if (!force && state.serverSetupInfo?.networks && state.serverSetupInfo.networks.length > 0) return;
+  if (!hasLiveServer()) return;
   try {
     const res = await fetch(buildApiUrl('/api/setup-info'));
     if (res.ok) {

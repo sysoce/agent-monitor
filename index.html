@@ -7073,7 +7073,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.9" : "1.0.3";
+  var CLIENT_VERSION = true ? "1.0.10" : "1.0.3";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -11522,6 +11522,7 @@ ${thought.trim()}` : thought.trim();
   // src/ui/settingsModalEvents.ts
   async function fetchServerSetupInfo(state2, onRender, force = false) {
     if (!force && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
+    if (!hasLiveServer()) return;
     try {
       const res = await fetch(buildApiUrl("/api/setup-info"));
       if (res.ok) {
