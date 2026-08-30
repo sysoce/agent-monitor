@@ -80,9 +80,16 @@ export function renderSettingsNetworkSection(state: AppState): string {
     }
   }
 
-  const items = Array.from(itemsMap.values());
+  const availability = state.connectionAvailability;
+  const items = Array.from(itemsMap.values()).map((item) => {
+    if (availability && typeof availability[item.url] === 'boolean') {
+      return { ...item, isAvailable: availability[item.url] };
+    }
+    return item;
+  });
   const renderedList = items.length > 0
     ? items.map((item) => renderNetworkConnectionItem(item, currentBaseUrl, defaultLanUrl, payload, copyFeedback)).join('')
+
     : `
         <div class="network-ip-empty">
           <p>No active network connections configured or detected from server.</p>

@@ -1,10 +1,22 @@
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
-import { getServerBaseUrl, setServerBaseUrl, clearServerBaseUrl, getDefaultServerUrl } from '../src/ui/authStore';
+import {
+  getServerBaseUrl,
+  setServerBaseUrl,
+  clearServerBaseUrl,
+  getDefaultServerUrl,
+  getDefaultLanUrl,
+  getTailscaleUrl,
+} from '../src/ui/authStore';
 
 test('getDefaultServerUrl returns empty string when define is undefined', () => {
   const def = getDefaultServerUrl();
   assert.equal(def, '');
+});
+
+test('getDefaultLanUrl and getTailscaleUrl return host default values when storage is empty', () => {
+  assert.equal(getDefaultLanUrl(), 'http://192.168.1.111:4200');
+  assert.equal(getTailscaleUrl(), 'http://100.74.73.50:4200');
 });
 
 test('getServerBaseUrl returns default LAN IP when localStorage is empty', () => {
@@ -37,3 +49,4 @@ test('getServerBaseUrl returns default LAN IP when localStorage is empty', () =>
   (globalThis as any).window = originalWindow;
   (globalThis as any).localStorage = originalLocalStorage;
 });
+

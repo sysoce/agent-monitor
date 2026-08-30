@@ -49,7 +49,7 @@ function createMockState(overrides: Partial<AppState> = {}): AppState {
 }
 test('authStore helpers manage customServerIp and tailscaleUrl independently', () => {
   assert.equal(getCustomServerIp(), '');
-  assert.equal(getTailscaleUrl(), '');
+  assert.equal(getTailscaleUrl(), 'http://100.74.73.50:4200');
   setCustomServerIp('http://192.168.1.111:4200');
   setTailscaleUrl('http://100.74.73.50:4200');
   assert.equal(getCustomServerIp(), 'http://192.168.1.111:4200');
@@ -58,6 +58,7 @@ test('authStore helpers manage customServerIp and tailscaleUrl independently', (
   assert.equal(getCustomServerIp(), '');
   assert.equal(getTailscaleUrl(), 'http://100.74.73.50:4200');
 });
+
 test('saveCustomServerUrl saves custom IP into storage and state and sets server base URL', () => {
   const state = createMockState();
   let rendered = false;

@@ -73,6 +73,7 @@ export interface AppState {
   customServerIp?: string;
   tailscaleUrl?: string;
   customConnections?: Array<string | { url: string; name?: string; tag?: string }>;
+  connectionAvailability?: Record<string, boolean>;
   serverSetupInfo?: {
     githubPagesUrl?: string;
     lanUrl?: string;
@@ -83,4 +84,5 @@ export interface AppState {
     networks?: NetworkAddressInfo[];
   };
 }
+
 

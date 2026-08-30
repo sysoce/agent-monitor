@@ -43,10 +43,11 @@ function createMockState(overrides: Partial<AppState> = {}): AppState {
 }
 
 test('authStore manages defaultLanUrl, tailscaleUrl, and customConnections list independently', () => {
-  assert.equal(getDefaultLanUrl(), '');
-  assert.equal(getTailscaleUrl(), '');
+  assert.equal(getDefaultLanUrl(), 'http://192.168.1.111:4200');
+  assert.equal(getTailscaleUrl(), 'http://100.74.73.50:4200');
   assert.deepEqual(getCustomConnections(), []);
   setDefaultLanUrl('http://192.168.1.111:4200');
+
   setTailscaleUrl('http://100.74.73.50:4200');
   addCustomConnection('http://10.0.0.99:4200');
   addCustomConnection('http://custom-node.local:4200');
@@ -143,3 +144,21 @@ test('handleSettingsModalClick handles switching and deleting connections', () =
   assert.equal(handleSettingsModalClick(state, deleteTarget, { onRender: () => { rendered = true; } } as any), true);
   assert.deepEqual(state.customConnections, []);
 });
+
+test('addNewCustomConnection then deleteCustomConnection removes the connection completely from storage and state', () => {
+  const state = createMockState({
+    defaultLanUrl: 'http://192.168.1.111:4200',
+    tailscaleUrl: 'http://100.74.73.50:4200',
+  });
+  let rendered = false;
+  addNewCustomConnection(state, 'http://192.168.1.55:4200', 'Secondary PC', 'Secondary PC', () => { rendered = true; });
+  assert.equal(state.selectedLanIp, 'http://192.168.1.55:4200');
+  assert.equal(getCustomConnections().length, 1);
+  assert.equal(getCustomConnections()[0].url, 'http://192.168.1.55:4200');
+
+  deleteCustomConnection(state, 'http://192.168.1.55:4200', () => { rendered = true; });
+  assert.deepEqual(state.customConnections, []);
+  assert.deepEqual(getCustomConnections(), []);
+  assert.equal(state.selectedLanIp, 'http://192.168.1.111:4200');
+});
+

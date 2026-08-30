@@ -14,6 +14,7 @@ import {
 } from './settingsConnectionSwitcher';
 import { getCustomServerIp, getTailscaleUrl, getDefaultLanUrl, getCustomConnections } from './authStore';
 import { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
+import { probeAllConnections } from './connectionAvailabilityProbe';
 
 export {
   fetchServerSetupInfo,
@@ -38,7 +39,9 @@ export function openSettingsModal(state: AppState, onRender: () => void): void {
   if (!state.customConnections) state.customConnections = getCustomConnections();
   onRender();
   void fetchServerSetupInfo(state, onRender);
+  void probeAllConnections(state, onRender);
 }
+
 
 export function closeSettingsModal(state: AppState, onRender: () => void): void {
   state.isSettingsModalOpen = false;

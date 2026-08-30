@@ -7313,6 +7313,24 @@ input:checked + .slider:before {
   color: #9ca3af;
   border: 1px solid rgba(156, 163, 175, 0.2);
 }
+.network-status--unavailable {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.network-ip-item.connection-unavailable,
+.network-ip-item.is-unavailable {
+  opacity: 0.55;
+  filter: grayscale(0.7);
+  border-color: #2a2a30;
+  background: #18181b;
+}
+.network-ip-item.connection-unavailable:hover,
+.network-ip-item.is-unavailable:hover {
+  opacity: 0.8;
+  filter: grayscale(0.35);
+  border-color: #4b5563;
+}
 .network-ip-actions {
   display: flex;
   gap: 6px;
@@ -7679,6 +7697,8 @@ input:checked + .slider:before {
   var TAILSCALE_KEY = "agent_tailscale_url";
   var DEFAULT_LAN_KEY = "agent_default_lan_url";
   var CUSTOM_CONNECTIONS_KEY = "agent_custom_connections";
+  var DEFAULT_MACHINE_LAN_URL = "http://192.168.1.111:4200";
+  var DEFAULT_MACHINE_TAILSCALE_URL = "http://100.74.73.50:4200";
   function getCleanStorage(key) {
     try {
       const val = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
@@ -7698,8 +7718,8 @@ input:checked + .slider:before {
   }
   function getDefaultServerUrl() {
     try {
-      if ("") {
-        return "";
+      if ("http://192.168.1.111:4200") {
+        return "http://192.168.1.111:4200";
       }
     } catch {
     }
@@ -7724,14 +7744,30 @@ input:checked + .slider:before {
     }
   }
   function getTailscaleUrl() {
-    return getCleanStorage(TAILSCALE_KEY);
+    const stored = getCleanStorage(TAILSCALE_KEY);
+    if (stored) return stored;
+    try {
+      if ("http://100.74.73.50:4200") {
+        return "http://100.74.73.50:4200";
+      }
+    } catch {
+    }
+    return DEFAULT_MACHINE_TAILSCALE_URL;
   }
   function setTailscaleUrl(url) {
     setCleanStorage(TAILSCALE_KEY, url);
   }
   function getDefaultLanUrl() {
     const stored = getCleanStorage(DEFAULT_LAN_KEY);
-    return stored || getDefaultServerUrl();
+    if (stored) return stored;
+    try {
+      if ("http://192.168.1.111:4200") {
+        return "http://192.168.1.111:4200";
+      }
+    } catch {
+    }
+    const defServer = getDefaultServerUrl();
+    return defServer || DEFAULT_MACHINE_LAN_URL;
   }
   function setDefaultLanUrl(url) {
     setCleanStorage(DEFAULT_LAN_KEY, url);
@@ -7757,7 +7793,7 @@ input:checked + .slider:before {
     try {
       const clean = url.trim().replace(/\/+$/, "");
       if (!clean || typeof localStorage === "undefined") return getCustomConnections();
-      const current = getCustomConnections().filter((c) => c.url !== clean);
+      const current = getCustomConnections().filter((c) => c.url.toLowerCase() !== clean.toLowerCase());
       const rec = { url: clean };
       if (name?.trim()) rec.name = name.trim();
       if (tag?.trim()) rec.tag = tag.trim();
@@ -7771,10 +7807,15 @@ input:checked + .slider:before {
   function removeCustomConnection(url) {
     try {
       const clean = url.trim().replace(/\/+$/, "");
-      if (typeof localStorage === "undefined") return [];
-      const current = getCustomConnections().filter((c) => c.url !== clean);
+      if (!clean || typeof localStorage === "undefined") return [];
+      const legacy = getCustomServerIp();
+      if (legacy && legacy.trim().replace(/\/+$/, "").toLowerCase() === clean.toLowerCase()) {
+        clearCustomServerIp();
+      }
+      const raw = localStorage.getItem(CUSTOM_CONNECTIONS_KEY);
+      const rawList = raw ? JSON.parse(raw) : [];
+      const current = rawList.map((item) => typeof item === "string" ? { url: item } : item).filter((item) => Boolean(item && item.url && item.url.trim().replace(/\/+$/, "").toLowerCase() !== clean.toLowerCase()));
       localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
-      if (getCustomServerIp() === clean) clearCustomServerIp();
       return current;
     } catch {
       return getCustomConnections();
@@ -8195,7 +8236,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.35" : "1.0.33";
+  var CLIENT_VERSION = true ? "1.0.36" : "1.0.33";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -10464,6 +10505,69 @@ input:checked + .slider:before {
     });
   }
 
+  // src/ui/connectionAvailabilityProbe.ts
+  async function probeConnectionAvailability(url, timeoutMs = 1500) {
+    const clean = url?.trim().replace(/\/+$/, "");
+    if (!clean || !clean.startsWith("http")) return false;
+    const controller2 = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = controller2 ? setTimeout(() => controller2.abort(), timeoutMs) : null;
+    try {
+      const probeUrl = `${clean}/api/version`;
+      const res = await fetch(probeUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller2?.signal,
+        cache: "no-store",
+        mode: "cors"
+      });
+      return res.ok || res.status === 401 || res.status === 403;
+    } catch {
+      return false;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+  function collectAllConnectionUrls(state2) {
+    const urls = /* @__PURE__ */ new Set();
+    const defaultLan = state2.defaultLanUrl || getDefaultLanUrl();
+    if (defaultLan) urls.add(defaultLan.trim().replace(/\/+$/, ""));
+    const tailscale = state2.tailscaleUrl || getTailscaleUrl();
+    if (tailscale) urls.add(tailscale.trim().replace(/\/+$/, ""));
+    const customList = state2.customConnections || getCustomConnections();
+    for (const item of customList) {
+      const raw = typeof item === "string" ? item : item?.url;
+      if (raw) urls.add(raw.trim().replace(/\/+$/, ""));
+    }
+    const networks = state2.serverSetupInfo?.networks || [];
+    for (const net of networks) {
+      if (net.url) urls.add(net.url.trim().replace(/\/+$/, ""));
+    }
+    return Array.from(urls).filter(Boolean);
+  }
+  async function probeAllConnections(state2, onRender, timeoutMs = 1500) {
+    const urls = collectAllConnectionUrls(state2);
+    if (urls.length === 0) return;
+    if (!state2.connectionAvailability) {
+      state2.connectionAvailability = {};
+    }
+    const results = await Promise.all(
+      urls.map(async (url) => {
+        const isAvailable = await probeConnectionAvailability(url, timeoutMs);
+        return { url, isAvailable };
+      })
+    );
+    let hasChanged = false;
+    for (const { url, isAvailable } of results) {
+      if (state2.connectionAvailability[url] !== isAvailable) {
+        state2.connectionAvailability[url] = isAvailable;
+        hasChanged = true;
+      }
+    }
+    if (hasChanged) {
+      onRender();
+    }
+  }
+
   // src/ui/appController.ts
   var AppController = class {
     constructor(state2, render2) {
@@ -10634,6 +10738,7 @@ input:checked + .slider:before {
         applyPersistedSyncMode(this.syncMachine, () => this.startSse());
         await this.reloadData(true);
         void checkForUpdates(this.state, this.render);
+        void probeAllConnections(this.state, this.render);
       }
     }
   };
@@ -13582,6 +13687,8 @@ ${thought.trim()}` : thought.trim();
     const isSelected = normCurrent ? normCurrent === normItem : normItem === normDefault || Boolean(item.isDefault);
     const isCopied = copyFeedback === `ip-${item.address}`;
     const fullSetupUrl = `${item.url}/#setup=${payload}`;
+    const isAvailable = item.isAvailable !== false;
+    const unavailableClass = !isAvailable ? "connection-unavailable is-unavailable" : "";
     let badgeClass = "badge-lan";
     let badgeLabel = item.tag ? `\u{1F3E0} ${item.tag}` : item.isDefault ? "\u{1F3E0} Default LAN" : "\u{1F3E0} Local LAN";
     if (item.isTailscale) {
@@ -13592,15 +13699,19 @@ ${thought.trim()}` : thought.trim();
       badgeLabel = item.tag ? `\u{1F3F7}\uFE0F ${item.tag}` : "\u{1F310} Custom IP";
     }
     const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : item.isDefault || item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : "";
+    const statusBadge = !isAvailable ? '<span class="network-status-badge network-status--unavailable">\u25CB Unavailable</span>' : `<span class="network-status-badge ${isSelected ? "network-status--active" : "network-status--disabled"}">
+        ${isSelected ? "\u25CF Active" : "\u25CB Disabled"}
+      </span>`;
     return `
     <div
-      class="network-ip-item ${isSelected ? "selected active-connection" : "inactive-connection"}"
+      class="network-ip-item ${isSelected ? "selected active-connection" : "inactive-connection"} ${unavailableClass}"
       data-switch-connection="${escapeHtml2(item.url)}"
       data-ip-url="${escapeHtml2(item.url)}"
       ${btnId}
       role="button"
       tabindex="0"
-      title="Click to activate ${escapeHtml2(item.name)} (${escapeHtml2(item.url)})"
+      ${!isAvailable ? 'aria-disabled="true"' : ""}
+      title="${!isAvailable ? `Unavailable: ${escapeHtml2(item.name)} (${escapeHtml2(item.url)})` : `Click to activate ${escapeHtml2(item.name)} (${escapeHtml2(item.url)})`}"
     >
       <div class="network-ip-header">
         <div class="network-ip-title-group">
@@ -13608,9 +13719,7 @@ ${thought.trim()}` : thought.trim();
           <span class="network-ip-badge ${badgeClass}">
             ${escapeHtml2(badgeLabel)}
           </span>
-          <span class="network-status-badge ${isSelected ? "network-status--active" : "network-status--disabled"}">
-            ${isSelected ? "\u25CF Active" : "\u25CB Disabled"}
-          </span>
+          ${statusBadge}
         </div>
         <div class="network-ip-actions">
           <button
@@ -13706,7 +13815,13 @@ ${thought.trim()}` : thought.trim();
         });
       }
     }
-    const items = Array.from(itemsMap.values());
+    const availability = state2.connectionAvailability;
+    const items = Array.from(itemsMap.values()).map((item) => {
+      if (availability && typeof availability[item.url] === "boolean") {
+        return { ...item, isAvailable: availability[item.url] };
+      }
+      return item;
+    });
     const renderedList = items.length > 0 ? items.map((item) => renderNetworkConnectionItem(item, currentBaseUrl, defaultLanUrl, payload, copyFeedback)).join("") : `
         <div class="network-ip-empty">
           <p>No active network connections configured or detected from server.</p>
@@ -15276,6 +15391,7 @@ ${thought.trim()}` : thought.trim();
     if (!state2.customConnections) state2.customConnections = getCustomConnections();
     onRender();
     void fetchServerSetupInfo(state2, onRender);
+    void probeAllConnections(state2, onRender);
   }
   function closeSettingsModal(state2, onRender) {
     state2.isSettingsModalOpen = false;

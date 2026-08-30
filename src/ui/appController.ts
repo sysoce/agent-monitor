@@ -19,8 +19,10 @@ import {
 } from './queuedMessagesOps';
 
 import { isAutoFallbackEnabled, setAutoFallbackEnabled } from './fallbackSettings';
+import { probeAllConnections } from './connectionAvailabilityProbe';
 
 export class AppController {
+
   private sseCleanup: (() => void) | null = null;
   private syncMachine: SyncStateMachine;
 
@@ -139,6 +141,8 @@ export class AppController {
       applyPersistedSyncMode(this.syncMachine, () => this.startSse());
       await this.reloadData(true);
       void checkForUpdates(this.state, this.render);
+      void probeAllConnections(this.state, this.render);
     }
   }
 }
+

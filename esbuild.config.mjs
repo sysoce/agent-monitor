@@ -1,9 +1,33 @@
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, cpSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
+import { networkInterfaces } from 'node:os';
 
 const isWatch = process.argv.includes('--watch');
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
+
+function detectHostNetworkDefaults() {
+  const nets = networkInterfaces();
+  let lanIp = 'http://192.168.1.111:4200';
+  let tailscaleIp = 'http://100.74.73.50:4200';
+
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === 'IPv4' || net.family === 4) {
+        if (!net.internal) {
+          if (net.address.startsWith('100.') || name.toLowerCase().includes('utun') || name.toLowerCase().includes('tailscale')) {
+            tailscaleIp = `http://${net.address}:4200`;
+          } else if (net.address.startsWith('192.168.') || net.address.startsWith('10.') || net.address.startsWith('172.')) {
+            lanIp = `http://${net.address}:4200`;
+          }
+        }
+      }
+    }
+  }
+  return { lanIp, tailscaleIp };
+}
+
+const { lanIp: detectedLanIp, tailscaleIp: detectedTailscaleIp } = detectHostNetworkDefaults();
 
 const serverConfig = {
   entryPoints: ['src/cli.ts'],
@@ -41,9 +65,12 @@ const uiConfig = {
   target: 'es2020',
   define: {
     __MONITOR_VERSION__: JSON.stringify(pkg.version),
-    __DEFAULT_SERVER_URL__: JSON.stringify(''),
+    __DEFAULT_SERVER_URL__: JSON.stringify(detectedLanIp),
+    __DEFAULT_LAN_URL__: JSON.stringify(detectedLanIp),
+    __DEFAULT_TAILSCALE_URL__: JSON.stringify(detectedTailscaleIp),
   },
 };
+
 
 
 const cssConfig = {

@@ -8,6 +8,7 @@ export interface NetworkConnectionItem {
   isDefault?: boolean;
   isTailscale?: boolean;
   isCustom?: boolean;
+  isAvailable?: boolean;
 }
 
 export function normalizeConnectionUrl(url: string): string {
@@ -34,6 +35,8 @@ export function renderNetworkConnectionItem(
     : (normItem === normDefault || Boolean(item.isDefault));
   const isCopied = copyFeedback === `ip-${item.address}`;
   const fullSetupUrl = `${item.url}/#setup=${payload}`;
+  const isAvailable = item.isAvailable !== false;
+  const unavailableClass = !isAvailable ? 'connection-unavailable is-unavailable' : '';
 
   let badgeClass = 'badge-lan';
   let badgeLabel = item.tag ? `🏠 ${item.tag}` : (item.isDefault ? '🏠 Default LAN' : '🏠 Local LAN');
@@ -46,16 +49,22 @@ export function renderNetworkConnectionItem(
   }
 
   const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : (item.isDefault || item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : '');
+  const statusBadge = !isAvailable
+    ? '<span class="network-status-badge network-status--unavailable">○ Unavailable</span>'
+    : `<span class="network-status-badge ${isSelected ? 'network-status--active' : 'network-status--disabled'}">
+        ${isSelected ? '● Active' : '○ Disabled'}
+      </span>`;
 
   return `
     <div
-      class="network-ip-item ${isSelected ? 'selected active-connection' : 'inactive-connection'}"
+      class="network-ip-item ${isSelected ? 'selected active-connection' : 'inactive-connection'} ${unavailableClass}"
       data-switch-connection="${escapeHtml(item.url)}"
       data-ip-url="${escapeHtml(item.url)}"
       ${btnId}
       role="button"
       tabindex="0"
-      title="Click to activate ${escapeHtml(item.name)} (${escapeHtml(item.url)})"
+      ${!isAvailable ? 'aria-disabled="true"' : ''}
+      title="${!isAvailable ? `Unavailable: ${escapeHtml(item.name)} (${escapeHtml(item.url)})` : `Click to activate ${escapeHtml(item.name)} (${escapeHtml(item.url)})`}"
     >
       <div class="network-ip-header">
         <div class="network-ip-title-group">
@@ -63,9 +72,7 @@ export function renderNetworkConnectionItem(
           <span class="network-ip-badge ${badgeClass}">
             ${escapeHtml(badgeLabel)}
           </span>
-          <span class="network-status-badge ${isSelected ? 'network-status--active' : 'network-status--disabled'}">
-            ${isSelected ? '● Active' : '○ Disabled'}
-          </span>
+          ${statusBadge}
         </div>
         <div class="network-ip-actions">
           <button
@@ -93,3 +100,4 @@ export function renderNetworkConnectionItem(
     </div>
   `;
 }
+

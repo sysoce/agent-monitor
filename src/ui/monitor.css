@@ -4207,7 +4207,29 @@ input:checked + .slider:before {
   border: 1px solid rgba(156, 163, 175, 0.2);
 }
 
+.network-status--unavailable {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.network-ip-item.connection-unavailable,
+.network-ip-item.is-unavailable {
+  opacity: 0.55;
+  filter: grayscale(0.7);
+  border-color: #2a2a30;
+  background: #18181b;
+}
+
+.network-ip-item.connection-unavailable:hover,
+.network-ip-item.is-unavailable:hover {
+  opacity: 0.8;
+  filter: grayscale(0.35);
+  border-color: #4b5563;
+}
+
 .network-ip-actions {
+
   display: flex;
   gap: 6px;
 }

@@ -81,8 +81,11 @@ test('renderSettingsModal renders full modal with all sections and 3 sync modes 
   assert.ok(html.includes('id="btn-settings-logout"'));
 });
 
-test('renderSettingsNetworkSection renders empty state when no networks available', () => {
+test('renderSettingsNetworkSection renders default LAN and Tailscale connections when state has no custom networks', () => {
   const state = createMockState();
   const html = renderSettingsNetworkSection(state);
-  assert.ok(html.includes('network-ip-empty'));
+  assert.ok(html.includes('192.168.1.111:4200'));
+  assert.ok(html.includes('100.74.73.50:4200'));
+  assert.ok(html.includes('Tailscale'));
 });
+
