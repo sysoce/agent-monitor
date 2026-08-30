@@ -28,6 +28,7 @@ export async function handleRequest(
 ): Promise<void> {
   const url = new URL(req.url || '/', 'http://localhost');
   const pathname = url.pathname;
+  if (pathname.startsWith('/api/')) console.log(`[${new Date().toISOString()}] [API ${req.method}] ${pathname}`);
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' });
@@ -93,7 +94,7 @@ export async function handleRequest(
 
   const msgMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/messages$/);
   if (msgMatch && req.method === 'POST') {
-    const body = await readJsonBody<{ content: string; role?: 'user' | 'assistant'; model?: string; mode?: string; attachments?: AttachmentItem[] }>(req);
+    const body = await readJsonBody<{ content: string; role?: 'user' | 'assistant'; model?: string; mode?: string; attachments?: AttachmentItem[]; timestamp?: number }>(req);
     if (!body.content?.trim() && (!body.attachments || body.attachments.length === 0)) return sendJson(res, 400, { error: 'Content or attachments required' }, req);
     await enqueueSessionMessage({
       workspaceRoot,
@@ -103,6 +104,7 @@ export async function handleRequest(
       model: body.model,
       mode: body.mode,
       attachments: body.attachments,
+      timestamp: body.timestamp,
     });
     return sendJson(res, 200, { ok: true }, req);
   }

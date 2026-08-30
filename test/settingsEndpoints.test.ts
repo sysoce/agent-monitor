@@ -20,7 +20,7 @@ test('handleSetupRoute serves /download as standalone HTML attachment', async ()
     },
   } as unknown as ServerResponse;
 
-  const staticDir = path.resolve(__dirname, '../dist');
+  const staticDir = path.resolve(process.cwd(), 'dist');
   const url = new URL('http://localhost:4200/download');
   const handled = await handleSetupRoute(mockRes, '/download', url, path.resolve('.'), staticDir);
 

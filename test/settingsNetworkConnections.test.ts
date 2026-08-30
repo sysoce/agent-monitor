@@ -110,7 +110,7 @@ test('deleteCustomConnection removes custom IP and falls back active connection'
   assert.equal(rendered, true);
 });
 
-test('renderSettingsNetworkSection renders Default LAN, Tailscale, and custom connection items', () => {
+test('renderSettingsNetworkSection renders Default LAN, Tailscale, and custom connection items in unified list without switcher box', () => {
   const state = createMockState({
     defaultLanUrl: 'http://192.168.1.111:4200',
     tailscaleUrl: 'http://100.74.73.50:4200',
@@ -123,6 +123,8 @@ test('renderSettingsNetworkSection renders Default LAN, Tailscale, and custom co
   assert.ok(html.includes('10.0.0.99:4200'), 'Must display Custom connection URL');
   assert.ok(html.includes('data-delete-custom-ip="http://10.0.0.99:4200"'), 'Must render delete button');
   assert.ok(html.includes('id="btn-save-custom-ip"'), 'Must render add connection button');
+  assert.ok(!html.includes('network-connection-switcher'), 'Must NOT render redundant switcher box');
+  assert.ok(!html.includes('Available Connections:'), 'Must NOT render Available Connections label');
 });
 
 test('handleSettingsModalClick handles switching and deleting connections', () => {

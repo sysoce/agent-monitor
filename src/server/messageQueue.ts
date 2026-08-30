@@ -13,6 +13,7 @@ export interface PostMessageOptions {
   mode?: string;
   action?: 'message' | 'abort';
   attachments?: AttachmentItem[];
+  timestamp?: number;
 }
 
 export async function enqueueSessionMessage(opts: PostMessageOptions): Promise<void> {
@@ -23,8 +24,9 @@ export async function enqueueSessionMessage(opts: PostMessageOptions): Promise<v
     role: opts.role ?? 'user',
     content: opts.content,
     from: opts.from ?? 'mobile-monitor',
-    timestamp: Date.now(),
+    timestamp: opts.timestamp ?? Date.now(),
     model: opts.model,
+    mode: opts.mode,
     action: opts.action ?? 'message',
     attachments: opts.attachments,
   });

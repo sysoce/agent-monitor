@@ -49,7 +49,8 @@ export function mergeSessionDetail(
   existing: SessionDetail | undefined,
   incoming: SessionDetail,
   inbox?: SyncInboxMessage[],
-  lastAbortedAt?: number
+  lastAbortedAt?: number,
+  lastAbortedSessionId?: string
 ): SessionDetail {
   const incomingUserTexts = new Set<string>();
   for (const m of incoming.messages || []) {
@@ -74,7 +75,7 @@ export function mergeSessionDetail(
     if (pendingInboxMsgs.length > 0) {
       baseDetail = { ...incoming, messages: [...(incoming.messages || []), ...pendingInboxMsgs] };
     }
-    return applyAbortSuppression(baseDetail, lastAbortedAt);
+    return applyAbortSuppression(baseDetail, lastAbortedAt, lastAbortedSessionId);
   }
 
   const pendingUserMsgs = (existing.messages || []).filter((m) => {
@@ -137,5 +138,5 @@ export function mergeSessionDetail(
     ...incoming,
     isGenerating,
     messages: mergedMessages,
-  }, lastAbortedAt);
+  }, lastAbortedAt, lastAbortedSessionId);
 }

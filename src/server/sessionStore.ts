@@ -1,18 +1,18 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import * as crypto from 'node:crypto';
 import type { ChatMessage } from '../types';
 import type { SessionDetail } from './types';
 import { extractSessionPlans } from './planStore';
 import { isPlanFilePath } from '../utils/planExtractor';
-import { writeIncomingMessage } from '../utils/incomingMessages';
 import { parseSubagents, parseBackgroundTasks, enrichPlanDetails, enrichToolResults, enrichThinking } from './sessionEnricher';
 import { readPendingApprovals } from './sessionApprovals';
 import { readSessionDraft, injectDraftIntoSession } from './sessionDraft';
 import { findSessionFile, parseAndDeduplicateLines } from './sessionFinder';
 import { extractMessageTimestamp } from './sessionActivity';
+import { readIncomingMessages } from './sessionIncoming';
 
 export { listSessions } from './sessionLister';
+export { stopSession, createSession } from './sessionLifecycle';
 
 export async function getSessionDetail(workspaceRoot: string, sessionId: string): Promise<SessionDetail | null> {
   const sDir = path.join(workspaceRoot, '.agent', 'sessions', sessionId);
@@ -22,32 +22,7 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
   try { raw = await fs.readFile(sFile.path, 'utf8'); } catch { return null; }
   const messages: ChatMessage[] = parseAndDeduplicateLines(raw);
 
-  let hasPending = false;
-  let incomingMtime = 0;
-  try {
-    const inDir = path.join(sDir, 'incoming');
-    const inFiles = (await fs.readdir(inDir)).filter((f) => f.endsWith('.json')).sort();
-    hasPending = inFiles.some((f) => !f.startsWith('abort-'));
-    if (hasPending) {
-      incomingMtime = (await fs.stat(inDir).catch(() => ({ mtimeMs: 0 }))).mtimeMs;
-    }
-    const seenUser = new Set<string>();
-    for (const m of messages.slice(-5)) {
-      if (m.role === 'user' && typeof m.content === 'string') seenUser.add(m.content.trim());
-    }
-    for (const f of inFiles) {
-      try {
-        const p = JSON.parse(await fs.readFile(path.join(inDir, f), 'utf8')) as { role?: string; content?: string; action?: string; attachments?: any[] };
-        if (p?.action !== 'abort' && (p?.content?.trim() || (p?.attachments && p.attachments.length > 0))) {
-          const content = p.content?.trim() || '';
-          if (!content || !seenUser.has(content)) {
-            if (content) seenUser.add(content);
-            messages.push({ role: (p.role as 'user' | 'assistant') ?? 'user', content, attachments: p.attachments });
-          }
-        }
-      } catch {}
-    }
-  } catch {}
+  const { hasPending, incomingMtime } = await readIncomingMessages(sDir, messages);
 
   const firstUser = messages.find((m) => m.role === 'user' && (m.content?.trim() || (m.attachments && m.attachments.length > 0)));
   const title = firstUser?.content?.trim().split(/\r?\n/)[0]?.slice(0, 50) || firstUser?.attachments?.[0]?.label || sessionId;
@@ -77,37 +52,30 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
     const abRaw = await fs.readFile(path.join(sDir, '.aborted'), 'utf8');
     abortedAt = Number((JSON.parse(abRaw) as { abortedAt?: number }).abortedAt) || 0;
   } catch {}
-  const hasNewUserTurn = abortedAt > 0 && messages.some((m) => m.role === 'user' && Number((m as { timestamp?: number }).timestamp || 0) > abortedAt);
-  const isAborted = abortedAt > 0 && !hasNewUserTurn;
 
-  let hasActiveLock = false;
-  let activeMtime = 0;
-  if (!isAborted) {
-    try {
-      const activeSt = await fs.stat(path.join(sDir, '.active'));
-      hasActiveLock = activeSt.isFile() && (Date.now() - activeSt.mtimeMs < 120_000);
-      activeMtime = activeSt.mtimeMs;
-    } catch {}
-  }
-  let hasDraft = false;
-  let draftMtime = 0;
-  if (!isAborted) {
-    try {
-      const draftSt = await fs.stat(path.join(sDir, 'live_draft.json'));
-      hasDraft = draftSt.isFile() && (Date.now() - draftSt.mtimeMs < 60_000);
+  let hasActiveLock = false, activeMtime = 0;
+  try {
+    const activeSt = await fs.stat(path.join(sDir, '.active'));
+    hasActiveLock = activeSt.isFile() && (Date.now() - activeSt.mtimeMs < 1800_000);
+    activeMtime = activeSt.mtimeMs;
+  } catch {}
+
+  let hasDraft = false, draftMtime = 0;
+  try {
+    const draftSt = await fs.stat(path.join(sDir, 'live_draft.json'));
+    if (draftSt.isFile() && Date.now() - draftSt.mtimeMs < 60_000) {
       draftMtime = draftSt.mtimeMs;
-    } catch {}
-  }
-  const isGenerating = !isAborted && Boolean(hasActiveLock || hasDraft || hasPending);
-  const subagents = parseSubagents(messages, isGenerating);
-  const backgroundTasks = parseBackgroundTasks(messages, isGenerating);
-  const hasRunningSub = subagents.some((s) => s.status === 'running');
-  const hasRunningBg = backgroundTasks.some((t) => t.status === 'running');
-  const finalIsGenerating = !isAborted && Boolean(isGenerating || hasRunningSub || hasRunningBg);
-  const pendingApprovals = await readPendingApprovals(sDir);
+      try {
+        const dObj = JSON.parse(await fs.readFile(path.join(sDir, 'live_draft.json'), 'utf8')) as { timestamp?: number };
+        const dTs = Number(dObj.timestamp) || 0;
+        if (abortedAt === 0 || dTs === 0 || dTs > abortedAt) hasDraft = true;
+      } catch {
+        hasDraft = true;
+      }
+    }
+  } catch {}
 
-  let firstMsgTimestamp: number | undefined;
-  let lastMsgTimestamp: number | undefined;
+  let firstMsgTimestamp: number | undefined, lastMsgTimestamp: number | undefined;
   for (const m of messages) {
     const ts = extractMessageTimestamp(m);
     if (ts !== undefined) {
@@ -115,6 +83,32 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
       if (lastMsgTimestamp === undefined || ts > lastMsgTimestamp) lastMsgTimestamp = ts;
     }
   }
+
+  const userTimestamps = messages.filter((m) => m.role === 'user').map((m) => Number((m as { timestamp?: number }).timestamp || 0)).filter((t) => t > 0);
+  const maxUserTs = userTimestamps.length > 0 ? Math.max(...userTimestamps) : 0;
+  const hasNewActivity = (hasActiveLock && activeMtime > abortedAt) ||
+    (hasDraft && draftMtime > abortedAt) ||
+    (hasPending && incomingMtime > abortedAt) ||
+    (maxUserTs > abortedAt);
+  const isAborted = abortedAt > 0 && !hasNewActivity;
+
+  const hasUnresolvedTools = Boolean(
+    hasActiveLock &&
+    messages.length > 0 &&
+    messages[messages.length - 1]?.role === 'assistant' &&
+    messages[messages.length - 1]?.tool_calls?.some((tc: any) =>
+      !messages.some((m) => m.role === 'tool' && (m as any).tool_call_id === tc.id)
+    )
+  );
+
+  const isGenerating = !isAborted && Boolean(hasActiveLock || hasDraft || hasPending || hasUnresolvedTools);
+  const subagents = parseSubagents(messages, isGenerating);
+  const backgroundTasks = parseBackgroundTasks(messages, isGenerating);
+  const hasRunningSub = subagents.some((s) => s.status === 'running');
+  const hasRunningBg = backgroundTasks.some((t) => t.status === 'running');
+  const finalIsGenerating = !isAborted && Boolean(isGenerating || hasRunningSub || hasRunningBg);
+  const pendingApprovals = await readPendingApprovals(sDir);
+
   const liveMax = Math.max(activeMtime, draftMtime, incomingMtime);
   const updatedAt = lastMsgTimestamp !== undefined ? Math.max(lastMsgTimestamp, liveMax) : Math.max(sFile.mtimeMs, liveMax);
   const createdAt = firstMsgTimestamp || sFile.birthtimeMs || sFile.mtimeMs || updatedAt;
@@ -123,36 +117,4 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
   if (isAborted) return detail;
   const draft = await readSessionDraft(workspaceRoot, sessionId);
   return draft ? injectDraftIntoSession(detail, draft) : detail;
-}
-
-export async function stopSession(workspaceRoot: string, sessionId: string): Promise<boolean> {
-  try {
-    const sBase = path.join(workspaceRoot, '.agent', 'sessions'), sids = new Set<string>();
-    if (sessionId) sids.add(sessionId);
-    try {
-      const dirs = await fs.readdir(sBase);
-      for (const d of dirs) {
-        try { if ((await fs.stat(path.join(sBase, d, '.active'))).isFile()) sids.add(d); } catch {}
-      }
-    } catch {}
-    await Promise.all(Array.from(sids).map(async (sid) => {
-      const sDir = path.join(sBase, sid);
-      await Promise.all([
-        writeIncomingMessage(workspaceRoot, sid, { action: 'abort', content: 'stop', from: 'monitor-stop' }),
-        fs.writeFile(path.join(sDir, '.aborted'), JSON.stringify({ abortedAt: Date.now() }), 'utf8').catch(() => {}),
-        fs.unlink(path.join(sDir, '.active')).catch(() => {}),
-        fs.unlink(path.join(sDir, 'live_draft.json')).catch(() => {}),
-      ]);
-    }));
-    return true;
-  } catch { return false; }
-}
-
-export async function createSession(workspaceRoot: string, _title?: string): Promise<string> {
-  const sessionId = `sess-${crypto.randomBytes(4).toString('hex')}`;
-  const dir = path.join(workspaceRoot, '.agent', 'sessions', sessionId);
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, 'chat.jsonl'), '', 'utf8');
-  await fs.unlink(path.join(dir, '.aborted')).catch(() => {});
-  return sessionId;
 }

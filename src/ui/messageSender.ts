@@ -12,20 +12,21 @@ export async function submitUserMessage(
 ): Promise<void> {
   const attachments = attachmentsParam ?? (state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined);
   const sid = state.activeSessionId || `sess-${Math.random().toString(36).slice(2, 10)}`;
+  const clientTimestamp = Date.now();
   state.activeSessionId = sid;
   state.awaitingSessionId = sid;
 
   if (state.syncMode === 'git-backup') {
     try {
       await syncMachine.pushInboxMessage({
-        id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `msg-${clientTimestamp}-${Math.random().toString(36).slice(2, 7)}`,
         sessionId: sid,
         content: text,
         role: 'user',
         model: state.selectedModel,
         mode: state.composerMode,
         attachments,
-        timestamp: Date.now(),
+        timestamp: clientTimestamp,
       });
     } catch (err) {
       if (!syncMachine.getAutoFallback()) {
@@ -39,7 +40,7 @@ export async function submitUserMessage(
           state.awaitingSessionId = s.id;
           if (state.activeSession) state.activeSession.id = s.id;
         }
-        await sendSessionMessage(state.activeSessionId || sid, text, 'user', state.selectedModel, state.composerMode, attachments);
+        await sendSessionMessage(state.activeSessionId || sid, text, 'user', state.selectedModel, state.composerMode, attachments, clientTimestamp);
         syncMachine.restorePrimaryLive();
       } catch {
         throw err;
@@ -59,7 +60,8 @@ export async function submitUserMessage(
       'user',
       state.selectedModel,
       state.composerMode,
-      attachments
+      attachments,
+      clientTimestamp
     );
   }
 }

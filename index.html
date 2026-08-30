@@ -7207,7 +7207,12 @@ input:checked + .slider:before {
   border: 1px solid #303036;
   border-radius: 8px;
   padding: 10px 12px;
+  cursor: pointer;
   transition: all 0.15s ease;
+}
+.network-ip-item:hover {
+  border-color: #388bfd;
+  background: #242938;
 }
 .network-ip-item.selected {
   border-color: #388bfd;
@@ -7247,6 +7252,11 @@ input:checked + .slider:before {
   color: #c586c0;
   border: 1px solid rgba(197, 134, 192, 0.3);
 }
+.badge-custom {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
 .network-ip-active-tag {
   font-size: 10px;
   background: rgba(56, 139, 253, 0.2);
@@ -7261,10 +7271,19 @@ input:checked + .slider:before {
   gap: 6px;
 }
 .network-btn-use-qr,
-.network-btn-copy {
+.network-btn-copy,
+.network-btn-delete {
   padding: 4px 8px;
   font-size: 11px;
   border-radius: 5px;
+}
+.network-btn-delete {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.3);
+}
+.network-btn-delete:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
 }
 .network-btn-use-qr.active {
   background: #0e639c;
@@ -7813,6 +7832,9 @@ input:checked + .slider:before {
           const data = await res.json();
           if (data.token) setStoredToken(data.token);
           if (data.gistConfig) localStorage.setItem("agent_gist_sync", JSON.stringify(data.gistConfig));
+          if (typeof localStorage !== "undefined" && !isStaticDeployment()) {
+            localStorage.setItem("agent_sync_mode", "live-sse");
+          }
           return data.ok;
         }
       } catch {
@@ -7870,11 +7892,11 @@ input:checked + .slider:before {
     if (!res.ok) throw new Error(`Failed to create session: ${res.statusText}`);
     return await res.json();
   }
-  async function sendSessionMessage(sessionId, content, role, model, mode, attachments) {
+  async function sendSessionMessage(sessionId, content, role, model, mode, attachments, timestamp) {
     const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/messages`), {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: JSON.stringify({ content, role, model, mode, attachments })
+      body: JSON.stringify({ content, role, model, mode, attachments, timestamp: timestamp ?? Date.now() })
     });
     if (!res.ok) throw new Error(`Failed to send message: ${res.statusText}`);
   }
@@ -7990,8 +8012,12 @@ input:checked + .slider:before {
   }
 
   // src/ui/sessionAbortSuppression.ts
-  function applyAbortSuppression(detail, lastAbortedAt) {
+  function applyAbortSuppression(detail, lastAbortedAt, lastAbortedSessionId) {
     if (!lastAbortedAt || lastAbortedAt <= 0) return detail;
+    const isEpoch = lastAbortedAt > 1e12;
+    if (isEpoch && Date.now() - lastAbortedAt > 1e4) return detail;
+    if (lastAbortedSessionId && detail.id !== lastAbortedSessionId) return detail;
+    if (isEpoch && detail.updatedAt && detail.updatedAt > lastAbortedAt) return detail;
     const msgs = detail.messages || [];
     const hasUserMsgAfterAbort = msgs.some(
       (m) => m.role === "user" && (m.timestamp || 0) > lastAbortedAt
@@ -8049,7 +8075,7 @@ input:checked + .slider:before {
       });
     }
   }
-  function mergeSessionDetail(existing, incoming, inbox, lastAbortedAt) {
+  function mergeSessionDetail(existing, incoming, inbox, lastAbortedAt, lastAbortedSessionId) {
     const incomingUserTexts = /* @__PURE__ */ new Set();
     for (const m of incoming.messages || []) {
       if (m.role === "user" && typeof m.content === "string") {
@@ -8069,7 +8095,7 @@ input:checked + .slider:before {
       if (pendingInboxMsgs.length > 0) {
         baseDetail = { ...incoming, messages: [...incoming.messages || [], ...pendingInboxMsgs] };
       }
-      return applyAbortSuppression(baseDetail, lastAbortedAt);
+      return applyAbortSuppression(baseDetail, lastAbortedAt, lastAbortedSessionId);
     }
     const pendingUserMsgs = (existing.messages || []).filter((m) => {
       if (m.role !== "user") return false;
@@ -8111,11 +8137,11 @@ input:checked + .slider:before {
       ...incoming,
       isGenerating,
       messages: mergedMessages
-    }, lastAbortedAt);
+    }, lastAbortedAt, lastAbortedSessionId);
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.32" : "1.0.32";
+  var CLIENT_VERSION = true ? "1.0.33" : "1.0.33";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8500,19 +8526,20 @@ input:checked + .slider:before {
   async function submitUserMessage(state2, syncMachine, text, attachmentsParam) {
     const attachments = attachmentsParam ?? (state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0);
     const sid = state2.activeSessionId || `sess-${Math.random().toString(36).slice(2, 10)}`;
+    const clientTimestamp = Date.now();
     state2.activeSessionId = sid;
     state2.awaitingSessionId = sid;
     if (state2.syncMode === "git-backup") {
       try {
         await syncMachine.pushInboxMessage({
-          id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          id: `msg-${clientTimestamp}-${Math.random().toString(36).slice(2, 7)}`,
           sessionId: sid,
           content: text,
           role: "user",
           model: state2.selectedModel,
           mode: state2.composerMode,
           attachments,
-          timestamp: Date.now()
+          timestamp: clientTimestamp
         });
       } catch (err) {
         if (!syncMachine.getAutoFallback()) {
@@ -8526,7 +8553,7 @@ input:checked + .slider:before {
             state2.awaitingSessionId = s.id;
             if (state2.activeSession) state2.activeSession.id = s.id;
           }
-          await sendSessionMessage(state2.activeSessionId || sid, text, "user", state2.selectedModel, state2.composerMode, attachments);
+          await sendSessionMessage(state2.activeSessionId || sid, text, "user", state2.selectedModel, state2.composerMode, attachments, clientTimestamp);
           syncMachine.restorePrimaryLive();
         } catch {
           throw err;
@@ -8546,7 +8573,8 @@ input:checked + .slider:before {
         "user",
         state2.selectedModel,
         state2.composerMode,
-        attachments
+        attachments,
+        clientTimestamp
       );
     }
   }
@@ -9911,16 +9939,13 @@ input:checked + .slider:before {
     const cfg = loadCachedGistConfig();
     if (cfg) syncMachine.setGistConfig(cfg);
     syncMachine.setAutoFallback(isAutoFallbackEnabled());
-    const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-    let mode = saved;
-    if (!mode) {
-      if (hasLiveServer()) {
-        mode = "live-sse";
-      } else if (cfg?.gistId) {
-        mode = "git-backup";
-      } else {
-        mode = "live-sse";
-      }
+    let mode;
+    if (!isStaticDeployment()) {
+      const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
+      mode = saved === "p2p" ? "p2p" : "live-sse";
+    } else {
+      const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
+      mode = saved || (hasLiveServer() ? "live-sse" : cfg?.gistId ? "git-backup" : "live-sse");
     }
     if (mode === "p2p") {
       syncMachine.forceP2PMode();
@@ -10189,10 +10214,14 @@ input:checked + .slider:before {
         fetchSessions().catch(() => null),
         fetchModels().catch(() => ({ models: [], groups: [] }))
       ]);
+      if (state2.lastAbortedAt && Date.now() - state2.lastAbortedAt > 1e4) {
+        state2.lastAbortedAt = void 0;
+        state2.lastAbortedSessionId = void 0;
+      }
       if (sessions !== null) {
-        if (state2.lastAbortedAt) {
+        if (state2.lastAbortedAt && state2.lastAbortedSessionId) {
           for (const s of sessions) {
-            if (s.id === state2.lastAbortedSessionId || s.id === state2.activeSessionId) s.isGenerating = false;
+            if (s.id === state2.lastAbortedSessionId) s.isGenerating = false;
           }
         }
         if (state2.activeSessionId && state2.activeSession) {
@@ -10220,22 +10249,19 @@ input:checked + .slider:before {
         const d = await fetchSessionDetail(state2.activeSessionId).catch(() => void 0);
         state2.isLoadingSession = false;
         if (d) {
-          state2.activeSession = mergeSessionDetail(state2.activeSession, d, void 0, state2.lastAbortedAt);
+          state2.activeSession = mergeSessionDetail(state2.activeSession, d, void 0, state2.lastAbortedAt, state2.lastAbortedSessionId);
           saveCachedSessionDetail(state2.activeSession);
           saveActiveSessionId(state2.activeSession.id);
         }
         if (state2.activeSession && !state2.activeSession.isGenerating && !state2.isSending) {
           Object.assign(state2, { isAwaitingResponse: false, awaitingSessionId: void 0 });
         }
-        if (state2.lastAbortedAt && state2.activeSession?.messages) {
+        if (state2.lastAbortedAt && state2.lastAbortedSessionId === state2.activeSession?.id && state2.activeSession?.messages) {
           const hasNewTurn = state2.activeSession.messages.some((m) => m.role === "user" && Number(m.timestamp || 0) > (state2.lastAbortedAt || 0));
           if (!hasNewTurn) {
             state2.activeSession.isGenerating = false;
             Object.assign(state2, { isAwaitingResponse: false, awaitingSessionId: void 0 });
           }
-        }
-        if (state2.activeSession?.messages?.slice(-1)[0]?.role === "assistant") {
-          Object.assign(state2, { isAwaitingResponse: false, awaitingSessionId: void 0 });
         }
         if (state2.activeSession && state2.sessions) {
           const matching = state2.sessions.find((s) => s.id === state2.activeSession.id);
@@ -13426,32 +13452,70 @@ ${thought.trim()}` : thought.trim();
   }
 
   // src/ui/components/settingsModal/settingsConnectionCards.ts
-  function renderConnectionOptionBtn(opt, currentBaseUrl) {
-    const isActive = currentBaseUrl === opt.url;
-    const host = extractHostFromUrl(opt.url);
-    const btnId = opt.type === "tailscale" ? "btn-switch-tailscale" : opt.type === "lan" ? "btn-switch-set-ip" : "";
+  function renderNetworkConnectionItem(item, currentBaseUrl, defaultLanUrl, payload, copyFeedback) {
+    const isSelected = currentBaseUrl === item.url || !currentBaseUrl && item.url === defaultLanUrl;
+    const isCopied = copyFeedback === `ip-${item.address}`;
+    const fullSetupUrl = `${item.url}/#setup=${payload}`;
+    let badgeClass = "badge-lan";
+    let badgeLabel = "\u{1F3E0} Local LAN";
+    if (item.isTailscale) {
+      badgeClass = "badge-tailscale";
+      badgeLabel = "\u{1F512} Tailscale";
+    } else if (item.isCustom) {
+      badgeClass = "badge-custom";
+      badgeLabel = "\u{1F310} Custom IP";
+    }
+    const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : "";
     return `
-    <div class="switcher-opt-wrapper ${isActive ? "active" : ""}">
-      <button
-        type="button"
-        class="btn switcher-opt-btn ${isActive ? "active" : ""}"
-        ${btnId ? `id="${btnId}"` : ""}
-        data-switch-connection="${escapeHtml2(opt.url)}"
-        title="Switch to ${escapeHtml2(opt.name)} (${escapeHtml2(opt.url)})"
-      >
-        <span class="switcher-icon">${opt.icon}</span>
-        <span class="switcher-title">${escapeHtml2(opt.name)}</span>
-        <span class="switcher-badge font-mono">${escapeHtml2(host)}</span>
-        ${isActive ? '<span class="switcher-active-dot">\u25CF Active</span>' : ""}
-      </button>
-      ${opt.isCustom ? `
-        <button
-          type="button"
-          class="switcher-delete-btn"
-          data-delete-custom-ip="${escapeHtml2(opt.url)}"
-          title="Remove ${escapeHtml2(opt.url)}"
-        >\u2715</button>
-      ` : ""}
+    <div
+      class="network-ip-item ${isSelected ? "selected" : ""}"
+      data-switch-connection="${escapeHtml2(item.url)}"
+      data-ip-url="${escapeHtml2(item.url)}"
+      ${btnId}
+      role="button"
+      tabindex="0"
+      title="Click to switch to ${escapeHtml2(item.name)} (${escapeHtml2(item.url)})"
+    >
+      <div class="network-ip-header">
+        <div class="network-ip-title-group">
+          <span class="network-ip-name">${escapeHtml2(item.name)}</span>
+          <span class="network-ip-badge ${badgeClass}">
+            ${badgeLabel}
+          </span>
+          ${isSelected ? '<span class="network-ip-active-tag">\u25CF Active</span>' : ""}
+        </div>
+        <div class="network-ip-actions">
+          <button
+            type="button"
+            class="btn btn-secondary network-btn-use-qr ${isSelected ? "active" : ""}"
+            data-switch-connection="${escapeHtml2(item.url)}"
+            data-use-ip="${escapeHtml2(item.url)}"
+            title="${isSelected ? "Active connection" : `Switch to ${escapeHtml2(item.url)}`}"
+          >
+            ${isSelected ? "\u2713 Active" : "\u{1F4F2} Set as Active"}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary network-btn-copy"
+            data-copy-ip-url="${escapeHtml2(fullSetupUrl)}"
+            data-ip-address="${escapeHtml2(item.address)}"
+            title="Copy direct connection URL"
+          >
+            ${isCopied ? "\u2705 Copied!" : "\u{1F4CB} Copy URL"}
+          </button>
+          ${item.isCustom ? `
+            <button
+              type="button"
+              class="btn btn-secondary network-btn-delete"
+              data-delete-custom-ip="${escapeHtml2(item.url)}"
+              title="Remove ${escapeHtml2(item.url)}"
+            >\u2715 Remove</button>
+          ` : ""}
+        </div>
+      </div>
+      <div class="network-ip-address-text">
+        <code>${escapeHtml2(item.url)}</code>
+      </div>
     </div>
   `;
   }
@@ -13469,72 +13533,62 @@ ${thought.trim()}` : thought.trim();
     const customList = (state2.customConnections || getCustomConnections()).filter(
       (u) => u && u !== defaultLanUrl && u !== tailscaleUrl
     );
-    const options = [];
-    if (defaultLanUrl) {
-      options.push({ url: defaultLanUrl, name: "Default LAN", icon: "\u{1F3E0}", type: "lan" });
+    const itemsMap = /* @__PURE__ */ new Map();
+    for (const net of networks) {
+      const clean = net.url.trim().replace(/\/+$/, "");
+      if (clean && !itemsMap.has(clean)) {
+        itemsMap.set(clean, {
+          name: net.name || (net.isTailscale ? "Tailscale" : "Local LAN"),
+          url: clean,
+          address: net.address || extractHostFromUrl(clean),
+          isTailscale: Boolean(net.isTailscale),
+          isCustom: false
+        });
+      }
     }
     if (tailscaleUrl) {
-      options.push({ url: tailscaleUrl, name: "Tailscale", icon: "\u{1F512}", type: "tailscale" });
+      const cleanTs = tailscaleUrl.trim().replace(/\/+$/, "");
+      if (cleanTs && !itemsMap.has(cleanTs)) {
+        itemsMap.set(cleanTs, {
+          name: "Tailscale",
+          url: cleanTs,
+          address: extractHostFromUrl(cleanTs),
+          isTailscale: true,
+          isCustom: false
+        });
+      }
+    }
+    if (defaultLanUrl) {
+      const cleanLan = defaultLanUrl.trim().replace(/\/+$/, "");
+      if (cleanLan && !itemsMap.has(cleanLan)) {
+        itemsMap.set(cleanLan, {
+          name: "Default LAN",
+          url: cleanLan,
+          address: extractHostFromUrl(cleanLan),
+          isTailscale: false,
+          isCustom: false
+        });
+      }
     }
     for (const customUrl of customList) {
-      options.push({ url: customUrl, name: "Custom IP", icon: "\u{1F310}", type: "custom", isCustom: true });
+      const cleanCust = customUrl.trim().replace(/\/+$/, "");
+      if (cleanCust && !itemsMap.has(cleanCust)) {
+        itemsMap.set(cleanCust, {
+          name: `Custom Server (${extractHostFromUrl(cleanCust)})`,
+          url: cleanCust,
+          address: extractHostFromUrl(cleanCust),
+          isTailscale: detectIsTailscale(cleanCust),
+          isCustom: true
+        });
+      }
     }
-    const renderedList = networks.length > 0 ? networks.map((net) => {
-      const fullSetupUrl = `${net.url}/#setup=${payload}`;
-      const isSelected = currentBaseUrl === net.url || !currentBaseUrl && net.url === defaultLanUrl;
-      const isCopied = copyFeedback === `ip-${net.address}`;
-      return `
-          <div class="network-ip-item ${isSelected ? "selected" : ""}" data-ip-url="${escapeHtml2(net.url)}">
-            <div class="network-ip-header">
-              <div class="network-ip-title-group">
-                <span class="network-ip-name">${escapeHtml2(net.name)}</span>
-                <span class="network-ip-badge ${net.isTailscale ? "badge-tailscale" : "badge-lan"}">
-                  ${net.isTailscale ? "\u{1F512} Tailscale" : "\u{1F3E0} Local LAN"}
-                </span>
-                ${isSelected ? '<span class="network-ip-active-tag">Active</span>' : ""}
-              </div>
-              <div class="network-ip-actions">
-                <button
-                  type="button"
-                  class="btn btn-secondary network-btn-use-qr ${isSelected ? "active" : ""}"
-                  data-use-ip="${escapeHtml2(net.url)}"
-                  title="Use this network address for live SSE & QR"
-                >
-                  ${isSelected ? "\u2713 Active" : "\u{1F4F2} Set as Active"}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-secondary network-btn-copy"
-                  data-copy-ip-url="${escapeHtml2(fullSetupUrl)}"
-                  data-ip-address="${escapeHtml2(net.address)}"
-                  title="Copy direct connection URL"
-                >
-                  ${isCopied ? "\u2705 Copied!" : "\u{1F4CB} Copy URL"}
-                </button>
-              </div>
-            </div>
-            <div class="network-ip-address-text">
-              <code>${escapeHtml2(net.url)}</code>
-            </div>
-          </div>
-        `;
-    }).join("") : `
+    const items = Array.from(itemsMap.values());
+    const renderedList = items.length > 0 ? items.map((item) => renderNetworkConnectionItem(item, currentBaseUrl, defaultLanUrl, payload, copyFeedback)).join("") : `
         <div class="network-ip-empty">
-          <p>No active local network interfaces detected from server.</p>
+          <p>No active network connections configured or detected from server.</p>
           <p class="network-ip-hint">Local connection URL: <code>${escapeHtml2(currentBaseUrl || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200"))}</code></p>
         </div>
       `;
-    const switcherHtml = options.length > 0 ? `
-        <div class="network-connection-switcher">
-          <div class="switcher-header-row">
-            <span class="switcher-label">Available Connections:</span>
-            <span class="switcher-count-tag">${options.length} configured</span>
-          </div>
-          <div class="switcher-options">
-            ${options.map((opt) => renderConnectionOptionBtn(opt, currentBaseUrl)).join("")}
-          </div>
-        </div>
-      ` : "";
     return `
     <div class="settings-section settings-section--network" id="settings-section-network">
       <div class="settings-section-header">
@@ -13543,8 +13597,6 @@ ${thought.trim()}` : thought.trim();
           Connect directly via local Wi-Fi, LAN, or Tailscale for zero-latency <strong>Live SSE streaming</strong> without cloud sync.
         </p>
       </div>
-
-      ${switcherHtml}
 
       <div class="server-ip-config-box" style="margin-bottom: 12px;">
         <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
@@ -14154,7 +14206,10 @@ ${thought.trim()}` : thought.trim();
     );
     if (currentSession?.isGenerating) return true;
     const lastMsg = state2.activeSession?.messages?.slice(-1)[0];
-    if (lastMsg && lastMsg.role === "assistant" && lastMsg.isLive) return true;
+    if (lastMsg && lastMsg.role === "assistant") {
+      if (lastMsg.isLive) return true;
+      if (!lastMsg.content && lastMsg.tool_calls && lastMsg.tool_calls.length > 0) return true;
+    }
     return false;
   }
   function renderStopButtonHtml() {
@@ -15120,6 +15175,19 @@ ${thought.trim()}` : thought.trim();
       selectQrTab(state2, "download", callbacks.onRender);
       return true;
     }
+    const copyIpBtn = target.closest("[data-copy-ip-url]");
+    if (copyIpBtn) {
+      const ipUrl = copyIpBtn.getAttribute("data-copy-ip-url") || "";
+      const ipAddr = copyIpBtn.getAttribute("data-ip-address") || "";
+      if (ipUrl) void copyIpUrl(state2, ipUrl, ipAddr, callbacks.onRender);
+      return true;
+    }
+    const deleteBtn = target.closest("[data-delete-custom-ip]");
+    if (deleteBtn) {
+      const deleteUrl = deleteBtn.getAttribute("data-delete-custom-ip") || "";
+      if (deleteUrl) deleteCustomConnection(state2, deleteUrl, callbacks.onRender);
+      return true;
+    }
     if (target.closest("#btn-switch-tailscale")) {
       switchToTailscale(state2, callbacks.onRender);
       return true;
@@ -15134,23 +15202,10 @@ ${thought.trim()}` : thought.trim();
       if (targetUrl) selectActiveConnection(state2, targetUrl, callbacks.onRender);
       return true;
     }
-    const deleteBtn = target.closest("[data-delete-custom-ip]");
-    if (deleteBtn) {
-      const deleteUrl = deleteBtn.getAttribute("data-delete-custom-ip") || "";
-      if (deleteUrl) deleteCustomConnection(state2, deleteUrl, callbacks.onRender);
-      return true;
-    }
     const useIpBtn = target.closest("[data-use-ip]");
     if (useIpBtn) {
       const ipUrl = useIpBtn.getAttribute("data-use-ip") || "";
       if (ipUrl) selectLanIp(state2, ipUrl, callbacks.onRender);
-      return true;
-    }
-    const copyIpBtn = target.closest("[data-copy-ip-url]");
-    if (copyIpBtn) {
-      const ipUrl = copyIpBtn.getAttribute("data-copy-ip-url") || "";
-      const ipAddr = copyIpBtn.getAttribute("data-ip-address") || "";
-      if (ipUrl) void copyIpUrl(state2, ipUrl, ipAddr, callbacks.onRender);
       return true;
     }
     if (target.closest("#btn-save-custom-ip")) {

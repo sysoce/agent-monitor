@@ -2,7 +2,7 @@ import type { AppState } from './types';
 import type { TransportMode } from '../sync/types';
 import { SyncStateMachine } from './syncStateMachine';
 import { loadCachedGistConfig, applyGistSyncPayload } from './sessionPlanSync';
-import { hasLiveServer } from './authStore';
+import { hasLiveServer, isStaticDeployment } from './authStore';
 import { isAutoFallbackEnabled } from './fallbackSettings';
 
 export function createAppSyncMachine(
@@ -53,16 +53,13 @@ export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: 
   const cfg = loadCachedGistConfig();
   if (cfg) syncMachine.setGistConfig(cfg);
   syncMachine.setAutoFallback(isAutoFallbackEnabled());
-  const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
-  let mode = saved;
-  if (!mode) {
-    if (hasLiveServer()) {
-      mode = 'live-sse';
-    } else if (cfg?.gistId) {
-      mode = 'git-backup';
-    } else {
-      mode = 'live-sse';
-    }
+  let mode: TransportMode;
+  if (!isStaticDeployment()) {
+    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
+    mode = saved === 'p2p' ? 'p2p' : 'live-sse';
+  } else {
+    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
+    mode = saved || (hasLiveServer() ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'live-sse'));
   }
 
   if (mode === 'p2p') {

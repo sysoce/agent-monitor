@@ -4083,7 +4083,13 @@ input:checked + .slider:before {
   border: 1px solid #303036;
   border-radius: 8px;
   padding: 10px 12px;
+  cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.network-ip-item:hover {
+  border-color: #388bfd;
+  background: #242938;
 }
 
 .network-ip-item.selected {
@@ -4131,6 +4137,12 @@ input:checked + .slider:before {
   border: 1px solid rgba(197, 134, 192, 0.3);
 }
 
+.badge-custom {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
 .network-ip-active-tag {
   font-size: 10px;
   background: rgba(56, 139, 253, 0.2);
@@ -4147,10 +4159,21 @@ input:checked + .slider:before {
 }
 
 .network-btn-use-qr,
-.network-btn-copy {
+.network-btn-copy,
+.network-btn-delete {
   padding: 4px 8px;
   font-size: 11px;
   border-radius: 5px;
+}
+
+.network-btn-delete {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.network-btn-delete:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
 }
 
 .network-btn-use-qr.active {

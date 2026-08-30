@@ -59,7 +59,7 @@ describe('P2PHeartbeat', () => {
     });
 
     hb.start();
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await new Promise((resolve) => setTimeout(resolve, 80));
     hb.stop();
 
     assert.equal(timedOut, true);

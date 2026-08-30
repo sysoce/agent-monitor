@@ -39,7 +39,7 @@ test('handleSetupRoute handles /api/setup-info and returns setup metadata', asyn
   assert.ok(json.githubPagesUrl.includes('https://sysoce.github.io/agent-monitor/#setup='));
   assert.ok(json.lanUrl.includes('/#setup='));
   assert.ok(json.setupPayload);
-  const pkg = JSON.parse(await fs.readFile(path.resolve(__dirname, '../package.json'), 'utf8'));
+  const pkg = JSON.parse(await fs.readFile(path.resolve(process.cwd(), 'package.json'), 'utf8'));
   assert.equal(json.version, pkg.version);
   assert.ok(Array.isArray(json.networks));
 });

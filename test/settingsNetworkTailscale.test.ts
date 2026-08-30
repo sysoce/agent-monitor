@@ -101,7 +101,7 @@ test('switchToSetIp switches active server URL back to customServerIp while pres
   assert.equal(state.tailscaleUrl, 'http://100.74.73.50:4200', 'tailscaleUrl MUST be preserved');
   assert.equal(rendered, true);
 });
-test('renderSettingsNetworkSection renders connection switcher with Set IP and Tailscale options', () => {
+test('renderSettingsNetworkSection renders unified connections list with Set IP and Tailscale options', () => {
   const state = createMockState({
     customServerIp: 'http://192.168.1.111:4200',
     tailscaleUrl: 'http://100.74.73.50:4200',
@@ -114,11 +114,12 @@ test('renderSettingsNetworkSection renders connection switcher with Set IP and T
     },
   });
   const html = renderSettingsNetworkSection(state);
-  assert.ok(html.includes('id="btn-switch-set-ip"'), 'Must render switch to Set IP button');
   assert.ok(html.includes('id="btn-switch-tailscale"'), 'Must render switch to Tailscale button');
   assert.ok(html.includes('192.168.1.111:4200'), 'Must display Set IP address');
   assert.ok(html.includes('100.74.73.50:4200'), 'Must display Tailscale address');
   assert.ok(html.includes('value="http://192.168.1.111:4200"'), 'Set IP input must show customServerIp even when Tailscale is active');
+  assert.ok(!html.includes('network-connection-switcher'), 'Must NOT render redundant switcher box');
+  assert.ok(!html.includes('Available Connections:'), 'Must NOT render Available Connections label');
 });
 test('handleSettingsModalClick handles switcher buttons', () => {
   const state = createMockState({

@@ -28,23 +28,27 @@ export async function listSessions(workspaceRoot: string): Promise<SessionSummar
 
       let hasActiveLock = false;
       let activeMtime = 0;
-      if (abortedAt === 0) {
-        try {
-          const activeSt = await fs.stat(path.join(sDir, '.active'));
-          hasActiveLock = activeSt.isFile() && (Date.now() - activeSt.mtimeMs < 120_000);
-          activeMtime = activeSt.mtimeMs;
-        } catch {}
-      }
+      try {
+        const activeSt = await fs.stat(path.join(sDir, '.active'));
+        hasActiveLock = activeSt.isFile() && (Date.now() - activeSt.mtimeMs < 1800_000);
+        activeMtime = activeSt.mtimeMs;
+      } catch {}
 
       let hasDraft = false;
       let draftMtime = 0;
-      if (abortedAt === 0) {
-        try {
-          const draftSt = await fs.stat(path.join(sDir, 'live_draft.json'));
-          hasDraft = draftSt.isFile() && (Date.now() - draftSt.mtimeMs < 60_000);
+      try {
+        const draftSt = await fs.stat(path.join(sDir, 'live_draft.json'));
+        if (draftSt.isFile() && Date.now() - draftSt.mtimeMs < 60_000) {
           draftMtime = draftSt.mtimeMs;
-        } catch {}
-      }
+          try {
+            const dObj = JSON.parse(await fs.readFile(path.join(sDir, 'live_draft.json'), 'utf8')) as { timestamp?: number };
+            const dTs = Number(dObj.timestamp) || 0;
+            if (abortedAt === 0 || dTs === 0 || dTs > abortedAt) hasDraft = true;
+          } catch {
+            hasDraft = true;
+          }
+        }
+      } catch {}
 
       let hasIncoming = false;
       let incomingMtime = 0;
@@ -58,7 +62,11 @@ export async function listSessions(workspaceRoot: string): Promise<SessionSummar
         }
       } catch {}
 
-      const isGenerating = Boolean((hasActiveLock || hasDraft || hasIncoming) && abortedAt === 0);
+      const hasNewActivity = (hasActiveLock && activeMtime > abortedAt) ||
+        (hasDraft && draftMtime > abortedAt) ||
+        (hasIncoming && incomingMtime > abortedAt);
+      const isAborted = abortedAt > 0 && !hasNewActivity;
+      const isGenerating = !isAborted && Boolean(hasActiveLock || hasDraft || hasIncoming);
       const activity = extractSessionActivityFromLines(lines, sFile, { activeMtime, draftMtime, incomingMtime });
 
       summaries.push({

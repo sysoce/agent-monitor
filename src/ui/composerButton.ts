@@ -10,7 +10,10 @@ export function isAgentRunning(state: AppState): boolean {
   );
   if (currentSession?.isGenerating) return true;
   const lastMsg = state.activeSession?.messages?.slice(-1)[0];
-  if (lastMsg && lastMsg.role === 'assistant' && (lastMsg as any).isLive) return true;
+  if (lastMsg && lastMsg.role === 'assistant') {
+    if ((lastMsg as any).isLive) return true;
+    if (!lastMsg.content && lastMsg.tool_calls && lastMsg.tool_calls.length > 0) return true;
+  }
   return false;
 }
 

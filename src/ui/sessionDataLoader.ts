@@ -56,10 +56,15 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       fetchSessions().catch(() => null),
       fetchModels().catch(() => ({ models: [], groups: [] })),
     ]);
+    if (state.lastAbortedAt && Date.now() - state.lastAbortedAt > 10_000) {
+      state.lastAbortedAt = undefined;
+      state.lastAbortedSessionId = undefined;
+    }
+
     if (sessions !== null) {
-      if (state.lastAbortedAt) {
+      if (state.lastAbortedAt && state.lastAbortedSessionId) {
         for (const s of sessions) {
-          if (s.id === state.lastAbortedSessionId || s.id === state.activeSessionId) s.isGenerating = false;
+          if (s.id === state.lastAbortedSessionId) s.isGenerating = false;
         }
       }
       if (state.activeSessionId && state.activeSession) {
@@ -87,22 +92,19 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       const d = await fetchSessionDetail(state.activeSessionId).catch(() => undefined);
       state.isLoadingSession = false;
       if (d) {
-        state.activeSession = mergeSessionDetail(state.activeSession, d, undefined, state.lastAbortedAt);
+        state.activeSession = mergeSessionDetail(state.activeSession, d, undefined, state.lastAbortedAt, state.lastAbortedSessionId);
         saveCachedSessionDetail(state.activeSession);
         saveActiveSessionId(state.activeSession.id);
       }
       if (state.activeSession && !state.activeSession.isGenerating && !state.isSending) {
         Object.assign(state, { isAwaitingResponse: false, awaitingSessionId: undefined });
       }
-      if (state.lastAbortedAt && state.activeSession?.messages) {
+      if (state.lastAbortedAt && state.lastAbortedSessionId === state.activeSession?.id && state.activeSession?.messages) {
         const hasNewTurn = state.activeSession.messages.some((m) => m.role === 'user' && Number((m as { timestamp?: number }).timestamp || 0) > (state.lastAbortedAt || 0));
         if (!hasNewTurn) {
           state.activeSession.isGenerating = false;
           Object.assign(state, { isAwaitingResponse: false, awaitingSessionId: undefined });
         }
-      }
-      if (state.activeSession?.messages?.slice(-1)[0]?.role === 'assistant') {
-        Object.assign(state, { isAwaitingResponse: false, awaitingSessionId: undefined });
       }
       if (state.activeSession && state.sessions) {
         const matching = state.sessions.find((s) => s.id === state.activeSession!.id);

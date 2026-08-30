@@ -67,13 +67,11 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   if (target.closest('#qr-tab-gh')) { selectQrTab(state, 'gh_pages', callbacks.onRender); return true; }
   if (target.closest('#qr-tab-lan')) { selectQrTab(state, 'lan', callbacks.onRender); return true; }
   if (target.closest('#qr-tab-dl')) { selectQrTab(state, 'download', callbacks.onRender); return true; }
-  if (target.closest('#btn-switch-tailscale')) { switchToTailscale(state, callbacks.onRender); return true; }
-  if (target.closest('#btn-switch-set-ip')) { switchToSetIp(state, callbacks.onRender); return true; }
-
-  const switchBtn = target.closest<HTMLElement>('[data-switch-connection]');
-  if (switchBtn) {
-    const targetUrl = switchBtn.getAttribute('data-switch-connection') || '';
-    if (targetUrl) selectActiveConnection(state, targetUrl, callbacks.onRender);
+  const copyIpBtn = target.closest<HTMLElement>('[data-copy-ip-url]');
+  if (copyIpBtn) {
+    const ipUrl = copyIpBtn.getAttribute('data-copy-ip-url') || '';
+    const ipAddr = copyIpBtn.getAttribute('data-ip-address') || '';
+    if (ipUrl) void copyIpUrl(state, ipUrl, ipAddr, callbacks.onRender);
     return true;
   }
 
@@ -84,17 +82,20 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
     return true;
   }
 
+  if (target.closest('#btn-switch-tailscale')) { switchToTailscale(state, callbacks.onRender); return true; }
+  if (target.closest('#btn-switch-set-ip')) { switchToSetIp(state, callbacks.onRender); return true; }
+
+  const switchBtn = target.closest<HTMLElement>('[data-switch-connection]');
+  if (switchBtn) {
+    const targetUrl = switchBtn.getAttribute('data-switch-connection') || '';
+    if (targetUrl) selectActiveConnection(state, targetUrl, callbacks.onRender);
+    return true;
+  }
+
   const useIpBtn = target.closest<HTMLElement>('[data-use-ip]');
   if (useIpBtn) {
     const ipUrl = useIpBtn.getAttribute('data-use-ip') || '';
     if (ipUrl) selectLanIp(state, ipUrl, callbacks.onRender);
-    return true;
-  }
-  const copyIpBtn = target.closest<HTMLElement>('[data-copy-ip-url]');
-  if (copyIpBtn) {
-    const ipUrl = copyIpBtn.getAttribute('data-copy-ip-url') || '';
-    const ipAddr = copyIpBtn.getAttribute('data-ip-address') || '';
-    if (ipUrl) void copyIpUrl(state, ipUrl, ipAddr, callbacks.onRender);
     return true;
   }
   if (target.closest('#btn-save-custom-ip')) {

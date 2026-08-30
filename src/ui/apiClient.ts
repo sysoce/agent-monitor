@@ -1,7 +1,7 @@
 import type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup } from '../server/types';
 import type { MentionSuggestionItem } from '../types';
 import type { AttachmentItem } from '../types';
-import { getStoredToken, setStoredToken, buildApiUrl, hasLiveServer } from './authStore';
+import { getStoredToken, setStoredToken, buildApiUrl, hasLiveServer, isStaticDeployment } from './authStore';
 
 function getAuthHeaders(): Record<string, string> {
   const token = getStoredToken();
@@ -39,6 +39,9 @@ export async function loginWithPassword(password: string): Promise<boolean> {
         const data = (await res.json()) as { ok: boolean; token?: string; gistConfig?: { token: string; gistId: string } };
         if (data.token) setStoredToken(data.token);
         if (data.gistConfig) localStorage.setItem('agent_gist_sync', JSON.stringify(data.gistConfig));
+        if (typeof localStorage !== 'undefined' && !isStaticDeployment()) {
+          localStorage.setItem('agent_sync_mode', 'live-sse');
+        }
         return data.ok;
       }
     } catch {}
@@ -98,11 +101,11 @@ export async function createSession(title?: string): Promise<{ id: string }> {
 }
 
 export async function sendSessionMessage(
-  sessionId: string, content: string, role?: 'user' | 'assistant', model?: string, mode?: string, attachments?: AttachmentItem[]
+  sessionId: string, content: string, role?: 'user' | 'assistant', model?: string, mode?: string, attachments?: AttachmentItem[], timestamp?: number
 ): Promise<void> {
   const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/messages`), {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify({ content, role, model, mode, attachments }),
+    body: JSON.stringify({ content, role, model, mode, attachments, timestamp: timestamp ?? Date.now() }),
   });
   if (!res.ok) throw new Error(`Failed to send message: ${res.statusText}`);
 }
