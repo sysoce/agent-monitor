@@ -60,18 +60,28 @@ export function handlePlanClick(target: HTMLElement, state: AppState, callbacks:
 }
 
 export function handleControlClick(target: HTMLElement, state: AppState, callbacks: EventHandlerCallbacks): boolean {
-  const autoFallbackChk = target.closest<HTMLInputElement>('#toggle-auto-fallback, .btn-toggle-auto-fallback');
+  const fallbackRow = target.closest<HTMLElement>('.settings-fallback-row');
+  const autoFallbackChk = target.closest<HTMLInputElement>('#toggle-auto-fallback, .btn-toggle-auto-fallback') ||
+    (fallbackRow ? fallbackRow.querySelector<HTMLInputElement>('#toggle-auto-fallback') : null);
   if (autoFallbackChk) {
-    setAutoFallbackEnabled(autoFallbackChk.checked);
-    state.autoFallbackEnabled = autoFallbackChk.checked;
-    callbacks.onToggleAutoFallback?.(autoFallbackChk.checked);
+    const isDirectChk = Boolean(target.closest('#toggle-auto-fallback, .btn-toggle-auto-fallback'));
+    const nextVal = isDirectChk ? autoFallbackChk.checked : !autoFallbackChk.checked;
+    autoFallbackChk.checked = nextVal;
+    setAutoFallbackEnabled(nextVal);
+    state.autoFallbackEnabled = nextVal;
+    callbacks.onToggleAutoFallback?.(nextVal);
     callbacks.onRender();
     return true;
   }
-  const autoUpdateChk = target.closest<HTMLInputElement>('#toggle-auto-update, .btn-toggle-auto-update');
+  const updateRow = target.closest<HTMLElement>('.settings-update-row');
+  const autoUpdateChk = target.closest<HTMLInputElement>('#toggle-auto-update, .btn-toggle-auto-update') ||
+    (updateRow ? updateRow.querySelector<HTMLInputElement>('#toggle-auto-update') : null);
   if (autoUpdateChk) {
-    setAutoUpdateEnabled(autoUpdateChk.checked);
-    state.autoUpdateEnabled = autoUpdateChk.checked;
+    const isDirectChk = Boolean(target.closest('#toggle-auto-update, .btn-toggle-auto-update'));
+    const nextVal = isDirectChk ? autoUpdateChk.checked : !autoUpdateChk.checked;
+    autoUpdateChk.checked = nextVal;
+    setAutoUpdateEnabled(nextVal);
+    state.autoUpdateEnabled = nextVal;
     callbacks.onRender();
     return true;
   }

@@ -77,11 +77,12 @@ export function checkAndApplyUrlConfig(): {
   gistConfig?: { token: string; gistId: string };
   password?: string;
   serverUrl?: string;
+  autoFallback?: boolean;
 } {
   if (typeof window === 'undefined') return { imported: false };
   const raw = window.location.hash || window.location.search;
   const parsed = parseUrlConfig(raw);
-  if (!parsed || (!parsed.gistId && !parsed.token && !parsed.serverUrl)) return { imported: false };
+  if (!parsed || (!parsed.gistId && !parsed.token && !parsed.serverUrl && parsed.autoFallback === undefined)) return { imported: false };
 
   const ok = applyConfigToStorage(parsed);
   if (ok) {
@@ -94,6 +95,7 @@ export function checkAndApplyUrlConfig(): {
       gistConfig: parsed.gistId && parsed.token ? { gistId: parsed.gistId, token: parsed.token } : undefined,
       password: parsed.password,
       serverUrl: parsed.serverUrl,
+      autoFallback: parsed.autoFallback,
     };
   }
 

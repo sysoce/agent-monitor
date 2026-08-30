@@ -3,8 +3,9 @@ import { GistClient } from '../sync/gistClient';
 import { LiveReachabilityProbe } from './liveReachabilityProbe';
 import { computeClientPollInterval } from '../sync/syncPollingPolicy';
 import type { SyncStateMachineCallbacks, RateLimitInfo } from './syncStateMachineTypes';
-import { executeGistPoll } from './syncStateMachinePoll';
-import { startP2PCoordination } from './syncStateMachineP2P';
+import { GitPollController } from './syncStateMachinePoll';
+import { dispatchInboxMessage } from './syncStateMachineDispatch';
+import { switchP2PMode, switchLiveSseMode, switchGitBackupMode, handleSseFailure, restoreLive } from './syncStateMachineModes';
 import type { P2PClientCoordinator } from '../p2p/p2pClientCoordinator';
 
 export type { SyncStateMachineCallbacks, RateLimitInfo };
@@ -16,21 +17,38 @@ export class SyncStateMachine {
   private p2pCoord: P2PClientCoordinator | null = null;
   private isAwaitingResponse = false;
   private awaitingStartedAt?: number;
-  private pollTimer?: any;
-  private lastEtag?: string;
   private autoFallback = true;
   private reachabilityProbe: LiveReachabilityProbe;
+  private pollController: GitPollController;
 
   constructor(private readonly callbacks: SyncStateMachineCallbacks) {
     this.reachabilityProbe = new LiveReachabilityProbe({ onReachable: () => this.triggerLiveServerReachable() });
+    this.pollController = new GitPollController(
+      () => this.gistClient,
+      () => this.mode,
+      () => this.getPollInterval(),
+      this.callbacks
+    );
     if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-          if (this.mode === 'git-backup') this.restartGitPolling();
+          if (this.mode === 'git-backup') this.pollController.restart();
           if (this.autoFallback) void this.reachabilityProbe.checkReachability();
         }
       });
     }
+  }
+
+  private getModeCtx() {
+    return {
+      mode: this.mode,
+      gistConfig: this.gistConfig,
+      p2pCoord: this.p2pCoord,
+      autoFallback: this.autoFallback,
+      reachabilityProbe: this.reachabilityProbe,
+      pollController: this.pollController,
+      callbacks: this.callbacks,
+    };
   }
 
   setAutoFallback(enabled: boolean): void {
@@ -39,19 +57,23 @@ export class SyncStateMachine {
   }
 
   getAutoFallback(): boolean { return this.autoFallback; }
-
   getMode(): TransportMode { return this.mode; }
 
   getPollInterval(): number {
     const isHidden = typeof document !== 'undefined' && Boolean(document.hidden);
     const rateInfo = this.gistClient?.getRateLimitInfo?.();
-    return computeClientPollInterval({ isAwaitingResponse: this.isAwaitingResponse, awaitingStartedAt: this.awaitingStartedAt, isHidden, remainingQuota: rateInfo?.remaining });
+    return computeClientPollInterval({
+      isAwaitingResponse: this.isAwaitingResponse,
+      awaitingStartedAt: this.awaitingStartedAt,
+      isHidden,
+      remainingQuota: rateInfo?.remaining,
+    });
   }
 
   setAwaitingResponse(awaiting: boolean): void {
     this.isAwaitingResponse = awaiting;
     this.awaitingStartedAt = awaiting ? Date.now() : undefined;
-    if (this.mode === 'git-backup') this.restartGitPolling();
+    if (this.mode === 'git-backup') this.pollController.restart();
   }
 
   setGistConfig(config?: GistSyncConfig): void {
@@ -60,71 +82,36 @@ export class SyncStateMachine {
   }
 
   forceP2PMode(): void {
-    this.stopGitPolling();
-    this.reachabilityProbe.stop();
-    this.mode = 'p2p';
-    this.callbacks.onModeChange('p2p');
-    this.callbacks.onError?.('');
-    this.p2pCoord?.stop();
-    this.p2pCoord = startP2PCoordination(this.callbacks, this.gistConfig);
-    if (!this.p2pCoord) {
-      this.callbacks.onStatusChange('connected');
-    }
+    const ctx = this.getModeCtx();
+    this.p2pCoord = switchP2PMode(ctx);
+    this.mode = ctx.mode;
   }
 
   forceLiveSseMode(): void {
-    this.stopGitPolling();
-    this.reachabilityProbe.stop();
-    this.p2pCoord?.stop();
+    const ctx = this.getModeCtx();
+    switchLiveSseMode(ctx);
+    this.mode = ctx.mode;
     this.p2pCoord = null;
-    this.mode = 'live-sse';
-    this.callbacks.onModeChange('live-sse');
-    this.callbacks.onStatusChange('connecting');
-    this.callbacks.onError?.('');
   }
 
   forceGitBackupMode(): void {
-    this.p2pCoord?.stop();
+    const ctx = this.getModeCtx();
+    switchGitBackupMode(ctx);
+    this.mode = ctx.mode;
     this.p2pCoord = null;
-    if (this.gistConfig) {
-      this.mode = 'git-backup';
-      this.callbacks.onModeChange('git-backup');
-      this.callbacks.onStatusChange('connected');
-      this.callbacks.onError?.('');
-      if (this.autoFallback) this.reachabilityProbe.start();
-      this.restartGitPolling();
-    } else {
-      this.callbacks.onError?.('Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.');
-    }
   }
 
   handlePrimarySseFailure(): void {
-    if (!this.autoFallback || this.mode === 'live-sse' || this.mode === 'p2p') {
-      this.callbacks.onStatusChange('disconnected');
-      return;
-    }
-    if (this.gistConfig) {
-      this.mode = 'git-backup';
-      this.callbacks.onModeChange('git-backup');
-      this.callbacks.onStatusChange('syncing');
-      this.reachabilityProbe.start();
-      this.restartGitPolling();
-    } else {
-      this.mode = 'offline';
-      this.callbacks.onModeChange('offline');
-      this.callbacks.onStatusChange('disconnected');
-    }
+    const ctx = this.getModeCtx();
+    handleSseFailure(ctx);
+    this.mode = ctx.mode;
   }
 
   restorePrimaryLive(): void {
-    this.stopGitPolling();
-    this.reachabilityProbe.stop();
-    this.p2pCoord?.stop();
+    const ctx = this.getModeCtx();
+    restoreLive(ctx);
+    this.mode = ctx.mode;
     this.p2pCoord = null;
-    this.mode = 'live-sse';
-    this.callbacks.onModeChange('live-sse');
-    this.callbacks.onStatusChange('connected');
-    this.callbacks.onError?.('');
   }
 
   triggerLiveServerReachable(): void {
@@ -134,47 +121,25 @@ export class SyncStateMachine {
   }
 
   async pushInboxMessage(msg: SyncInboxMessage): Promise<void> {
-    if (this.p2pCoord?.isConnected()) {
-      const adapter = this.p2pCoord.getAdapter();
-      if (adapter) {
-        await adapter.send({ id: msg.id, type: 'user_input', sessionId: msg.sessionId, payload: msg, timestamp: Date.now() });
-        return;
-      }
-    }
-    if (this.gistClient && (this.mode === 'git-backup' || this.mode === 'p2p')) {
-      await this.gistClient.pushInboxMessage(msg);
-      await this.pollOnce();
-      return;
-    }
-    throw new Error('Gist client is not configured or transport mode is not available');
+    return dispatchInboxMessage(
+      {
+        p2pCoord: this.p2pCoord,
+        gistClient: this.gistClient,
+        mode: this.mode,
+        autoFallback: this.autoFallback,
+        pollOnce: () => this.pollController.pollOnce(),
+      },
+      msg
+    );
   }
 
-  private restartGitPolling(): void {
-    this.stopGitPolling();
-    void this.pollOnce();
-    const timer = setInterval(() => { void this.pollOnce(); }, this.getPollInterval());
-    if (typeof (timer as any)?.unref === 'function') (timer as any).unref();
-    this.pollTimer = timer;
-  }
-
-  async pollOnce(): Promise<void> {
-    if (!this.gistClient || (this.mode !== 'git-backup' && this.mode !== 'p2p')) return;
-    const { etag } = await executeGistPoll(this.gistClient, this.lastEtag, this.callbacks, (resetTime) => {
-      const waitMs = Math.max(3000, resetTime - Date.now() + 1000);
-      this.stopGitPolling();
-      this.pollTimer = setTimeout(() => this.restartGitPolling(), waitMs);
-    });
-    if (etag) this.lastEtag = etag;
-  }
-
-  stopGitPolling(): void {
-    if (this.pollTimer) { clearInterval(this.pollTimer); clearTimeout(this.pollTimer); this.pollTimer = undefined; }
-  }
+  async pollOnce(): Promise<void> { await this.pollController.pollOnce(); }
+  stopGitPolling(): void { this.pollController.stop(); }
 
   stop(): void {
     this.reachabilityProbe.stop();
     this.p2pCoord?.stop();
     this.p2pCoord = null;
-    this.stopGitPolling();
+    this.pollController.stop();
   }
 }

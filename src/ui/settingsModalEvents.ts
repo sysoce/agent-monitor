@@ -5,18 +5,24 @@ import type { EventHandlerCallbacks } from './eventHandlers';
 import {
   fetchServerSetupInfo,
   selectLanIp,
+  selectActiveConnection,
   switchToTailscale,
   switchToSetIp,
+  addNewCustomConnection,
+  deleteCustomConnection,
   saveCustomServerUrl,
 } from './settingsConnectionSwitcher';
-import { getCustomServerIp, getTailscaleUrl } from './authStore';
+import { getCustomServerIp, getTailscaleUrl, getDefaultLanUrl, getCustomConnections } from './authStore';
 import { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
 
 export {
   fetchServerSetupInfo,
   selectLanIp,
+  selectActiveConnection,
   switchToTailscale,
   switchToSetIp,
+  addNewCustomConnection,
+  deleteCustomConnection,
   saveCustomServerUrl,
 } from './settingsConnectionSwitcher';
 export { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
@@ -27,8 +33,9 @@ export function openSettingsModal(state: AppState, onRender: () => void): void {
   state.qrModalTarget = state.qrModalTarget || 'gh_pages';
   state.settingsCopyFeedback = undefined;
   state.qrCopyFeedback = undefined;
-  if (!state.customServerIp) state.customServerIp = getCustomServerIp() || undefined;
+  if (!state.defaultLanUrl) state.defaultLanUrl = getDefaultLanUrl() || undefined;
   if (!state.tailscaleUrl) state.tailscaleUrl = getTailscaleUrl() || undefined;
+  if (!state.customConnections) state.customConnections = getCustomConnections();
   onRender();
   void fetchServerSetupInfo(state, onRender);
 }
@@ -48,7 +55,6 @@ export function selectQrTab(state: AppState, target: QrTarget, onRender: () => v
   onRender();
 }
 
-
 export function handleSettingsModalClick(state: AppState, target: HTMLElement, callbacks: EventHandlerCallbacks): boolean {
   if (target.closest('#btn-open-settings, #btn-show-qr, #btn-sidebar-qr')) {
     openSettingsModal(state, callbacks.onRender);
@@ -63,6 +69,20 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   if (target.closest('#qr-tab-dl')) { selectQrTab(state, 'download', callbacks.onRender); return true; }
   if (target.closest('#btn-switch-tailscale')) { switchToTailscale(state, callbacks.onRender); return true; }
   if (target.closest('#btn-switch-set-ip')) { switchToSetIp(state, callbacks.onRender); return true; }
+
+  const switchBtn = target.closest<HTMLElement>('[data-switch-connection]');
+  if (switchBtn) {
+    const targetUrl = switchBtn.getAttribute('data-switch-connection') || '';
+    if (targetUrl) selectActiveConnection(state, targetUrl, callbacks.onRender);
+    return true;
+  }
+
+  const deleteBtn = target.closest<HTMLElement>('[data-delete-custom-ip]');
+  if (deleteBtn) {
+    const deleteUrl = deleteBtn.getAttribute('data-delete-custom-ip') || '';
+    if (deleteUrl) deleteCustomConnection(state, deleteUrl, callbacks.onRender);
+    return true;
+  }
 
   const useIpBtn = target.closest<HTMLElement>('[data-use-ip]');
   if (useIpBtn) {
@@ -79,7 +99,11 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   }
   if (target.closest('#btn-save-custom-ip')) {
     const input = document.getElementById('input-custom-server-ip') as HTMLInputElement | null;
-    saveCustomServerUrl(state, input?.value || '', callbacks.onRender);
+    const val = input?.value || '';
+    if (val.trim()) {
+      addNewCustomConnection(state, val, callbacks.onRender);
+      if (input) input.value = '';
+    }
     return true;
   }
   if (target.closest('#btn-clear-custom-ip')) {
@@ -98,4 +122,3 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   if (target.closest('#btn-settings-logout')) { callbacks.onLogout?.(); closeSettingsModal(state, callbacks.onRender); return true; }
   return false;
 }
-

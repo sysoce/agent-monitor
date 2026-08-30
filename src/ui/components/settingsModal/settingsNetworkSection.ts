@@ -1,28 +1,38 @@
 import type { AppState } from '../../types';
 import { escapeHtml } from '../markdown';
-import { getServerBaseUrl, getCustomServerIp, getTailscaleUrl } from '../../authStore';
-import { detectIsTailscale, extractHostFromUrl } from '../connectionEndpointInfo';
+import { getServerBaseUrl, getCustomConnections, getDefaultLanUrl, getTailscaleUrl, getCustomServerIp } from '../../authStore';
 import { getCurrentClientPayload } from './settingsQrBuilder';
+import { renderConnectionOptionBtn, type ConnectionOption } from './settingsConnectionCards';
 
 export function renderSettingsNetworkSection(state: AppState): string {
   const networks = state.serverSetupInfo?.networks || [];
   const payload = getCurrentClientPayload(state);
   const copyFeedback = state.settingsCopyFeedback || '';
   const currentBaseUrl = getServerBaseUrl() || state.selectedLanIp || '';
-  const isServerSaved = copyFeedback === 'server-saved';
+  const isConnectionAdded = copyFeedback === 'connection-added' || copyFeedback === 'server-saved';
 
-  const customIp = state.customServerIp || getCustomServerIp() || (!detectIsTailscale(currentBaseUrl) ? currentBaseUrl : '');
-  const tailscaleUrl = state.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || (detectIsTailscale(currentBaseUrl) ? currentBaseUrl : '');
+  const customIp = state.customServerIp || getCustomServerIp() || '';
+  const defaultLanUrl = state.defaultLanUrl || getDefaultLanUrl() || networks.find((n) => !n.isTailscale)?.url || customIp;
+  const tailscaleUrl = state.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || '';
+  const customList = (state.customConnections || getCustomConnections()).filter(
+    (u) => u && u !== defaultLanUrl && u !== tailscaleUrl
+  );
 
-  const isTailscaleActive = Boolean(currentBaseUrl && (currentBaseUrl === tailscaleUrl || detectIsTailscale(currentBaseUrl)));
-  const isSetIpActive = Boolean(currentBaseUrl && customIp && currentBaseUrl === customIp && !isTailscaleActive);
-
-  const hasSwitcher = Boolean(customIp || tailscaleUrl);
+  const options: ConnectionOption[] = [];
+  if (defaultLanUrl) {
+    options.push({ url: defaultLanUrl, name: 'Default LAN', icon: '🏠', type: 'lan' });
+  }
+  if (tailscaleUrl) {
+    options.push({ url: tailscaleUrl, name: 'Tailscale', icon: '🔒', type: 'tailscale' });
+  }
+  for (const customUrl of customList) {
+    options.push({ url: customUrl, name: 'Custom IP', icon: '🌐', type: 'custom', isCustom: true });
+  }
 
   const renderedList = networks.length > 0
     ? networks.map((net) => {
         const fullSetupUrl = `${net.url}/#setup=${payload}`;
-        const isSelected = currentBaseUrl === net.url || (!currentBaseUrl && net.url === state.serverSetupInfo?.lanUrl?.split('/#')[0]);
+        const isSelected = currentBaseUrl === net.url || (!currentBaseUrl && net.url === defaultLanUrl);
         const isCopied = copyFeedback === `ip-${net.address}`;
 
         return `
@@ -68,40 +78,15 @@ export function renderSettingsNetworkSection(state: AppState): string {
         </div>
       `;
 
-  const switcherHtml = hasSwitcher
+  const switcherHtml = options.length > 0
     ? `
         <div class="network-connection-switcher">
           <div class="switcher-header-row">
-            <span class="switcher-label">Quick Switch Connection:</span>
-            ${isTailscaleActive ? '<span class="switcher-active-tag tag-tailscale">🔒 Tailscale Active</span>' : (isSetIpActive ? '<span class="switcher-active-tag tag-lan">🏠 Set IP Active</span>' : '')}
+            <span class="switcher-label">Available Connections:</span>
+            <span class="switcher-count-tag">${options.length} configured</span>
           </div>
           <div class="switcher-options">
-            ${customIp ? `
-              <button
-                type="button"
-                class="btn switcher-opt-btn ${isSetIpActive ? 'active' : ''}"
-                id="btn-switch-set-ip"
-                title="Switch active connection to Set IP (${escapeHtml(customIp)})"
-              >
-                <span class="switcher-icon">🏠</span>
-                <span class="switcher-title">Set IP</span>
-                <span class="switcher-badge font-mono">${escapeHtml(extractHostFromUrl(customIp))}</span>
-                ${isSetIpActive ? '<span class="switcher-active-dot">● Active</span>' : ''}
-              </button>
-            ` : ''}
-            ${tailscaleUrl ? `
-              <button
-                type="button"
-                class="btn switcher-opt-btn ${isTailscaleActive ? 'active' : ''}"
-                id="btn-switch-tailscale"
-                title="Switch active connection to Tailscale (${escapeHtml(tailscaleUrl)})"
-              >
-                <span class="switcher-icon">🔒</span>
-                <span class="switcher-title">Tailscale</span>
-                <span class="switcher-badge font-mono">${escapeHtml(extractHostFromUrl(tailscaleUrl))}</span>
-                ${isTailscaleActive ? '<span class="switcher-active-dot">● Active</span>' : ''}
-              </button>
-            ` : ''}
+            ${options.map((opt) => renderConnectionOptionBtn(opt, currentBaseUrl)).join('')}
           </div>
         </div>
       `
@@ -120,7 +105,7 @@ export function renderSettingsNetworkSection(state: AppState): string {
 
       <div class="server-ip-config-box" style="margin-bottom: 12px;">
         <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
-          Agent Server Address (LAN / Set IP):
+          Add New Server Address (LAN, Remote, or Tunnel IP):
         </label>
         <div style="display: flex; gap: 8px; align-items: center;">
           <input
@@ -132,7 +117,7 @@ export function renderSettingsNetworkSection(state: AppState): string {
             style="flex: 1;"
           />
           <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
-            ${isServerSaved ? '✅ Saved!' : '💾 Set IP'}
+            ${isConnectionAdded ? '✅ Added!' : '➕ Add Connection'}
           </button>
           ${customIp ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ''}
         </div>
@@ -144,4 +129,3 @@ export function renderSettingsNetworkSection(state: AppState): string {
     </div>
   `;
 }
-

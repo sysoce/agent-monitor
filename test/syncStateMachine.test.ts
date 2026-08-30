@@ -20,7 +20,7 @@ test('SyncStateMachine initializes in p2p default mode and transitions on status
   assert.equal(sm.getPollInterval(), 15000, 'Should return to gentle interval when idle');
 });
 
-test('SyncStateMachine preserves live-sse mode when SSE connection drops and does not silently trigger git-backup', () => {
+test('SyncStateMachine preserves live-sse mode on SSE drop when autoFallback is disabled and falls back when enabled', () => {
   let activeMode = '';
   let activeStatus = '';
   const sm = new SyncStateMachine({
@@ -31,12 +31,20 @@ test('SyncStateMachine preserves live-sse mode when SSE connection drops and doe
 
   sm.setGistConfig({ token: 'test-pat', gistId: 'gist-123' });
   sm.forceLiveSseMode();
+  sm.setAutoFallback(false);
   assert.equal(activeMode, 'live-sse');
 
-  // When SSE fails in live-sse mode, it transitions status to disconnected but stays in live-sse
+  // When autoFallback is off, SSE failure preserves live-sse mode and marks status disconnected
   sm.handlePrimarySseFailure();
   assert.equal(sm.getMode(), 'live-sse');
   assert.equal(activeStatus, 'disconnected');
+
+  // When autoFallback is on, SSE failure falls back to git-backup
+  sm.setAutoFallback(true);
+  sm.handlePrimarySseFailure();
+  assert.equal(sm.getMode(), 'git-backup');
+  assert.equal(activeMode, 'git-backup');
+  assert.equal(activeStatus, 'syncing');
   sm.stop();
 });
 

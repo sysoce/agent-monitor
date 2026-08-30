@@ -4029,6 +4029,48 @@ input:checked + .slider:before {
   color: #c9d1d9;
 }
 
+.switcher-count-tag {
+  font-size: 11px;
+  color: #8b949e;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.switcher-opt-wrapper {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 140px;
+  gap: 2px;
+  position: relative;
+}
+
+.switcher-opt-wrapper .switcher-opt-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.switcher-delete-btn {
+  background: #202736;
+  border: 1px solid #3d4d68;
+  border-radius: 6px;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.switcher-delete-btn:hover {
+  background: rgba(248, 81, 73, 0.2);
+  border-color: #f85149;
+  color: #f85149;
+}
+
 .switcher-active-dot {
   font-size: 10px;
   font-weight: 700;

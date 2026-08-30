@@ -7159,6 +7159,43 @@ input:checked + .slider:before {
 .switcher-opt-btn.active .switcher-badge {
   color: #c9d1d9;
 }
+.switcher-count-tag {
+  font-size: 11px;
+  color: #8b949e;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.switcher-opt-wrapper {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 140px;
+  gap: 2px;
+  position: relative;
+}
+.switcher-opt-wrapper .switcher-opt-btn {
+  flex: 1;
+  min-width: 0;
+}
+.switcher-delete-btn {
+  background: #202736;
+  border: 1px solid #3d4d68;
+  border-radius: 6px;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.switcher-delete-btn:hover {
+  background: rgba(248, 81, 73, 0.2);
+  border-color: #f85149;
+  color: #f85149;
+}
 .switcher-active-dot {
   font-size: 10px;
   font-weight: 700;
@@ -7576,87 +7613,12 @@ input:checked + .slider:before {
   ));
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-  // src/ui/authStore.ts
-  var TOKEN_KEY = "agent_monitor_token";
+  // src/ui/networkStore.ts
   var SERVER_KEY = "agent_server_url";
   var CUSTOM_IP_KEY = "agent_custom_server_ip";
   var TAILSCALE_KEY = "agent_tailscale_url";
-  function getStoredToken() {
-    try {
-      if (typeof window !== "undefined" && window.location) {
-        const fromUrl = new URLSearchParams(window.location.search).get("token");
-        if (fromUrl) {
-          setStoredToken(fromUrl);
-          const url = new URL(window.location.href);
-          url.searchParams.delete("token");
-          window.history.replaceState({}, "", url.toString());
-          return fromUrl;
-        }
-      }
-      return typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
-    } catch {
-      return null;
-    }
-  }
-  function setStoredToken(token) {
-    try {
-      if (typeof localStorage !== "undefined") {
-        localStorage.setItem(TOKEN_KEY, token);
-      }
-    } catch {
-    }
-  }
-  function clearStoredToken() {
-    try {
-      if (typeof localStorage !== "undefined") {
-        localStorage.removeItem(TOKEN_KEY);
-      }
-    } catch {
-    }
-  }
-  function getDefaultServerUrl() {
-    try {
-      if ("") {
-        return "";
-      }
-    } catch {
-    }
-    return "";
-  }
-  function getServerBaseUrl() {
-    try {
-      if (typeof window !== "undefined" && window.location) {
-        const fromUrl = new URLSearchParams(window.location.search).get("server");
-        if (fromUrl) {
-          const clean = fromUrl.replace(/\/+$/, "");
-          setServerBaseUrl(clean);
-          return clean;
-        }
-      }
-      const stored = typeof localStorage !== "undefined" ? localStorage.getItem(SERVER_KEY) : null;
-      if (stored === "none") {
-        return "";
-      }
-      if (stored) return stored.replace(/\/+$/, "");
-      if (isStaticDeployment()) {
-        const def = getDefaultServerUrl();
-        if (def) return def.replace(/\/+$/, "");
-      }
-    } catch {
-    }
-    return "";
-  }
-  function isStaticDeployment() {
-    if (typeof window === "undefined") return false;
-    return window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev") || window.location.hostname.endsWith(".vercel.app") || window.location.hostname.endsWith(".netlify.app");
-  }
-  function hasLiveServer() {
-    const base = getServerBaseUrl();
-    if (isStaticDeployment()) {
-      return Boolean(base);
-    }
-    return true;
-  }
+  var DEFAULT_LAN_KEY = "agent_default_lan_url";
+  var CUSTOM_CONNECTIONS_KEY = "agent_custom_connections";
   function getCleanStorage(key) {
     try {
       const val = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
@@ -7673,6 +7635,15 @@ input:checked + .slider:before {
       }
     } catch {
     }
+  }
+  function getDefaultServerUrl() {
+    try {
+      if ("") {
+        return "";
+      }
+    } catch {
+    }
+    return "";
   }
   function setServerBaseUrl(url) {
     setCleanStorage(SERVER_KEY, url);
@@ -7697,6 +7668,112 @@ input:checked + .slider:before {
   }
   function setTailscaleUrl(url) {
     setCleanStorage(TAILSCALE_KEY, url);
+  }
+  function getDefaultLanUrl() {
+    const stored = getCleanStorage(DEFAULT_LAN_KEY);
+    return stored || getDefaultServerUrl();
+  }
+  function setDefaultLanUrl(url) {
+    setCleanStorage(DEFAULT_LAN_KEY, url);
+  }
+  function getCustomConnections() {
+    try {
+      if (typeof localStorage === "undefined") return [];
+      const raw = localStorage.getItem(CUSTOM_CONNECTIONS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      const legacy = getCustomServerIp();
+      if (legacy && !list.includes(legacy)) list.unshift(legacy);
+      return list.filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+  function addCustomConnection(url) {
+    try {
+      const clean = url.trim().replace(/\/+$/, "");
+      if (!clean || typeof localStorage === "undefined") return getCustomConnections();
+      const current = getCustomConnections().filter((u) => u !== clean);
+      current.push(clean);
+      localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
+      return current;
+    } catch {
+      return getCustomConnections();
+    }
+  }
+  function removeCustomConnection(url) {
+    try {
+      const clean = url.trim().replace(/\/+$/, "");
+      if (typeof localStorage === "undefined") return [];
+      const current = getCustomConnections().filter((u) => u !== clean);
+      localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
+      if (getCustomServerIp() === clean) clearCustomServerIp();
+      return current;
+    } catch {
+      return getCustomConnections();
+    }
+  }
+
+  // src/ui/authStore.ts
+  var TOKEN_KEY = "agent_monitor_token";
+  var SERVER_KEY2 = "agent_server_url";
+  function getStoredToken() {
+    try {
+      if (typeof window !== "undefined" && window.location) {
+        const fromUrl = new URLSearchParams(window.location.search).get("token");
+        if (fromUrl) {
+          setStoredToken(fromUrl);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("token");
+          window.history.replaceState({}, "", url.toString());
+          return fromUrl;
+        }
+      }
+      return typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+    } catch {
+      return null;
+    }
+  }
+  function setStoredToken(token) {
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(TOKEN_KEY, token);
+    } catch {
+    }
+  }
+  function clearStoredToken() {
+    try {
+      if (typeof localStorage !== "undefined") localStorage.removeItem(TOKEN_KEY);
+    } catch {
+    }
+  }
+  function getServerBaseUrl() {
+    try {
+      if (typeof window !== "undefined" && window.location) {
+        const fromUrl = new URLSearchParams(window.location.search).get("server");
+        if (fromUrl) {
+          const clean = fromUrl.replace(/\/+$/, "");
+          setServerBaseUrl(clean);
+          return clean;
+        }
+      }
+      const stored = typeof localStorage !== "undefined" ? localStorage.getItem(SERVER_KEY2) : null;
+      if (stored === "none") return "";
+      if (stored) return stored.replace(/\/+$/, "");
+      if (isStaticDeployment()) {
+        const def = getDefaultServerUrl();
+        if (def) return def.replace(/\/+$/, "");
+      }
+    } catch {
+    }
+    return "";
+  }
+  function isStaticDeployment() {
+    if (typeof window === "undefined") return false;
+    return window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev") || window.location.hostname.endsWith(".vercel.app") || window.location.hostname.endsWith(".netlify.app");
+  }
+  function hasLiveServer() {
+    const base = getServerBaseUrl();
+    if (isStaticDeployment()) return Boolean(base);
+    return true;
   }
   function buildApiUrl(pathname) {
     const base = getServerBaseUrl();
@@ -8019,7 +8096,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.30" : "1.0.29";
+  var CLIENT_VERSION = true ? "1.0.31" : "1.0.29";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8339,6 +8416,13 @@ input:checked + .slider:before {
     };
   }
 
+  // src/ui/planPrompt.ts
+  function buildPlanHandoffPrompt(planPath, planTitle) {
+    const title = planTitle || planPath.split("/").pop() || "Plan";
+    const planRef = planPath ? ` [${title}](${planPath})` : "";
+    return `I am ready to implement the plan${planRef}. Please follow each step in the plan, work through the checklist items in order, verify the changes, and produce a walkthrough.md artifact summarizing the changes made, verification results, and tested behavior.`;
+  }
+
   // src/ui/messageSender.ts
   async function submitUserMessage(state2, syncMachine, text, attachmentsParam) {
     const attachments = attachmentsParam ?? (state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0);
@@ -8358,6 +8442,9 @@ input:checked + .slider:before {
           timestamp: Date.now()
         });
       } catch (err) {
+        if (!syncMachine.getAutoFallback()) {
+          throw err;
+        }
         try {
           const exists = state2.sessions.some((s) => s.id === sid);
           if (!exists) {
@@ -8441,11 +8528,6 @@ input:checked + .slider:before {
         state2.errorMessage = "Failed to stop agent: could not reach server.";
       }
     }
-  }
-  function buildPlanHandoffPrompt(planPath, planTitle) {
-    const title = planTitle || planPath.split("/").pop() || "Plan";
-    const planRef = planPath ? ` [${title}](${planPath})` : "";
-    return `I am ready to implement the plan${planRef}. Please follow each step in the plan, work through the checklist items in order, verify the changes, and produce a walkthrough.md artifact summarizing the changes made, verification results, and tested behavior.`;
   }
   async function submitMessageFlow(state2, syncMachine, text, onReload, onRender, options) {
     const input = typeof document !== "undefined" ? document.getElementById("composer-input") : null;
@@ -8884,6 +8966,77 @@ input:checked + .slider:before {
       }
       return { etag: lastEtag, handled: false };
     }
+  }
+  var GitPollController = class {
+    constructor(getGistClient, getMode, getInterval, callbacks) {
+      this.getGistClient = getGistClient;
+      this.getMode = getMode;
+      this.getInterval = getInterval;
+      this.callbacks = callbacks;
+      __publicField(this, "pollTimer");
+      __publicField(this, "lastEtag");
+    }
+    restart() {
+      this.stop();
+      void this.pollOnce();
+      const timer = setInterval(() => {
+        void this.pollOnce();
+      }, this.getInterval());
+      if (typeof timer?.unref === "function") timer.unref();
+      this.pollTimer = timer;
+    }
+    async pollOnce() {
+      const client = this.getGistClient();
+      const mode = this.getMode();
+      if (!client || mode !== "git-backup" && mode !== "p2p") return;
+      const { etag } = await executeGistPoll(client, this.lastEtag, this.callbacks, (resetTime) => {
+        const waitMs = Math.max(3e3, resetTime - Date.now() + 1e3);
+        this.stop();
+        this.pollTimer = setTimeout(() => this.restart(), waitMs);
+      });
+      if (etag) this.lastEtag = etag;
+    }
+    stop() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        clearTimeout(this.pollTimer);
+        this.pollTimer = void 0;
+      }
+    }
+  };
+
+  // src/ui/syncStateMachineDispatch.ts
+  async function dispatchInboxMessage(ctx, msg) {
+    if (ctx.p2pCoord?.isConnected()) {
+      const adapter = ctx.p2pCoord.getAdapter();
+      if (adapter) {
+        await adapter.send({
+          id: msg.id,
+          type: "user_input",
+          sessionId: msg.sessionId,
+          payload: msg,
+          timestamp: Date.now()
+        });
+        return;
+      }
+    }
+    if (ctx.mode === "p2p") {
+      if (!ctx.autoFallback) {
+        throw new Error("WebRTC P2P is not connected and auto-fallback is disabled.");
+      }
+      if (ctx.gistClient) {
+        await ctx.gistClient.pushInboxMessage(msg);
+        await ctx.pollOnce();
+        return;
+      }
+      throw new Error("WebRTC P2P is not connected and Gist fallback is not configured.");
+    }
+    if (ctx.gistClient && ctx.mode === "git-backup") {
+      await ctx.gistClient.pushInboxMessage(msg);
+      await ctx.pollOnce();
+      return;
+    }
+    throw new Error("Gist client is not configured or transport mode is not available");
   }
 
   // src/p2p/p2pIceConfig.ts
@@ -9477,6 +9630,70 @@ input:checked + .slider:before {
     return coord;
   }
 
+  // src/ui/syncStateMachineModes.ts
+  function switchP2PMode(ctx) {
+    ctx.pollController.stop();
+    ctx.reachabilityProbe.stop();
+    ctx.mode = "p2p";
+    ctx.callbacks.onModeChange("p2p");
+    ctx.callbacks.onError?.("");
+    ctx.p2pCoord?.stop();
+    const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig);
+    if (!coord) ctx.callbacks.onStatusChange("connected");
+    return coord;
+  }
+  function switchLiveSseMode(ctx) {
+    ctx.pollController.stop();
+    ctx.reachabilityProbe.stop();
+    ctx.p2pCoord?.stop();
+    ctx.p2pCoord = null;
+    ctx.mode = "live-sse";
+    ctx.callbacks.onModeChange("live-sse");
+    ctx.callbacks.onStatusChange("connecting");
+    ctx.callbacks.onError?.("");
+  }
+  function switchGitBackupMode(ctx) {
+    ctx.p2pCoord?.stop();
+    ctx.p2pCoord = null;
+    if (ctx.gistConfig) {
+      ctx.mode = "git-backup";
+      ctx.callbacks.onModeChange("git-backup");
+      ctx.callbacks.onStatusChange("connected");
+      ctx.callbacks.onError?.("");
+      if (ctx.autoFallback) ctx.reachabilityProbe.start();
+      ctx.pollController.restart();
+    } else {
+      ctx.callbacks.onError?.("Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.");
+    }
+  }
+  function handleSseFailure(ctx) {
+    if (!ctx.autoFallback) {
+      ctx.callbacks.onStatusChange("disconnected");
+      return;
+    }
+    if (ctx.gistConfig) {
+      ctx.mode = "git-backup";
+      ctx.callbacks.onModeChange("git-backup");
+      ctx.callbacks.onStatusChange("syncing");
+      ctx.reachabilityProbe.start();
+      ctx.pollController.restart();
+    } else {
+      ctx.mode = "offline";
+      ctx.callbacks.onModeChange("offline");
+      ctx.callbacks.onStatusChange("disconnected");
+    }
+  }
+  function restoreLive(ctx) {
+    ctx.pollController.stop();
+    ctx.reachabilityProbe.stop();
+    ctx.p2pCoord?.stop();
+    ctx.p2pCoord = null;
+    ctx.mode = "live-sse";
+    ctx.callbacks.onModeChange("live-sse");
+    ctx.callbacks.onStatusChange("connected");
+    ctx.callbacks.onError?.("");
+  }
+
   // src/ui/syncStateMachine.ts
   var SyncStateMachine = class {
     constructor(callbacks) {
@@ -9487,19 +9704,35 @@ input:checked + .slider:before {
       __publicField(this, "p2pCoord", null);
       __publicField(this, "isAwaitingResponse", false);
       __publicField(this, "awaitingStartedAt");
-      __publicField(this, "pollTimer");
-      __publicField(this, "lastEtag");
       __publicField(this, "autoFallback", true);
       __publicField(this, "reachabilityProbe");
+      __publicField(this, "pollController");
       this.reachabilityProbe = new LiveReachabilityProbe({ onReachable: () => this.triggerLiveServerReachable() });
+      this.pollController = new GitPollController(
+        () => this.gistClient,
+        () => this.mode,
+        () => this.getPollInterval(),
+        this.callbacks
+      );
       if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden) {
-            if (this.mode === "git-backup") this.restartGitPolling();
+            if (this.mode === "git-backup") this.pollController.restart();
             if (this.autoFallback) void this.reachabilityProbe.checkReachability();
           }
         });
       }
+    }
+    getModeCtx() {
+      return {
+        mode: this.mode,
+        gistConfig: this.gistConfig,
+        p2pCoord: this.p2pCoord,
+        autoFallback: this.autoFallback,
+        reachabilityProbe: this.reachabilityProbe,
+        pollController: this.pollController,
+        callbacks: this.callbacks
+      };
     }
     setAutoFallback(enabled) {
       this.autoFallback = enabled;
@@ -9514,79 +9747,49 @@ input:checked + .slider:before {
     getPollInterval() {
       const isHidden = typeof document !== "undefined" && Boolean(document.hidden);
       const rateInfo = this.gistClient?.getRateLimitInfo?.();
-      return computeClientPollInterval({ isAwaitingResponse: this.isAwaitingResponse, awaitingStartedAt: this.awaitingStartedAt, isHidden, remainingQuota: rateInfo?.remaining });
+      return computeClientPollInterval({
+        isAwaitingResponse: this.isAwaitingResponse,
+        awaitingStartedAt: this.awaitingStartedAt,
+        isHidden,
+        remainingQuota: rateInfo?.remaining
+      });
     }
     setAwaitingResponse(awaiting) {
       this.isAwaitingResponse = awaiting;
       this.awaitingStartedAt = awaiting ? Date.now() : void 0;
-      if (this.mode === "git-backup") this.restartGitPolling();
+      if (this.mode === "git-backup") this.pollController.restart();
     }
     setGistConfig(config) {
       this.gistConfig = config;
       this.gistClient = config ? new GistClient(config) : void 0;
     }
     forceP2PMode() {
-      this.stopGitPolling();
-      this.reachabilityProbe.stop();
-      this.mode = "p2p";
-      this.callbacks.onModeChange("p2p");
-      this.callbacks.onError?.("");
-      this.p2pCoord?.stop();
-      this.p2pCoord = startP2PCoordination(this.callbacks, this.gistConfig);
-      if (!this.p2pCoord) {
-        this.callbacks.onStatusChange("connected");
-      }
+      const ctx = this.getModeCtx();
+      this.p2pCoord = switchP2PMode(ctx);
+      this.mode = ctx.mode;
     }
     forceLiveSseMode() {
-      this.stopGitPolling();
-      this.reachabilityProbe.stop();
-      this.p2pCoord?.stop();
+      const ctx = this.getModeCtx();
+      switchLiveSseMode(ctx);
+      this.mode = ctx.mode;
       this.p2pCoord = null;
-      this.mode = "live-sse";
-      this.callbacks.onModeChange("live-sse");
-      this.callbacks.onStatusChange("connecting");
-      this.callbacks.onError?.("");
     }
     forceGitBackupMode() {
-      this.p2pCoord?.stop();
+      const ctx = this.getModeCtx();
+      switchGitBackupMode(ctx);
+      this.mode = ctx.mode;
       this.p2pCoord = null;
-      if (this.gistConfig) {
-        this.mode = "git-backup";
-        this.callbacks.onModeChange("git-backup");
-        this.callbacks.onStatusChange("connected");
-        this.callbacks.onError?.("");
-        if (this.autoFallback) this.reachabilityProbe.start();
-        this.restartGitPolling();
-      } else {
-        this.callbacks.onError?.("Gist configuration missing. Scan pairing QR code or set token & Gist ID in Settings.");
-      }
     }
     handlePrimarySseFailure() {
-      if (!this.autoFallback || this.mode === "live-sse" || this.mode === "p2p") {
-        this.callbacks.onStatusChange("disconnected");
-        return;
-      }
-      if (this.gistConfig) {
-        this.mode = "git-backup";
-        this.callbacks.onModeChange("git-backup");
-        this.callbacks.onStatusChange("syncing");
-        this.reachabilityProbe.start();
-        this.restartGitPolling();
-      } else {
-        this.mode = "offline";
-        this.callbacks.onModeChange("offline");
-        this.callbacks.onStatusChange("disconnected");
-      }
+      const ctx = this.getModeCtx();
+      handleSseFailure(ctx);
+      this.mode = ctx.mode;
     }
     restorePrimaryLive() {
-      this.stopGitPolling();
-      this.reachabilityProbe.stop();
-      this.p2pCoord?.stop();
+      const ctx = this.getModeCtx();
+      restoreLive(ctx);
+      this.mode = ctx.mode;
       this.p2pCoord = null;
-      this.mode = "live-sse";
-      this.callbacks.onModeChange("live-sse");
-      this.callbacks.onStatusChange("connected");
-      this.callbacks.onError?.("");
     }
     triggerLiveServerReachable() {
       this.reachabilityProbe.stop();
@@ -9594,50 +9797,28 @@ input:checked + .slider:before {
       this.callbacks.onLiveServerReachable?.();
     }
     async pushInboxMessage(msg) {
-      if (this.p2pCoord?.isConnected()) {
-        const adapter = this.p2pCoord.getAdapter();
-        if (adapter) {
-          await adapter.send({ id: msg.id, type: "user_input", sessionId: msg.sessionId, payload: msg, timestamp: Date.now() });
-          return;
-        }
-      }
-      if (this.gistClient && (this.mode === "git-backup" || this.mode === "p2p")) {
-        await this.gistClient.pushInboxMessage(msg);
-        await this.pollOnce();
-        return;
-      }
-      throw new Error("Gist client is not configured or transport mode is not available");
-    }
-    restartGitPolling() {
-      this.stopGitPolling();
-      void this.pollOnce();
-      const timer = setInterval(() => {
-        void this.pollOnce();
-      }, this.getPollInterval());
-      if (typeof timer?.unref === "function") timer.unref();
-      this.pollTimer = timer;
+      return dispatchInboxMessage(
+        {
+          p2pCoord: this.p2pCoord,
+          gistClient: this.gistClient,
+          mode: this.mode,
+          autoFallback: this.autoFallback,
+          pollOnce: () => this.pollController.pollOnce()
+        },
+        msg
+      );
     }
     async pollOnce() {
-      if (!this.gistClient || this.mode !== "git-backup" && this.mode !== "p2p") return;
-      const { etag } = await executeGistPoll(this.gistClient, this.lastEtag, this.callbacks, (resetTime) => {
-        const waitMs = Math.max(3e3, resetTime - Date.now() + 1e3);
-        this.stopGitPolling();
-        this.pollTimer = setTimeout(() => this.restartGitPolling(), waitMs);
-      });
-      if (etag) this.lastEtag = etag;
+      await this.pollController.pollOnce();
     }
     stopGitPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        clearTimeout(this.pollTimer);
-        this.pollTimer = void 0;
-      }
+      this.pollController.stop();
     }
     stop() {
       this.reachabilityProbe.stop();
       this.p2pCoord?.stop();
       this.p2pCoord = null;
-      this.stopGitPolling();
+      this.pollController.stop();
     }
   };
 
@@ -9891,7 +10072,7 @@ input:checked + .slider:before {
     if (typeof window === "undefined") return { imported: false };
     const raw = window.location.hash || window.location.search;
     const parsed = parseUrlConfig(raw);
-    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl) return { imported: false };
+    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl && parsed.autoFallback === void 0) return { imported: false };
     const ok = applyConfigToStorage(parsed);
     if (ok) {
       try {
@@ -9903,7 +10084,8 @@ input:checked + .slider:before {
         imported: true,
         gistConfig: parsed.gistId && parsed.token ? { gistId: parsed.gistId, token: parsed.token } : void 0,
         password: parsed.password,
-        serverUrl: parsed.serverUrl
+        serverUrl: parsed.serverUrl,
+        autoFallback: parsed.autoFallback
       };
     }
     return { imported: false };
@@ -13167,21 +13349,63 @@ ${thought.trim()}` : thought.trim();
     };
   }
 
+  // src/ui/components/settingsModal/settingsConnectionCards.ts
+  function renderConnectionOptionBtn(opt, currentBaseUrl) {
+    const isActive = currentBaseUrl === opt.url;
+    const host = extractHostFromUrl(opt.url);
+    const btnId = opt.type === "tailscale" ? "btn-switch-tailscale" : opt.type === "lan" ? "btn-switch-set-ip" : "";
+    return `
+    <div class="switcher-opt-wrapper ${isActive ? "active" : ""}">
+      <button
+        type="button"
+        class="btn switcher-opt-btn ${isActive ? "active" : ""}"
+        ${btnId ? `id="${btnId}"` : ""}
+        data-switch-connection="${escapeHtml2(opt.url)}"
+        title="Switch to ${escapeHtml2(opt.name)} (${escapeHtml2(opt.url)})"
+      >
+        <span class="switcher-icon">${opt.icon}</span>
+        <span class="switcher-title">${escapeHtml2(opt.name)}</span>
+        <span class="switcher-badge font-mono">${escapeHtml2(host)}</span>
+        ${isActive ? '<span class="switcher-active-dot">\u25CF Active</span>' : ""}
+      </button>
+      ${opt.isCustom ? `
+        <button
+          type="button"
+          class="switcher-delete-btn"
+          data-delete-custom-ip="${escapeHtml2(opt.url)}"
+          title="Remove ${escapeHtml2(opt.url)}"
+        >\u2715</button>
+      ` : ""}
+    </div>
+  `;
+  }
+
   // src/ui/components/settingsModal/settingsNetworkSection.ts
   function renderSettingsNetworkSection(state2) {
     const networks = state2.serverSetupInfo?.networks || [];
     const payload = getCurrentClientPayload(state2);
     const copyFeedback = state2.settingsCopyFeedback || "";
     const currentBaseUrl = getServerBaseUrl() || state2.selectedLanIp || "";
-    const isServerSaved = copyFeedback === "server-saved";
-    const customIp = state2.customServerIp || getCustomServerIp() || (!detectIsTailscale(currentBaseUrl) ? currentBaseUrl : "");
-    const tailscaleUrl = state2.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || (detectIsTailscale(currentBaseUrl) ? currentBaseUrl : "");
-    const isTailscaleActive = Boolean(currentBaseUrl && (currentBaseUrl === tailscaleUrl || detectIsTailscale(currentBaseUrl)));
-    const isSetIpActive = Boolean(currentBaseUrl && customIp && currentBaseUrl === customIp && !isTailscaleActive);
-    const hasSwitcher = Boolean(customIp || tailscaleUrl);
+    const isConnectionAdded = copyFeedback === "connection-added" || copyFeedback === "server-saved";
+    const customIp = state2.customServerIp || getCustomServerIp() || "";
+    const defaultLanUrl = state2.defaultLanUrl || getDefaultLanUrl() || networks.find((n) => !n.isTailscale)?.url || customIp;
+    const tailscaleUrl = state2.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || "";
+    const customList = (state2.customConnections || getCustomConnections()).filter(
+      (u) => u && u !== defaultLanUrl && u !== tailscaleUrl
+    );
+    const options = [];
+    if (defaultLanUrl) {
+      options.push({ url: defaultLanUrl, name: "Default LAN", icon: "\u{1F3E0}", type: "lan" });
+    }
+    if (tailscaleUrl) {
+      options.push({ url: tailscaleUrl, name: "Tailscale", icon: "\u{1F512}", type: "tailscale" });
+    }
+    for (const customUrl of customList) {
+      options.push({ url: customUrl, name: "Custom IP", icon: "\u{1F310}", type: "custom", isCustom: true });
+    }
     const renderedList = networks.length > 0 ? networks.map((net) => {
       const fullSetupUrl = `${net.url}/#setup=${payload}`;
-      const isSelected = currentBaseUrl === net.url || !currentBaseUrl && net.url === state2.serverSetupInfo?.lanUrl?.split("/#")[0];
+      const isSelected = currentBaseUrl === net.url || !currentBaseUrl && net.url === defaultLanUrl;
       const isCopied = copyFeedback === `ip-${net.address}`;
       return `
           <div class="network-ip-item ${isSelected ? "selected" : ""}" data-ip-url="${escapeHtml2(net.url)}">
@@ -13224,39 +13448,14 @@ ${thought.trim()}` : thought.trim();
           <p class="network-ip-hint">Local connection URL: <code>${escapeHtml2(currentBaseUrl || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200"))}</code></p>
         </div>
       `;
-    const switcherHtml = hasSwitcher ? `
+    const switcherHtml = options.length > 0 ? `
         <div class="network-connection-switcher">
           <div class="switcher-header-row">
-            <span class="switcher-label">Quick Switch Connection:</span>
-            ${isTailscaleActive ? '<span class="switcher-active-tag tag-tailscale">\u{1F512} Tailscale Active</span>' : isSetIpActive ? '<span class="switcher-active-tag tag-lan">\u{1F3E0} Set IP Active</span>' : ""}
+            <span class="switcher-label">Available Connections:</span>
+            <span class="switcher-count-tag">${options.length} configured</span>
           </div>
           <div class="switcher-options">
-            ${customIp ? `
-              <button
-                type="button"
-                class="btn switcher-opt-btn ${isSetIpActive ? "active" : ""}"
-                id="btn-switch-set-ip"
-                title="Switch active connection to Set IP (${escapeHtml2(customIp)})"
-              >
-                <span class="switcher-icon">\u{1F3E0}</span>
-                <span class="switcher-title">Set IP</span>
-                <span class="switcher-badge font-mono">${escapeHtml2(extractHostFromUrl(customIp))}</span>
-                ${isSetIpActive ? '<span class="switcher-active-dot">\u25CF Active</span>' : ""}
-              </button>
-            ` : ""}
-            ${tailscaleUrl ? `
-              <button
-                type="button"
-                class="btn switcher-opt-btn ${isTailscaleActive ? "active" : ""}"
-                id="btn-switch-tailscale"
-                title="Switch active connection to Tailscale (${escapeHtml2(tailscaleUrl)})"
-              >
-                <span class="switcher-icon">\u{1F512}</span>
-                <span class="switcher-title">Tailscale</span>
-                <span class="switcher-badge font-mono">${escapeHtml2(extractHostFromUrl(tailscaleUrl))}</span>
-                ${isTailscaleActive ? '<span class="switcher-active-dot">\u25CF Active</span>' : ""}
-              </button>
-            ` : ""}
+            ${options.map((opt) => renderConnectionOptionBtn(opt, currentBaseUrl)).join("")}
           </div>
         </div>
       ` : "";
@@ -13273,7 +13472,7 @@ ${thought.trim()}` : thought.trim();
 
       <div class="server-ip-config-box" style="margin-bottom: 12px;">
         <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
-          Agent Server Address (LAN / Set IP):
+          Add New Server Address (LAN, Remote, or Tunnel IP):
         </label>
         <div style="display: flex; gap: 8px; align-items: center;">
           <input
@@ -13285,7 +13484,7 @@ ${thought.trim()}` : thought.trim();
             style="flex: 1;"
           />
           <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
-            ${isServerSaved ? "\u2705 Saved!" : "\u{1F4BE} Set IP"}
+            ${isConnectionAdded ? "\u2705 Added!" : "\u2795 Add Connection"}
           </button>
           ${customIp ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ""}
         </div>
@@ -14640,8 +14839,10 @@ ${thought.trim()}` : thought.trim();
 
   // src/ui/settingsConnectionSwitcher.ts
   async function fetchServerSetupInfo(state2, onRender, force = false) {
-    if (!state2.customServerIp) state2.customServerIp = getCustomServerIp() || void 0;
+    if (!state2.defaultLanUrl) state2.defaultLanUrl = getDefaultLanUrl() || void 0;
     if (!state2.tailscaleUrl) state2.tailscaleUrl = getTailscaleUrl() || void 0;
+    if (!state2.customConnections) state2.customConnections = getCustomConnections();
+    if (!state2.customServerIp) state2.customServerIp = getCustomServerIp() || void 0;
     if (!force && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
     if (!hasLiveServer()) return;
     try {
@@ -14654,70 +14855,82 @@ ${thought.trim()}` : thought.trim();
           state2.tailscaleUrl = tsNet.url;
           setTailscaleUrl(tsNet.url);
         }
+        const lanNet = data.networks?.find((n) => !n.isTailscale) || (data.lanUrl ? { url: data.lanUrl.split("/#")[0] } : void 0);
+        if (lanNet?.url) {
+          state2.defaultLanUrl = lanNet.url;
+          setDefaultLanUrl(lanNet.url);
+        }
         onRender();
       }
     } catch {
     }
   }
-  function selectLanIp(state2, ipUrl, onRender) {
-    state2.selectedLanIp = ipUrl;
+  function selectActiveConnection(state2, url, onRender) {
+    const clean = url.trim().replace(/\/+$/, "");
+    state2.selectedLanIp = clean;
     state2.qrModalTarget = "lan";
-    setServerBaseUrl(ipUrl);
-    if (detectIsTailscale(extractHostFromUrl(ipUrl))) {
-      state2.tailscaleUrl = ipUrl;
-      setTailscaleUrl(ipUrl);
-    } else {
-      state2.customServerIp = ipUrl;
-      setCustomServerIp(ipUrl);
-    }
+    setServerBaseUrl(clean);
+    state2.settingsCopyFeedback = `switched-${extractHostFromUrl(clean)}`;
     onRender();
     void fetchServerSetupInfo(state2, onRender, true);
+  }
+  function selectLanIp(state2, ipUrl, onRender) {
+    selectActiveConnection(state2, ipUrl, onRender);
   }
   function switchToTailscale(state2, onRender) {
     const tsUrl = state2.tailscaleUrl || getTailscaleUrl() || state2.serverSetupInfo?.networks?.find((n) => n.isTailscale)?.url;
-    if (!tsUrl) return;
-    state2.selectedLanIp = tsUrl;
-    state2.tailscaleUrl = tsUrl;
-    state2.qrModalTarget = "lan";
-    setServerBaseUrl(tsUrl);
-    setTailscaleUrl(tsUrl);
-    state2.settingsCopyFeedback = "switched-tailscale";
-    onRender();
-    void fetchServerSetupInfo(state2, onRender, true);
+    if (tsUrl) selectActiveConnection(state2, tsUrl, onRender);
   }
   function switchToSetIp(state2, onRender) {
-    const customIp = state2.customServerIp || getCustomServerIp() || state2.serverSetupInfo?.lanUrl?.split("/#")[0];
-    if (!customIp) return;
-    state2.selectedLanIp = customIp;
-    state2.customServerIp = customIp;
-    state2.qrModalTarget = "lan";
-    setServerBaseUrl(customIp);
-    state2.settingsCopyFeedback = "switched-set-ip";
-    onRender();
-    void fetchServerSetupInfo(state2, onRender, true);
+    const customIp = state2.customServerIp || getCustomServerIp();
+    const customList = state2.customConnections || getCustomConnections();
+    const target = customIp || customList[0] || state2.defaultLanUrl || getDefaultLanUrl();
+    if (target) selectActiveConnection(state2, target, onRender);
   }
-  function saveCustomServerUrl(state2, url, onRender) {
-    const clean = url.trim().replace(/\/+$/, "");
-    if (clean) {
-      setCustomServerIp(clean);
-      setServerBaseUrl(clean);
-      state2.customServerIp = clean;
-      state2.selectedLanIp = clean;
-    } else {
-      clearCustomServerIp();
-      clearServerBaseUrl();
-      state2.customServerIp = void 0;
-      state2.selectedLanIp = void 0;
+  function addNewCustomConnection(state2, rawUrl, onRender) {
+    let clean = rawUrl.trim().replace(/\/+$/, "");
+    if (!clean) return;
+    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+      clean = `http://${clean}`;
     }
+    const updated = addCustomConnection(clean);
+    state2.customConnections = updated;
+    state2.customServerIp = clean;
+    setCustomServerIp(clean);
+    selectActiveConnection(state2, clean, onRender);
     state2.settingsCopyFeedback = "server-saved";
     onRender();
-    void fetchServerSetupInfo(state2, onRender, true);
-    setTimeout(() => {
-      if (state2.settingsCopyFeedback === "server-saved") {
-        state2.settingsCopyFeedback = void 0;
-        onRender();
+  }
+  function deleteCustomConnection(state2, url, onRender) {
+    const clean = url.trim().replace(/\/+$/, "");
+    const updated = removeCustomConnection(clean);
+    state2.customConnections = updated;
+    if (state2.customServerIp === clean) {
+      state2.customServerIp = void 0;
+      clearCustomServerIp();
+    }
+    if (state2.selectedLanIp === clean) {
+      const fallback = state2.defaultLanUrl || getDefaultLanUrl() || state2.tailscaleUrl || getTailscaleUrl() || updated[0] || "";
+      if (fallback) {
+        selectActiveConnection(state2, fallback, onRender);
+      } else {
+        clearServerBaseUrl();
+        state2.selectedLanIp = void 0;
       }
-    }, 2500);
+    }
+    state2.settingsCopyFeedback = "connection-deleted";
+    onRender();
+  }
+  function saveCustomServerUrl(state2, url, onRender) {
+    if (url.trim()) {
+      addNewCustomConnection(state2, url, onRender);
+    } else {
+      clearServerBaseUrl();
+      clearCustomServerIp();
+      state2.customServerIp = void 0;
+      state2.selectedLanIp = void 0;
+      onRender();
+    }
   }
 
   // src/ui/settingsClipboardActions.ts
@@ -14790,8 +15003,9 @@ ${thought.trim()}` : thought.trim();
     state2.qrModalTarget = state2.qrModalTarget || "gh_pages";
     state2.settingsCopyFeedback = void 0;
     state2.qrCopyFeedback = void 0;
-    if (!state2.customServerIp) state2.customServerIp = getCustomServerIp() || void 0;
+    if (!state2.defaultLanUrl) state2.defaultLanUrl = getDefaultLanUrl() || void 0;
     if (!state2.tailscaleUrl) state2.tailscaleUrl = getTailscaleUrl() || void 0;
+    if (!state2.customConnections) state2.customConnections = getCustomConnections();
     onRender();
     void fetchServerSetupInfo(state2, onRender);
   }
@@ -14837,6 +15051,18 @@ ${thought.trim()}` : thought.trim();
       switchToSetIp(state2, callbacks.onRender);
       return true;
     }
+    const switchBtn = target.closest("[data-switch-connection]");
+    if (switchBtn) {
+      const targetUrl = switchBtn.getAttribute("data-switch-connection") || "";
+      if (targetUrl) selectActiveConnection(state2, targetUrl, callbacks.onRender);
+      return true;
+    }
+    const deleteBtn = target.closest("[data-delete-custom-ip]");
+    if (deleteBtn) {
+      const deleteUrl = deleteBtn.getAttribute("data-delete-custom-ip") || "";
+      if (deleteUrl) deleteCustomConnection(state2, deleteUrl, callbacks.onRender);
+      return true;
+    }
     const useIpBtn = target.closest("[data-use-ip]");
     if (useIpBtn) {
       const ipUrl = useIpBtn.getAttribute("data-use-ip") || "";
@@ -14852,7 +15078,11 @@ ${thought.trim()}` : thought.trim();
     }
     if (target.closest("#btn-save-custom-ip")) {
       const input = document.getElementById("input-custom-server-ip");
-      saveCustomServerUrl(state2, input?.value || "", callbacks.onRender);
+      const val = input?.value || "";
+      if (val.trim()) {
+        addNewCustomConnection(state2, val, callbacks.onRender);
+        if (input) input.value = "";
+      }
       return true;
     }
     if (target.closest("#btn-clear-custom-ip")) {
@@ -14953,18 +15183,26 @@ ${thought.trim()}` : thought.trim();
     return false;
   }
   function handleControlClick(target, state2, callbacks) {
-    const autoFallbackChk = target.closest("#toggle-auto-fallback, .btn-toggle-auto-fallback");
+    const fallbackRow = target.closest(".settings-fallback-row");
+    const autoFallbackChk = target.closest("#toggle-auto-fallback, .btn-toggle-auto-fallback") || (fallbackRow ? fallbackRow.querySelector("#toggle-auto-fallback") : null);
     if (autoFallbackChk) {
-      setAutoFallbackEnabled(autoFallbackChk.checked);
-      state2.autoFallbackEnabled = autoFallbackChk.checked;
-      callbacks.onToggleAutoFallback?.(autoFallbackChk.checked);
+      const isDirectChk = Boolean(target.closest("#toggle-auto-fallback, .btn-toggle-auto-fallback"));
+      const nextVal = isDirectChk ? autoFallbackChk.checked : !autoFallbackChk.checked;
+      autoFallbackChk.checked = nextVal;
+      setAutoFallbackEnabled(nextVal);
+      state2.autoFallbackEnabled = nextVal;
+      callbacks.onToggleAutoFallback?.(nextVal);
       callbacks.onRender();
       return true;
     }
-    const autoUpdateChk = target.closest("#toggle-auto-update, .btn-toggle-auto-update");
+    const updateRow = target.closest(".settings-update-row");
+    const autoUpdateChk = target.closest("#toggle-auto-update, .btn-toggle-auto-update") || (updateRow ? updateRow.querySelector("#toggle-auto-update") : null);
     if (autoUpdateChk) {
-      setAutoUpdateEnabled(autoUpdateChk.checked);
-      state2.autoUpdateEnabled = autoUpdateChk.checked;
+      const isDirectChk = Boolean(target.closest("#toggle-auto-update, .btn-toggle-auto-update"));
+      const nextVal = isDirectChk ? autoUpdateChk.checked : !autoUpdateChk.checked;
+      autoUpdateChk.checked = nextVal;
+      setAutoUpdateEnabled(nextVal);
+      state2.autoUpdateEnabled = nextVal;
       callbacks.onRender();
       return true;
     }
