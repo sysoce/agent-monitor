@@ -5739,6 +5739,38 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.msg-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.msg-error-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #3a3a3a;
+  background: #292929;
+  color: #cccccc;
+  transition: background 0.15s, border-color 0.15s;
+}
+.msg-error-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #969696;
+}
+.msg-error-btn--primary {
+  background: #0e639c;
+  color: #ffffff;
+  border-color: transparent;
+}
+.msg-error-btn--primary:hover {
+  background: #1177bb;
+}
 .stream-loading {
   display: flex;
   align-items: center;
@@ -6319,6 +6351,11 @@ body {
   .tasks-stop-btn {
     min-width: 42px;
     min-height: 42px;
+  }
+  .msg-error-btn {
+    min-height: 38px;
+    padding: 8px 14px;
+    font-size: 12px;
   }
 }
 .telemetry-card {
@@ -8158,7 +8195,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.34" : "1.0.33";
+  var CLIENT_VERSION = true ? "1.0.35" : "1.0.33";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -15367,27 +15404,7 @@ ${thought.trim()}` : thought.trim();
     }
   }
 
-  // src/ui/controlHandlers.ts
-  var copyToClipboard = copyTextToClipboard;
-  function handleCopyAction(target) {
-    const copyBtn = target.closest(".copy-btn, .code-copy-btn");
-    if (!copyBtn) return false;
-    let text = copyBtn.getAttribute("data-copy-text");
-    if (!text) {
-      const block = copyBtn.closest(".code-block, .diff-card, .activity-toggle");
-      if (block) {
-        text = block.querySelector("code, .activity-toggle-output")?.textContent || "";
-      } else {
-        const turn = copyBtn.closest(".turn");
-        text = turn?.querySelector(".msg-user-text, .msg.assistant .msg-text")?.textContent || "";
-      }
-    }
-    if (text) {
-      void copyToClipboard(text);
-      flashCopyButton(copyBtn);
-    }
-    return true;
-  }
+  // src/ui/planClickHandler.ts
   function handlePlanClick(target, state2, callbacks) {
     const buildBtn = target.closest(".plan-build-btn");
     if (buildBtn) {
@@ -15416,7 +15433,47 @@ ${thought.trim()}` : thought.trim();
     }
     return false;
   }
+
+  // src/ui/controlHandlers.ts
+  var copyToClipboard = copyTextToClipboard;
+  function handleCopyAction(target) {
+    const copyBtn = target.closest(".copy-btn, .code-copy-btn");
+    if (!copyBtn) return false;
+    let text = copyBtn.getAttribute("data-copy-text");
+    if (!text) {
+      const block = copyBtn.closest(".code-block, .diff-card, .activity-toggle");
+      if (block) {
+        text = block.querySelector("code, .activity-toggle-output")?.textContent || "";
+      } else {
+        const turn = copyBtn.closest(".turn");
+        text = turn?.querySelector(".msg-user-text, .msg.assistant .msg-text")?.textContent || "";
+      }
+    }
+    if (text) {
+      void copyToClipboard(text);
+      flashCopyButton(copyBtn);
+    }
+    return true;
+  }
   function handleControlClick(target, state2, callbacks) {
+    if (target.closest("#btn-error-settings, .btn-error-settings")) {
+      state2.isSettingsModalOpen = true;
+      callbacks.onRender();
+      return true;
+    }
+    if (target.closest("#btn-error-retry, .btn-error-retry")) {
+      const input = typeof document !== "undefined" ? document.getElementById("composer-input") : null;
+      if (!input?.value?.trim() && !state2.composerDraft?.trim()) {
+        const msgs = state2.activeSession?.messages || [];
+        const lastUser = [...msgs].reverse().find((m) => m.role === "user");
+        if (lastUser && typeof lastUser.content === "string" && lastUser.content.trim()) {
+          if (input) input.value = lastUser.content.trim();
+          state2.composerDraft = lastUser.content.trim();
+        }
+      }
+      void callbacks.onSendMessage();
+      return true;
+    }
     const fallbackRow = target.closest(".settings-fallback-row");
     const autoFallbackChk = target.closest("#toggle-auto-fallback, .btn-toggle-auto-fallback") || (fallbackRow ? fallbackRow.querySelector("#toggle-auto-fallback") : null);
     if (autoFallbackChk) {
