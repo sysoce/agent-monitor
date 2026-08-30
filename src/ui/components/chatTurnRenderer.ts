@@ -16,6 +16,50 @@ export function extractText(msg: ChatMessage | Record<string, unknown>): string 
   return typeof (msg as Record<string, unknown>).text === 'string' ? ((msg as Record<string, unknown>).text as string) : '';
 }
 
+function extractErrorDetails(msg: ChatMessage, text: string): { isErr: boolean; textPart: string; errPart: string } {
+  const isExplicitErr = Boolean((msg as { isError?: boolean }).isError || (msg as { status?: string }).status === 'error');
+  const explicitErr = (msg as { error?: string; errorMessage?: string }).error ?? (msg as { error?: string; errorMessage?: string }).errorMessage;
+  const hasModelErr = text.includes('**Model Error:**');
+  const hasAgyErr = text.includes('Antigravity Error:');
+
+  if (explicitErr && typeof explicitErr === 'string') {
+    const cleanErr = explicitErr.replace(/^(?:⚠️\s*)?(?:\*\*Model Error:\*\*\s*)*/gi, '').trim();
+    return {
+      isErr: true,
+      textPart: text.trim(),
+      errPart: cleanErr || 'An unexpected error occurred while communicating with the model backend.',
+    };
+  }
+
+  if (hasModelErr) {
+    const idx = text.indexOf('**Model Error:**');
+    const textPart = idx > 0 ? text.slice(0, idx).replace(/⚠️\s*$/, '').trim() : '';
+    const errPart = text.slice(idx).replace(/^\*\*Model Error:\*\*\s*/, '').trim();
+    return {
+      isErr: true,
+      textPart,
+      errPart: errPart || 'An unexpected error occurred while communicating with the model backend.',
+    };
+  }
+
+  if (isExplicitErr) {
+    if (hasAgyErr) {
+      const idx = text.indexOf('Antigravity Error:');
+      const textPart = idx > 0 ? text.slice(0, idx).replace(/⚠️\s*$/, '').trim() : '';
+      const errPart = text.slice(idx).trim();
+      return { isErr: true, textPart, errPart };
+    }
+    const clean = text.replace(/^(?:⚠️\s*)?(?:\*\*Model Error:\*\*\s*)*/gi, '').trim();
+    return {
+      isErr: true,
+      textPart: '',
+      errPart: clean || 'An unexpected error occurred while communicating with the model backend.',
+    };
+  }
+
+  return { isErr: false, textPart: text, errPart: '' };
+}
+
 export function renderAssistantTurn(msg: ChatMessage, isBuildMode = false): string {
   const text = extractText(msg);
   const thought = (msg as { thought?: string; thinking?: string }).thought ?? (msg as { thought?: string; thinking?: string }).thinking;
@@ -24,15 +68,23 @@ export function renderAssistantTurn(msg: ChatMessage, isBuildMode = false): stri
   const planMeta = (msg as { planMeta?: { title?: string; overview?: string; path?: string } }).planMeta;
   const walkthroughMeta = (msg as { walkthroughMeta?: { title?: string; summary?: string; path?: string } }).walkthroughMeta;
   const todos = (msg as { todos?: TodoItem[] }).todos;
-  const isErr = (msg as { isError?: boolean }).isError || text.includes('**Model Error:**');
+  const { isErr, textPart, errPart } = extractErrorDetails(msg, text);
 
   let bodyHtml = '';
   if (isErr) {
-    const idx = text.indexOf('**Model Error:**');
-    const textPart = idx > 0 ? text.slice(0, idx).replace(/⚠️\s*$/, '').trim() : '';
-    const errPart = idx >= 0 ? text.slice(idx).replace(/^\*\*Model Error:\*\*\s*/, '').trim() : text;
-    if (textPart) bodyHtml += `<div class="msg assistant"><div class="msg-text">${renderMarkdownDocument(textPart)}</div></div>`;
-    bodyHtml += `<div class="msg-error-card"><div class="msg-error-header"><span class="msg-error-icon">⚠️</span><span class="msg-error-title">Model Request Failed</span></div><div class="msg-error-body">${escapeHtml(errPart)}</div></div>`;
+    if (textPart) {
+      bodyHtml += `<div class="msg assistant"><div class="msg-text">${renderMarkdownDocument(textPart)}</div></div>`;
+    }
+    bodyHtml += `
+      <div class="msg-error-card">
+        <div class="msg-error-header"><span class="msg-error-icon">⚠️</span><span class="msg-error-title">Model Request Failed</span></div>
+        <div class="msg-error-body">${escapeHtml(errPart)}</div>
+        <div class="msg-error-actions">
+          <button type="button" class="msg-error-btn msg-error-btn--primary" id="btn-error-settings">⚙️ Configure Settings</button>
+          <button type="button" class="msg-error-btn" id="btn-error-retry">🔄 Retry</button>
+        </div>
+      </div>
+    `.trim();
   } else if (text.trim()) {
     bodyHtml = `<div class="msg assistant"><div class="msg-text">${renderMarkdownDocument(text)}</div></div>`;
   } else if (!thought && toolCalls.length === 0 && !planMeta && !walkthroughMeta && (!todos || todos.length === 0)) {
@@ -40,7 +92,7 @@ export function renderAssistantTurn(msg: ChatMessage, isBuildMode = false): stri
   }
 
   const timestamp = (msg as { timestamp?: string | number | Date }).timestamp ?? (msg as { time?: string | number | Date }).time;
-  const copyHtml = bodyHtml && !isLive ? renderMessageCopyActionsHtml({ user: false, copyText: text, time: timestamp }) : '';
+  const copyHtml = bodyHtml && !isLive ? renderMessageCopyActionsHtml({ user: false, copyText: textPart || text || errPart, time: timestamp }) : '';
 
   return `
     <div class="turn turn-assistant${isLive ? ' turn--generating' : ''}">

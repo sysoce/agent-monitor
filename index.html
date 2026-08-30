@@ -8146,7 +8146,7 @@ input:checked + .slider:before {
     }
     if (allPending.length > 0) {
       const lastMsg = mergedMessages[mergedMessages.length - 1];
-      const isTrailingDraft = lastMsg?.role === "assistant" && (Boolean(lastMsg.isLive) || !lastMsg.content?.trim() && !lastMsg.tool_calls?.length && !lastMsg.thought?.trim());
+      const isTrailingDraft = lastMsg?.role === "assistant" && (Boolean(lastMsg.isLive) || !lastMsg.content?.trim() && !lastMsg.tool_calls?.length && !lastMsg.thought?.trim() && !lastMsg.isError && !lastMsg.error);
       if (isTrailingDraft) mergedMessages.splice(mergedMessages.length - 1, 0, ...allPending);
       else mergedMessages.push(...allPending);
     }
@@ -8268,7 +8268,7 @@ input:checked + .slider:before {
   function isMessageFinished(lastMsg) {
     if (!lastMsg || lastMsg.role !== "assistant") return false;
     return Boolean(
-      lastMsg.content && lastMsg.content.trim() || lastMsg.tool_calls?.length || lastMsg.thought?.trim() || lastMsg.isError
+      lastMsg.content && lastMsg.content.trim() || lastMsg.tool_calls?.length || lastMsg.thought?.trim() || lastMsg.isError || lastMsg.error || lastMsg.errorMessage || lastMsg.status === "error"
     );
   }
   function mergeActiveIntoSessions(state2, payloadSessions) {
@@ -12356,21 +12356,26 @@ ${items}
     if (Array.isArray(msg.content)) {
       return msg.content.map((p) => typeof p === "string" ? p : p?.text || "").filter(Boolean).join("\n");
     }
-    return typeof msg.text === "string" ? msg.text : "";
+    const text = msg.text;
+    if (typeof text === "string") return text;
+    const err = msg.error ?? msg.errorMessage;
+    return typeof err === "string" ? err : "";
   }
   function groupMessagesIntoTurns(messages, toolResults, isGenerating = false) {
     const result = [];
     let currentAssistant = null;
     const flushAssistant = (isLast = false) => {
       if (!currentAssistant) return;
-      if (isGenerating && isLast) {
+      if (isGenerating && isLast && !currentAssistant.isError) {
         currentAssistant.isLive = true;
       }
       const hasText = Boolean(currentAssistant.content && currentAssistant.content.trim());
       const hasThought = Boolean(currentAssistant.thought && currentAssistant.thought.trim());
       const hasTools = currentAssistant.tool_calls.length > 0;
       const hasMeta = Boolean(currentAssistant.planMeta || currentAssistant.walkthroughMeta || currentAssistant.todos?.length);
-      if (hasText || hasThought || hasTools || hasMeta || currentAssistant.isLive) {
+      const hasError = Boolean(currentAssistant.isError || currentAssistant.error);
+      if (hasText || hasThought || hasTools || hasMeta || currentAssistant.isLive || hasError) {
+        if (currentAssistant.isError) currentAssistant.isLive = false;
         result.push(currentAssistant);
       }
       currentAssistant = null;
@@ -12383,8 +12388,10 @@ ${items}
         result.push(m);
         continue;
       }
-      if (m.role === "assistant") {
+      if (m.role === "assistant" || m.role === "error") {
         const text = extractRawText(m);
+        const isErr = Boolean(m.isError || m.status === "error" || m.role === "error" || m.error || m.errorMessage);
+        const explicitErr = m.error ?? m.errorMessage;
         const thought = m.thought ?? m.thinking;
         const rawTools = m.tool_calls || m.toolCalls || [];
         const mappedTools = rawTools.map((tc) => ({
@@ -12401,9 +12408,10 @@ ${items}
             planMeta: m.planMeta,
             walkthroughMeta: m.walkthroughMeta,
             todos: m.todos,
-            isError: Boolean(m.isError),
+            isError: isErr,
             timestamp: m.timestamp ?? m.time
           };
+          if (explicitErr) currentAssistant.error = String(explicitErr);
         } else {
           if (text) {
             currentAssistant.content = currentAssistant.content ? `${currentAssistant.content}
@@ -12422,14 +12430,15 @@ ${thought.trim()}` : thought.trim();
           if (m.planMeta) currentAssistant.planMeta = m.planMeta;
           if (m.walkthroughMeta) currentAssistant.walkthroughMeta = m.walkthroughMeta;
           if (m.todos) currentAssistant.todos = m.todos;
-          if (m.isError) currentAssistant.isError = true;
+          if (isErr) currentAssistant.isError = true;
+          if (explicitErr && !currentAssistant.error) currentAssistant.error = String(explicitErr);
         }
       }
     }
     flushAssistant(true);
     if (isGenerating && result.length > 0) {
       const last = result[result.length - 1];
-      if (last && last.role === "assistant") {
+      if (last && last.role === "assistant" && !last.isError) {
         last.isLive = true;
       }
     }
@@ -12975,6 +12984,45 @@ ${thought.trim()}` : thought.trim();
     }
     return typeof msg.text === "string" ? msg.text : "";
   }
+  function extractErrorDetails(msg, text) {
+    const isExplicitErr = Boolean(msg.isError || msg.status === "error");
+    const explicitErr = msg.error ?? msg.errorMessage;
+    const hasModelErr = text.includes("**Model Error:**");
+    const hasAgyErr = text.includes("Antigravity Error:");
+    if (explicitErr && typeof explicitErr === "string") {
+      const cleanErr = explicitErr.replace(/^(?:⚠️\s*)?(?:\*\*Model Error:\*\*\s*)*/gi, "").trim();
+      return {
+        isErr: true,
+        textPart: text.trim(),
+        errPart: cleanErr || "An unexpected error occurred while communicating with the model backend."
+      };
+    }
+    if (hasModelErr) {
+      const idx = text.indexOf("**Model Error:**");
+      const textPart = idx > 0 ? text.slice(0, idx).replace(/⚠️\s*$/, "").trim() : "";
+      const errPart = text.slice(idx).replace(/^\*\*Model Error:\*\*\s*/, "").trim();
+      return {
+        isErr: true,
+        textPart,
+        errPart: errPart || "An unexpected error occurred while communicating with the model backend."
+      };
+    }
+    if (isExplicitErr) {
+      if (hasAgyErr) {
+        const idx = text.indexOf("Antigravity Error:");
+        const textPart = idx > 0 ? text.slice(0, idx).replace(/⚠️\s*$/, "").trim() : "";
+        const errPart = text.slice(idx).trim();
+        return { isErr: true, textPart, errPart };
+      }
+      const clean = text.replace(/^(?:⚠️\s*)?(?:\*\*Model Error:\*\*\s*)*/gi, "").trim();
+      return {
+        isErr: true,
+        textPart: "",
+        errPart: clean || "An unexpected error occurred while communicating with the model backend."
+      };
+    }
+    return { isErr: false, textPart: text, errPart: "" };
+  }
   function renderAssistantTurn(msg, isBuildMode = false) {
     const text = extractText(msg);
     const thought = msg.thought ?? msg.thinking;
@@ -12983,21 +13031,29 @@ ${thought.trim()}` : thought.trim();
     const planMeta = msg.planMeta;
     const walkthroughMeta = msg.walkthroughMeta;
     const todos = msg.todos;
-    const isErr = msg.isError || text.includes("**Model Error:**");
+    const { isErr, textPart, errPart } = extractErrorDetails(msg, text);
     let bodyHtml = "";
     if (isErr) {
-      const idx = text.indexOf("**Model Error:**");
-      const textPart = idx > 0 ? text.slice(0, idx).replace(/⚠️\s*$/, "").trim() : "";
-      const errPart = idx >= 0 ? text.slice(idx).replace(/^\*\*Model Error:\*\*\s*/, "").trim() : text;
-      if (textPart) bodyHtml += `<div class="msg assistant"><div class="msg-text">${renderMarkdownDocument(textPart)}</div></div>`;
-      bodyHtml += `<div class="msg-error-card"><div class="msg-error-header"><span class="msg-error-icon">\u26A0\uFE0F</span><span class="msg-error-title">Model Request Failed</span></div><div class="msg-error-body">${escapeHtml2(errPart)}</div></div>`;
+      if (textPart) {
+        bodyHtml += `<div class="msg assistant"><div class="msg-text">${renderMarkdownDocument(textPart)}</div></div>`;
+      }
+      bodyHtml += `
+      <div class="msg-error-card">
+        <div class="msg-error-header"><span class="msg-error-icon">\u26A0\uFE0F</span><span class="msg-error-title">Model Request Failed</span></div>
+        <div class="msg-error-body">${escapeHtml2(errPart)}</div>
+        <div class="msg-error-actions">
+          <button type="button" class="msg-error-btn msg-error-btn--primary" id="btn-error-settings">\u2699\uFE0F Configure Settings</button>
+          <button type="button" class="msg-error-btn" id="btn-error-retry">\u{1F504} Retry</button>
+        </div>
+      </div>
+    `.trim();
     } else if (text.trim()) {
       bodyHtml = `<div class="msg assistant"><div class="msg-text">${renderMarkdownDocument(text)}</div></div>`;
     } else if (!thought && toolCalls.length === 0 && !planMeta && !walkthroughMeta && (!todos || todos.length === 0)) {
       return isLive ? renderGeneratingIndicator() : "";
     }
     const timestamp = msg.timestamp ?? msg.time;
-    const copyHtml = bodyHtml && !isLive ? renderMessageCopyActionsHtml({ user: false, copyText: text, time: timestamp }) : "";
+    const copyHtml = bodyHtml && !isLive ? renderMessageCopyActionsHtml({ user: false, copyText: textPart || text || errPart, time: timestamp }) : "";
     return `
     <div class="turn turn-assistant${isLive ? " turn--generating" : ""}">
       ${renderThought(thought, { isLive, expanded: isLive })}

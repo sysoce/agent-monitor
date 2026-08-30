@@ -128,7 +128,7 @@ export function mergeSessionDetail(
     const lastMsg = mergedMessages[mergedMessages.length - 1];
     const isTrailingDraft = lastMsg?.role === 'assistant' && (
       Boolean((lastMsg as any).isLive) ||
-      (!lastMsg.content?.trim() && !(lastMsg as any).tool_calls?.length && !(lastMsg as any).thought?.trim())
+      (!lastMsg.content?.trim() && !(lastMsg as any).tool_calls?.length && !(lastMsg as any).thought?.trim() && !(lastMsg as any).isError && !(lastMsg as any).error)
     );
     if (isTrailingDraft) mergedMessages.splice(mergedMessages.length - 1, 0, ...allPending);
     else mergedMessages.push(...allPending);

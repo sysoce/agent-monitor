@@ -10,7 +10,10 @@ function isMessageFinished(lastMsg: any): boolean {
     (lastMsg.content && lastMsg.content.trim()) ||
     lastMsg.tool_calls?.length ||
     lastMsg.thought?.trim() ||
-    lastMsg.isError
+    lastMsg.isError ||
+    lastMsg.error ||
+    lastMsg.errorMessage ||
+    lastMsg.status === 'error'
   );
 }
 

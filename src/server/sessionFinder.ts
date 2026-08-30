@@ -33,7 +33,11 @@ export function parseAndDeduplicateLines(raw: string): ChatMessage[] {
         !msg.content &&
         !(msg as any).tool_calls?.length &&
         !(msg as any).thinking &&
-        !(msg as any).thought
+        !(msg as any).thought &&
+        !(msg as any).isError &&
+        !(msg as any).error &&
+        !(msg as any).errorMessage &&
+        (msg as any).status !== 'error'
       ) {
         continue;
       }

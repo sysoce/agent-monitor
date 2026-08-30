@@ -2,12 +2,13 @@ import type { AppState } from './types';
 import type { EventHandlerCallbacks } from './eventHandlers';
 import { saveActiveTab } from './tabStore';
 import { filterSessionCardsInPlace } from './sessionFilter';
-import { isComposerStopMode } from './composerButton';
 import { flashCopyButton, copyTextToClipboard } from './copyActions';
 import { setAutoUpdateEnabled, triggerBundleDownload } from './updateManager';
 import { setAutoFallbackEnabled } from './fallbackSettings';
+import { handlePlanClick } from './planClickHandler';
 
 export const copyToClipboard = copyTextToClipboard;
+export { handlePlanClick };
 
 export function handleCopyAction(target: HTMLElement): boolean {
   const copyBtn = target.closest<HTMLElement>('.copy-btn, .code-copy-btn');
@@ -29,37 +30,26 @@ export function handleCopyAction(target: HTMLElement): boolean {
   return true;
 }
 
-export function handlePlanClick(target: HTMLElement, state: AppState, callbacks: EventHandlerCallbacks): boolean {
-  const buildBtn = target.closest<HTMLElement>('.plan-build-btn');
-  if (buildBtn) {
-    const planPath = buildBtn.getAttribute('data-plan-path') || '';
-    const planTitle = buildBtn.getAttribute('data-plan-title') || buildBtn.closest('.plan-card')?.querySelector('.plan-card-title')?.textContent?.trim() || '';
-    if (callbacks.onBuildPlan) void callbacks.onBuildPlan(planPath, planTitle);
-    else {
-      state.composerMode = 'agent';
-      state.activePlan = undefined;
-      state.activePlanName = undefined;
-      state.activeTab = 'chat';
-      callbacks.onRender();
-    }
-    return true;
-  }
-
-  const planLink = target.closest<HTMLElement>('.plan-view-btn, .plan-link-item, .md-plan-link, .session-plan-chip, [data-plan-path], [data-open-artifact]');
-  if (planLink) {
-    const planPath = planLink.getAttribute('data-plan-path') || planLink.getAttribute('data-open-artifact') || '';
-    if (!planPath) return false;
-    const cleanPath = planPath.replace(/^📋\s*/, '').replace(/^file:\/\//, '').trim();
-    const name = cleanPath.split('/').pop() || cleanPath;
-    state.activePlanName = name;
-    state.activeTab = 'chat';
-    void callbacks.onSelectPlan(name);
-    return true;
-  }
-  return false;
-}
-
 export function handleControlClick(target: HTMLElement, state: AppState, callbacks: EventHandlerCallbacks): boolean {
+  if (target.closest('#btn-error-settings, .btn-error-settings')) {
+    state.isSettingsModalOpen = true;
+    callbacks.onRender();
+    return true;
+  }
+  if (target.closest('#btn-error-retry, .btn-error-retry')) {
+    const input = typeof document !== 'undefined' ? (document.getElementById('composer-input') as HTMLTextAreaElement | null) : null;
+    if (!input?.value?.trim() && !state.composerDraft?.trim()) {
+      const msgs = state.activeSession?.messages || [];
+      const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
+      if (lastUser && typeof lastUser.content === 'string' && lastUser.content.trim()) {
+        if (input) input.value = lastUser.content.trim();
+        state.composerDraft = lastUser.content.trim();
+      }
+    }
+    void callbacks.onSendMessage();
+    return true;
+  }
+
   const fallbackRow = target.closest<HTMLElement>('.settings-fallback-row');
   const autoFallbackChk = target.closest<HTMLInputElement>('#toggle-auto-fallback, .btn-toggle-auto-fallback') ||
     (fallbackRow ? fallbackRow.querySelector<HTMLInputElement>('#toggle-auto-fallback') : null);
