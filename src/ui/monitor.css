@@ -2431,6 +2431,43 @@ body {
   word-break: break-word;
 }
 
+.msg-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.msg-error-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #3a3a3a;
+  background: #292929;
+  color: #cccccc;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.msg-error-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #969696;
+}
+
+.msg-error-btn--primary {
+  background: #0e639c;
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.msg-error-btn--primary:hover {
+  background: #1177bb;
+}
+
 /* ---------------- Loading Indicator ---------------- */
 .stream-loading {
   display: flex;
@@ -3073,6 +3110,11 @@ body {
   .tasks-stop-btn {
     min-width: 42px;
     min-height: 42px;
+  }
+  .msg-error-btn {
+    min-height: 38px;
+    padding: 8px 14px;
+    font-size: 12px;
   }
 }
 
