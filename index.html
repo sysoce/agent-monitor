@@ -8300,7 +8300,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.39" : "1.0.39";
+  var CLIENT_VERSION = true ? "1.0.40" : "1.0.39";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -12623,18 +12623,18 @@ ${items}
     return false;
   }
   function flashCopyButton(btn) {
-    const origTitle = btn.getAttribute("aria-label") || btn.title || "Copy";
-    btn.classList.add("copied");
-    btn.classList.add("copy-btn--done");
+    const origTitle = btn.getAttribute?.("aria-label") || btn.title || "Copy";
+    btn.classList?.add?.("copied");
+    btn.classList?.add?.("copy-btn--done");
     btn.innerHTML = COPY_CHECK_ICON_SVG;
     btn.title = "Copied";
-    btn.setAttribute("aria-label", "Copied");
+    btn.setAttribute?.("aria-label", "Copied");
     setTimeout(() => {
-      btn.classList.remove("copied");
-      btn.classList.remove("copy-btn--done");
+      btn.classList?.remove?.("copied");
+      btn.classList?.remove?.("copy-btn--done");
       btn.innerHTML = COPY_ICON_SVG;
       btn.title = origTitle;
-      btn.setAttribute("aria-label", origTitle);
+      btn.setAttribute?.("aria-label", origTitle);
     }, 1500);
   }
 
@@ -15820,6 +15820,35 @@ ${resText}` : ""
     return false;
   }
 
+  // src/ui/fileClickHandler.ts
+  function extractCleanFilePath(rawPath) {
+    if (!rawPath) return "";
+    return rawPath.trim().replace(/^file:\/\//i, "").replace(/#L\d+(?:-L?\d+)?$/i, "").replace(/:\d+(?::\d+)?$/, "").trim();
+  }
+  function handleFileClick(target, state2, callbacks, copyFn = copyTextToClipboard) {
+    const fileEl = target.closest(
+      'a.md-link[href^="file://"], a.md-link[href^="file:/"], [data-file-path], .inline-code--link'
+    );
+    if (!fileEl) return false;
+    const raw = fileEl.getAttribute("data-file-path") || fileEl.getAttribute("href") || fileEl.textContent || "";
+    const cleanPath2 = extractCleanFilePath(raw);
+    if (!cleanPath2) return false;
+    if (isPlanFilePath(cleanPath2)) {
+      const name = cleanPath2.split("/").pop() || cleanPath2;
+      state2.activePlanName = name;
+      state2.activeTab = "chat";
+      void callbacks.onSelectPlan(name);
+      return true;
+    }
+    void (async () => {
+      const copied = await copyFn(cleanPath2);
+      if (copied) {
+        flashCopyButton(fileEl);
+      }
+    })();
+    return true;
+  }
+
   // src/ui/eventDelegation.ts
   function handleDelegatedClick(target, state2, callbacks) {
     if (!target) return false;
@@ -15921,6 +15950,7 @@ ${resText}` : ""
     if (handleSettingsModalClick(state2, target, callbacks)) return true;
     if (handleModelPickerClick(target, state2, callbacks)) return true;
     if (handlePlanClick(target, state2, callbacks)) return true;
+    if (handleFileClick(target, state2, callbacks)) return true;
     if (handleControlClick(target, state2, callbacks)) return true;
     return false;
   }

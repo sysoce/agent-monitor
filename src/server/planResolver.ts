@@ -22,6 +22,9 @@ export async function resolvePlanPath(workspaceRoot: string, target: string): Pr
     path.join(workspaceRoot, '.cursor', 'plans', base),
     path.join(workspaceRoot, 'plans', base),
     path.join(os.homedir(), '.gemini', 'antigravity', 'brain', base),
+    path.join(os.homedir(), '.gemini', 'antigravity-cli', 'brain', base),
+    path.join(os.homedir(), '.gemini', 'antigravity-cli', 'scratch', base),
+    path.join(os.homedir(), '.gemini', 'antigravity', 'scratch', base),
   ];
 
   for (const c of candidates) {

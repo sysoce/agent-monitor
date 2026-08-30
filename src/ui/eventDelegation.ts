@@ -9,8 +9,9 @@ import {
   handleControlClick,
   copyToClipboard,
 } from './controlHandlers';
+import { handleFileClick } from './fileClickHandler';
 
-export { handleCopyAction, handlePlanClick, handleControlClick, copyToClipboard };
+export { handleCopyAction, handlePlanClick, handleControlClick, copyToClipboard, handleFileClick };
 
 export function handleDelegatedClick(target: HTMLElement | null, state: AppState, callbacks: EventHandlerCallbacks): boolean {
   if (!target) return false;
@@ -118,6 +119,7 @@ export function handleDelegatedClick(target: HTMLElement | null, state: AppState
   if (handleSettingsModalClick(state, target, callbacks)) return true;
   if (handleModelPickerClick(target, state, callbacks)) return true;
   if (handlePlanClick(target, state, callbacks)) return true;
+  if (handleFileClick(target, state, callbacks)) return true;
   if (handleControlClick(target, state, callbacks)) return true;
   return false;
 }

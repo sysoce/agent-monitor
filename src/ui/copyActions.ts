@@ -80,18 +80,18 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
 }
 
 export function flashCopyButton(btn: HTMLElement): void {
-  const origTitle = btn.getAttribute('aria-label') || btn.title || 'Copy';
-  btn.classList.add('copied');
-  btn.classList.add('copy-btn--done');
+  const origTitle = btn.getAttribute?.('aria-label') || btn.title || 'Copy';
+  btn.classList?.add?.('copied');
+  btn.classList?.add?.('copy-btn--done');
   btn.innerHTML = COPY_CHECK_ICON_SVG;
   btn.title = 'Copied';
-  btn.setAttribute('aria-label', 'Copied');
+  btn.setAttribute?.('aria-label', 'Copied');
   setTimeout(() => {
-    btn.classList.remove('copied');
-    btn.classList.remove('copy-btn--done');
+    btn.classList?.remove?.('copied');
+    btn.classList?.remove?.('copy-btn--done');
     btn.innerHTML = COPY_ICON_SVG;
     btn.title = origTitle;
-    btn.setAttribute('aria-label', origTitle);
+    btn.setAttribute?.('aria-label', origTitle);
   }, 1500);
 }
 
