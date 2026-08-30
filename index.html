@@ -7944,6 +7944,12 @@ input:checked + .slider:before {
     if (typeof window === "undefined") return false;
     return window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev") || window.location.hostname.endsWith(".vercel.app") || window.location.hostname.endsWith(".netlify.app");
   }
+  function isMixedContentBlocked(url) {
+    if (typeof window === "undefined") return false;
+    if (window.location.protocol !== "https:") return false;
+    if (!url) return false;
+    return url.startsWith("http://") || url.startsWith("ws://");
+  }
   function hasLiveServer() {
     const base = getServerBaseUrl();
     if (isStaticDeployment()) return Boolean(base);
@@ -8089,7 +8095,8 @@ input:checked + .slider:before {
 
   // src/ui/sseClient.ts
   function isStaticHostEnvironment() {
-    return isStaticDeployment() && !getServerBaseUrl();
+    const base = getServerBaseUrl();
+    return isStaticDeployment() && !base;
   }
   function initSseClient(opts) {
     let es = null;
@@ -8106,10 +8113,21 @@ input:checked + .slider:before {
     }
     function connect() {
       if (closed) return;
-      opts.onStatusChange(retryCount > 0 ? "connecting" : "syncing");
+      if (es) {
+        try {
+          es.close();
+        } catch {
+        }
+        es = null;
+      }
       const token = getStoredToken();
       const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : "/api/events";
       const url = buildApiUrl(relative);
+      if (isMixedContentBlocked(url)) {
+        opts.onStatusChange("disconnected");
+        return;
+      }
+      opts.onStatusChange(retryCount > 0 ? "connecting" : "syncing");
       try {
         es = new EventSource(url);
       } catch {
@@ -8121,10 +8139,15 @@ input:checked + .slider:before {
         retryCount = 0;
         opts.onStatusChange("connected");
       };
-      es.addEventListener("change", () => {
+      const handleChange = () => {
         if (closed) return;
         opts.onChange();
-      });
+      };
+      es.onmessage = handleChange;
+      es.addEventListener("change", handleChange);
+      es.addEventListener("update", handleChange);
+      es.addEventListener("session", handleChange);
+      es.addEventListener("sync", handleChange);
       es.onerror = () => {
         if (closed) return;
         retryCount++;
@@ -8302,7 +8325,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.41" : "1.0.41";
+  var CLIENT_VERSION = true ? "1.0.42" : "1.0.42";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -16624,14 +16647,20 @@ ${resText}` : ""
     }
 
     try {
-      var cachedCss = localStorage.getItem(K_CSS);
-      if (cachedCss) {
-        var styleEl = document.getElementById('agent-monitor-style');
-        if (styleEl) styleEl.textContent = cachedCss;
-      }
-      var cachedJs = localStorage.getItem(K_JS);
-      if (cachedJs) {
-        boot(cachedJs);
+      var isFile = typeof window !== 'undefined' && window.location.protocol === 'file:';
+      if (isFile) {
+        var cachedCss = localStorage.getItem(K_CSS);
+        if (cachedCss) {
+          var styleEl = document.getElementById('agent-monitor-style');
+          if (styleEl) styleEl.textContent = cachedCss;
+        }
+        var cachedJs = localStorage.getItem(K_JS);
+        if (cachedJs) {
+          boot(cachedJs);
+        } else {
+          var fb = document.getElementById('agent-monitor-bundle-fallback');
+          if (fb && fb.textContent) boot(fb.textContent);
+        }
       } else {
         var fb = document.getElementById('agent-monitor-bundle-fallback');
         if (fb && fb.textContent) boot(fb.textContent);

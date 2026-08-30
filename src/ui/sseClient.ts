@@ -7,7 +7,8 @@ export interface SseClientOptions {
 }
 
 export function isStaticHostEnvironment(): boolean {
-  return isStaticDeployment() && !getServerBaseUrl();
+  const base = getServerBaseUrl();
+  return isStaticDeployment() && !base;
 }
 
 export function initSseClient(opts: SseClientOptions): () => void {
@@ -27,10 +28,18 @@ export function initSseClient(opts: SseClientOptions): () => void {
 
   function connect() {
     if (closed) return;
-    opts.onStatusChange(retryCount > 0 ? 'connecting' : 'syncing');
+    if (es) {
+      try { es.close(); } catch {}
+      es = null;
+    }
     const token = getStoredToken();
     const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events';
     const url = buildApiUrl(relative);
+    if (isMixedContentBlocked(url)) {
+      opts.onStatusChange('disconnected');
+      return;
+    }
+    opts.onStatusChange(retryCount > 0 ? 'connecting' : 'syncing');
     try {
       es = new EventSource(url);
     } catch {
@@ -44,10 +53,16 @@ export function initSseClient(opts: SseClientOptions): () => void {
       opts.onStatusChange('connected');
     };
 
-    es.addEventListener('change', () => {
+    const handleChange = () => {
       if (closed) return;
       opts.onChange();
-    });
+    };
+
+    es.onmessage = handleChange;
+    es.addEventListener('change', handleChange);
+    es.addEventListener('update', handleChange);
+    es.addEventListener('session', handleChange);
+    es.addEventListener('sync', handleChange);
 
     es.onerror = () => {
       if (closed) return;

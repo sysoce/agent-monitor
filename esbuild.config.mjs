@@ -146,14 +146,20 @@ ${safeJs}
     }
 
     try {
-      var cachedCss = localStorage.getItem(K_CSS);
-      if (cachedCss) {
-        var styleEl = document.getElementById('agent-monitor-style');
-        if (styleEl) styleEl.textContent = cachedCss;
-      }
-      var cachedJs = localStorage.getItem(K_JS);
-      if (cachedJs) {
-        boot(cachedJs);
+      var isFile = typeof window !== 'undefined' && window.location.protocol === 'file:';
+      if (isFile) {
+        var cachedCss = localStorage.getItem(K_CSS);
+        if (cachedCss) {
+          var styleEl = document.getElementById('agent-monitor-style');
+          if (styleEl) styleEl.textContent = cachedCss;
+        }
+        var cachedJs = localStorage.getItem(K_JS);
+        if (cachedJs) {
+          boot(cachedJs);
+        } else {
+          var fb = document.getElementById('agent-monitor-bundle-fallback');
+          if (fb && fb.textContent) boot(fb.textContent);
+        }
       } else {
         var fb = document.getElementById('agent-monitor-bundle-fallback');
         if (fb && fb.textContent) boot(fb.textContent);

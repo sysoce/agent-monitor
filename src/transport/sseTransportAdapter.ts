@@ -69,14 +69,18 @@ export class SseTransportAdapter implements TransportAdapter {
       };
 
       if (typeof this.eventSource.addEventListener === 'function') {
-        this.eventSource.addEventListener('change', (ev: { data?: string }) => {
+        const notifyChange = (ev: { data?: string }) => {
           try {
             const data = ev?.data ? JSON.parse(ev.data) : { timestamp: Date.now() };
             handlePayload({ type: 'change', ...data });
           } catch {
             handlePayload({ type: 'change', timestamp: Date.now() });
           }
-        });
+        };
+        this.eventSource.addEventListener('change', notifyChange);
+        this.eventSource.addEventListener('update', notifyChange);
+        this.eventSource.addEventListener('session', notifyChange);
+        this.eventSource.addEventListener('sync', notifyChange);
       }
 
       this.eventSource.onerror = () => {

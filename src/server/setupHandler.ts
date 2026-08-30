@@ -40,7 +40,10 @@ export async function handleSetupRoute(
   if (pathname === '/api/setup-info') {
     const port = url.port ? Number(url.port) : 4200;
     const networks = getLocalNetworkAddresses(port);
-    const lanAddress = networks.find((n) => !n.isTailscale && !n.name.includes('localhost')) || networks[0] || { url: url.origin };
+    const isExplicitHost = url.hostname !== '0.0.0.0' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1' && url.hostname !== '';
+    const lanAddress = isExplicitHost
+      ? { url: url.origin }
+      : (networks.find((n) => !n.isTailscale && !n.name.includes('localhost')) || networks[0] || { url: url.origin });
 
     const payload = encodeSetupPayload({
       token: syncConfig?.token || '',
