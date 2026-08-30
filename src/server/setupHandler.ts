@@ -40,16 +40,16 @@ export async function handleSetupRoute(
   if (pathname === '/api/setup-info') {
     const port = url.port ? Number(url.port) : 4200;
     const networks = getLocalNetworkAddresses(port);
-    const bestAddress = networks.find((n) => n.isTailscale) || networks.find((n) => !n.name.includes('localhost')) || { url: url.origin };
+    const lanAddress = networks.find((n) => !n.isTailscale && !n.name.includes('localhost')) || networks[0] || { url: url.origin };
 
     const payload = encodeSetupPayload({
       token: syncConfig?.token || '',
       gistId: syncConfig?.gistId || '',
       password: password || syncConfig?.password || '',
-      serverUrl: bestAddress.url,
+      serverUrl: lanAddress.url,
     });
     const githubPagesUrl = `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
-    const lanUrl = `${bestAddress.url}/#setup=${payload}`;
+    const lanUrl = `${lanAddress.url}/#setup=${payload}`;
 
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({
@@ -78,14 +78,19 @@ export async function handleSetupRoute(
 
   if (pathname !== '/setup' && pathname !== '/qr') return false;
 
+  const port = url.port ? Number(url.port) : 4200;
+  const networks = getLocalNetworkAddresses(port);
+  const lanAddress = networks.find((n) => !n.isTailscale && !n.name.includes('localhost')) || networks[0] || { url: url.origin };
+  const origin = (url.hostname === '0.0.0.0' || url.hostname === 'localhost' || url.hostname === '127.0.0.1') ? lanAddress.url : url.origin;
+
   const payload = encodeSetupPayload({
     token: syncConfig?.token || '',
     gistId: syncConfig?.gistId || '',
     password: password || syncConfig?.password || '',
-    serverUrl: url.origin,
+    serverUrl: origin,
   });
 
-  const setupUrl = `${url.origin}/#setup=${payload}`;
+  const setupUrl = `${origin}/#setup=${payload}`;
   const matrix = generateQrMatrix(setupUrl);
   const qrSvg = renderQrToSvg(matrix, 2, 7);
 

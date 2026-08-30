@@ -255,17 +255,23 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .session-meta {
   font-size: 10px;
   color: var(--vscode-descriptionForeground, #888888);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .session-time {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--vscode-descriptionForeground, #888888);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .session-row-action {
@@ -394,6 +400,8 @@ body {
   font-size: 13px;
   flex-shrink: 0;
   line-height: 1.3;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .file-dir, .skill-path, .subagent-summary {
@@ -406,6 +414,8 @@ body {
   margin-left: 6px;
   flex: 1;
   min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .file-stats {

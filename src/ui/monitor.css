@@ -2324,6 +2324,8 @@ body {
   font-size: 12px;
   color: #d1d5db;
   white-space: nowrap;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .file-dir,
@@ -2337,6 +2339,8 @@ body {
   margin-left: 4px;
   flex: 1;
   min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .row-icon {
@@ -2412,6 +2416,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg-error-header {
@@ -2429,6 +2435,9 @@ body {
   color: #999999;
   white-space: pre-wrap;
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .msg-error-actions {
@@ -2456,6 +2465,17 @@ body {
 .msg-error-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: #969696;
+}
+
+.msg-error-btn--copy {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #e5e7eb;
+}
+
+.msg-error-btn--copy:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .msg-error-btn--primary {
@@ -3121,6 +3141,7 @@ body {
 .telemetry-card {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 4px 8px;
   margin: 4px 0 8px;
   background: rgba(255, 255, 255, 0.03);
@@ -3128,6 +3149,8 @@ body {
   border-radius: 6px;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 11px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .telemetry-card--streaming {

@@ -1,4 +1,5 @@
 import { escapeHtml } from './markdown';
+import { COPY_ICON_SVG } from '../copyActions';
 
 export interface TelemetryData {
   tokensPerSecond?: number | null;
@@ -45,11 +46,19 @@ export function renderTelemetryCard(data: TelemetryData): string {
 
   if (badges.length === 0) return '';
 
+  const telemetrySummary = [
+    speed ? `Speed: ${speed}` : '',
+    inputSpeed ? `Prompt Speed: ${inputSpeed} eval` : '',
+    data.contextUsed != null && data.contextMax != null ? `Context: ${used} / ${max} tokens` : '',
+    data.activePhase ? `Phase: ${data.activePhase}` : '',
+  ].filter(Boolean).join(' | ');
+
   return `
     <div class="telemetry-card ${isStreaming ? 'telemetry-card--streaming' : ''}">
       <div class="telemetry-badges">
         ${badges.join('')}
       </div>
+      <button type="button" class="copy-btn copy-btn--compact telemetry-copy-btn" data-copy-text="${escapeHtml(telemetrySummary)}" title="Copy telemetry" aria-label="Copy telemetry">${COPY_ICON_SVG}</button>
     </div>
   `;
 }

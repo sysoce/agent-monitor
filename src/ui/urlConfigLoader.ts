@@ -80,7 +80,7 @@ export function checkAndApplyUrlConfig(): {
   if (typeof window === 'undefined') return { imported: false };
   const raw = window.location.hash || window.location.search;
   const parsed = parseUrlConfig(raw);
-  if (!parsed || (!parsed.gistId && !parsed.token && !parsed.serverUrl && parsed.autoFallback === undefined)) return { imported: false };
+  if (!parsed || (!parsed.gistId && !parsed.token && !parsed.serverUrl && !parsed.password && parsed.autoFallback === undefined)) return { imported: false };
 
   const ok = applyConfigToStorage(parsed);
   if (ok) {

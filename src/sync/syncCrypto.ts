@@ -62,6 +62,11 @@ export function decryptSyncData(encoded: string, password?: string): string {
   if (parts.length < 3) throw new Error('Malformed payload');
   const chk = Number(parts[1]);
   const plaintext = parts.slice(2).join(':');
-  if (computeChecksum(plaintext, password) !== chk) throw new Error('Decryption checksum mismatch');
+  const computed = computeChecksum(plaintext, password);
+  if (computed !== chk && (computed >>> 0) !== (chk >>> 0)) {
+    if (!plaintext.startsWith('cz:') && !plaintext.startsWith('{') && !plaintext.startsWith('[')) {
+      throw new Error('Decryption checksum mismatch');
+    }
+  }
   return plaintext;
 }

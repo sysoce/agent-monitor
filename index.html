@@ -233,6 +233,8 @@ kbd {
   color: var(--cursor-foreground, #cccccc);
   font-size: 12px;
   line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .msg-error-header {
   display: flex;
@@ -246,6 +248,9 @@ kbd {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--vscode-foreground, #cccccc);
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 .msg-error-actions {
   display: flex;
@@ -270,6 +275,15 @@ kbd {
 .msg-error-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--cursor-muted, #969696);
+}
+.msg-error-btn--copy {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #e5e7eb;
+}
+.msg-error-btn--copy:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 .msg-error-btn--primary {
   background: var(--vscode-button-background, #0e639c);
@@ -366,6 +380,8 @@ kbd {
   font-size: 12px;
   line-height: 1.45;
   color: var(--cursor-foreground);
+  user-select: text;
+  -webkit-user-select: text;
 }
 .activity-toggle.expanded .activity-toggle-body {
   display: block;
@@ -376,6 +392,14 @@ kbd {
   white-space: pre-wrap;
   overflow-x: auto;
   max-height: 200px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+.activity-toggle-thought-text {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 .activity-toggle--thought {
   border: none;
@@ -1297,11 +1321,18 @@ b {
 .diff-stat--add {
   color: #3fb950;
 }
+.diff-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .diff-body {
   padding: 4px 0;
   background: #141416;
   line-height: 1.45;
   overflow-x: auto;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .diff-row {
   display: flex;
@@ -1355,6 +1386,9 @@ b {
   padding-left: 4px;
   white-space: pre;
   color: #e6e6e6;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 .code-block {
   margin: 8px 0;
@@ -2955,15 +2989,21 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .session-meta {
   font-size: 10px;
   color: var(--vscode-descriptionForeground, #888888);
+  user-select: text;
+  -webkit-user-select: text;
 }
 .session-time {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--vscode-descriptionForeground, #888888);
+  user-select: text;
+  -webkit-user-select: text;
 }
 .session-row-action {
   opacity: 0;
@@ -3090,6 +3130,8 @@ body {
   font-size: 13px;
   flex-shrink: 0;
   line-height: 1.3;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .file-dir,
 .skill-path,
@@ -3103,6 +3145,8 @@ body {
   margin-left: 6px;
   flex: 1;
   min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .file-stats {
   display: inline-flex;
@@ -5647,6 +5691,8 @@ body {
   font-size: 12px;
   color: #d1d5db;
   white-space: nowrap;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .file-dir,
 .subagent-summary {
@@ -5659,6 +5705,8 @@ body {
   margin-left: 4px;
   flex: 1;
   min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .row-icon {
   color: #8b949e;
@@ -5723,6 +5771,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .msg-error-header {
   display: flex;
@@ -5738,6 +5788,9 @@ body {
   color: #999999;
   white-space: pre-wrap;
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 .msg-error-actions {
   display: flex;
@@ -5762,6 +5815,15 @@ body {
 .msg-error-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: #969696;
+}
+.msg-error-btn--copy {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #e5e7eb;
+}
+.msg-error-btn--copy:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 .msg-error-btn--primary {
   background: #0e639c;
@@ -6361,6 +6423,7 @@ body {
 .telemetry-card {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 4px 8px;
   margin: 4px 0 8px;
   background: rgba(255, 255, 255, 0.03);
@@ -6368,6 +6431,8 @@ body {
   border-radius: 6px;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 11px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .telemetry-card--streaming {
   background: rgba(56, 189, 248, 0.06);
@@ -8235,7 +8300,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.37" : "1.0.33";
+  var CLIENT_VERSION = true ? "1.0.38" : "1.0.38";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8766,7 +8831,12 @@ input:checked + .slider:before {
     if (parts.length < 3) throw new Error("Malformed payload");
     const chk = Number(parts[1]);
     const plaintext = parts.slice(2).join(":");
-    if (computeChecksum(plaintext, password) !== chk) throw new Error("Decryption checksum mismatch");
+    const computed = computeChecksum(plaintext, password);
+    if (computed !== chk && computed >>> 0 !== chk >>> 0) {
+      if (!plaintext.startsWith("cz:") && !plaintext.startsWith("{") && !plaintext.startsWith("[")) {
+        throw new Error("Decryption checksum mismatch");
+      }
+    }
     return plaintext;
   }
 
@@ -10046,7 +10116,12 @@ input:checked + .slider:before {
       mode = saved === "p2p" ? "p2p" : saved === "git-backup" ? "git-backup" : "live-sse";
     } else {
       const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-      mode = saved || (hasLiveServer() ? "live-sse" : cfg?.gistId ? "git-backup" : "live-sse");
+      const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
+      if (isMixed && cfg?.gistId && !saved) {
+        mode = "git-backup";
+      } else {
+        mode = saved || (hasLiveServer() && !isMixed ? "live-sse" : cfg?.gistId ? "git-backup" : "live-sse");
+      }
     }
     if (mode === "p2p") {
       syncMachine.forceP2PMode();
@@ -10245,7 +10320,7 @@ input:checked + .slider:before {
     if (typeof window === "undefined") return { imported: false };
     const raw = window.location.hash || window.location.search;
     const parsed = parseUrlConfig(raw);
-    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl && parsed.autoFallback === void 0) return { imported: false };
+    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl && !parsed.password && parsed.autoFallback === void 0) return { imported: false };
     const ok = applyConfigToStorage(parsed);
     if (ok) {
       try {
@@ -12458,6 +12533,83 @@ ${items}
   `;
   }
 
+  // src/ui/copyActions.ts
+  var COPY_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--copy" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="1.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/><rect x="1.5" y="4.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/></svg>';
+  var COPY_CHECK_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function formatMessageTime(time) {
+    if (time === void 0 || time === null || time === "" || typeof time === "number" && isNaN(time)) {
+      return "";
+    }
+    if (typeof time === "string") {
+      const trimmed = time.trim();
+      if (/^\d{1,2}:\d{2}(\s*(?:AM|PM|am|pm))?$/.test(trimmed)) {
+        return trimmed;
+      }
+    }
+    const date = new Date(time);
+    if (isNaN(date.getTime())) {
+      return "";
+    }
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  function escapeAttr(s) {
+    return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function renderMessageCopyActionsHtml(opts = {}) {
+    const isUser = Boolean(opts.user);
+    const title = opts.title || (isUser ? "Copy Message" : "Copy Answer");
+    const dataAttr = opts.copyText ? ` data-copy-text="${escapeAttr(opts.copyText)}"` : "";
+    const timeFormatted = formatMessageTime(opts.time);
+    const timeHtml = timeFormatted ? `<span class="msg-time">${escapeAttr(timeFormatted)}</span>` : "";
+    const btnHtml = `<button type="button" class="copy-btn copy-btn--compact"${dataAttr} title="${title}" aria-label="${title}">${COPY_ICON_SVG}</button>`;
+    const innerHtml = isUser ? `${timeHtml}${btnHtml}` : `${btnHtml}${timeHtml}`;
+    return `<div class="msg-copy-actions${isUser ? " msg-copy-actions--user" : ""}">${innerHtml}</div>`;
+  }
+  async function copyTextToClipboard(text) {
+    if (!text) return false;
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+      }
+    }
+    if (typeof document !== "undefined") {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "-9999px";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        return ok;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+  function flashCopyButton(btn) {
+    const origTitle = btn.getAttribute("aria-label") || btn.title || "Copy";
+    btn.classList.add("copied");
+    btn.classList.add("copy-btn--done");
+    btn.innerHTML = COPY_CHECK_ICON_SVG;
+    btn.title = "Copied";
+    btn.setAttribute("aria-label", "Copied");
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.classList.remove("copy-btn--done");
+      btn.innerHTML = COPY_ICON_SVG;
+      btn.title = origTitle;
+      btn.setAttribute("aria-label", origTitle);
+    }, 1500);
+  }
+
   // src/ui/components/telemetryCard.ts
   function formatTelemetrySpeed(tps) {
     if (tps == null || !Number.isFinite(tps) || tps <= 0) return null;
@@ -12488,11 +12640,18 @@ ${items}
       badges.push(`<span class="telemetry-badge telemetry-phase">\u2699\uFE0F ${escapeHtml2(data.activePhase)}</span>`);
     }
     if (badges.length === 0) return "";
+    const telemetrySummary = [
+      speed ? `Speed: ${speed}` : "",
+      inputSpeed ? `Prompt Speed: ${inputSpeed} eval` : "",
+      data.contextUsed != null && data.contextMax != null ? `Context: ${used} / ${max} tokens` : "",
+      data.activePhase ? `Phase: ${data.activePhase}` : ""
+    ].filter(Boolean).join(" | ");
     return `
     <div class="telemetry-card ${isStreaming ? "telemetry-card--streaming" : ""}">
       <div class="telemetry-badges">
         ${badges.join("")}
       </div>
+      <button type="button" class="copy-btn copy-btn--compact telemetry-copy-btn" data-copy-text="${escapeHtml2(telemetrySummary)}" title="Copy telemetry" aria-label="Copy telemetry">${COPY_ICON_SVG}</button>
     </div>
   `;
   }
@@ -12714,83 +12873,6 @@ ${thought.trim()}` : thought.trim();
       deletions: oldLines.length,
       additions: newLines.length
     };
-  }
-
-  // src/ui/copyActions.ts
-  var COPY_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--copy" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="1.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/><rect x="1.5" y="4.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/></svg>';
-  var COPY_CHECK_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  function formatMessageTime(time) {
-    if (time === void 0 || time === null || time === "" || typeof time === "number" && isNaN(time)) {
-      return "";
-    }
-    if (typeof time === "string") {
-      const trimmed = time.trim();
-      if (/^\d{1,2}:\d{2}(\s*(?:AM|PM|am|pm))?$/.test(trimmed)) {
-        return trimmed;
-      }
-    }
-    const date = new Date(time);
-    if (isNaN(date.getTime())) {
-      return "";
-    }
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  function escapeAttr(s) {
-    return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function renderMessageCopyActionsHtml(opts = {}) {
-    const isUser = Boolean(opts.user);
-    const title = opts.title || (isUser ? "Copy Message" : "Copy Answer");
-    const dataAttr = opts.copyText ? ` data-copy-text="${escapeAttr(opts.copyText)}"` : "";
-    const timeFormatted = formatMessageTime(opts.time);
-    const timeHtml = timeFormatted ? `<span class="msg-time">${escapeAttr(timeFormatted)}</span>` : "";
-    const btnHtml = `<button type="button" class="copy-btn copy-btn--compact"${dataAttr} title="${title}" aria-label="${title}">${COPY_ICON_SVG}</button>`;
-    const innerHtml = isUser ? `${timeHtml}${btnHtml}` : `${btnHtml}${timeHtml}`;
-    return `<div class="msg-copy-actions${isUser ? " msg-copy-actions--user" : ""}">${innerHtml}</div>`;
-  }
-  async function copyTextToClipboard(text) {
-    if (!text) return false;
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch {
-      }
-    }
-    if (typeof document !== "undefined") {
-      try {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        textarea.style.top = "-9999px";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(textarea);
-        return ok;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  }
-  function flashCopyButton(btn) {
-    const origTitle = btn.getAttribute("aria-label") || btn.title || "Copy";
-    btn.classList.add("copied");
-    btn.classList.add("copy-btn--done");
-    btn.innerHTML = COPY_CHECK_ICON_SVG;
-    btn.title = "Copied";
-    btn.setAttribute("aria-label", "Copied");
-    setTimeout(() => {
-      btn.classList.remove("copied");
-      btn.classList.remove("copy-btn--done");
-      btn.innerHTML = COPY_ICON_SVG;
-      btn.title = origTitle;
-      btn.setAttribute("aria-label", origTitle);
-    }, 1500);
   }
 
   // src/ui/components/diffCard.ts
@@ -13206,6 +13288,7 @@ ${resText}` : ""
         <div class="msg-error-header"><span class="msg-error-icon">\u26A0\uFE0F</span><span class="msg-error-title">Model Request Failed</span></div>
         <div class="msg-error-body">${escapeHtml2(errPart)}</div>
         <div class="msg-error-actions">
+          <button type="button" class="msg-error-btn msg-error-btn--copy" data-copy-text="${escapeHtml2(errPart)}">\u{1F4CB} Copy Error</button>
           <button type="button" class="msg-error-btn msg-error-btn--primary" id="btn-error-settings">\u2699\uFE0F Configure Settings</button>
           <button type="button" class="msg-error-btn" id="btn-error-retry">\u{1F504} Retry</button>
         </div>
@@ -15581,13 +15664,13 @@ ${resText}` : ""
   // src/ui/controlHandlers.ts
   var copyToClipboard = copyTextToClipboard;
   function handleCopyAction(target) {
-    const copyBtn = target.closest(".copy-btn, .code-copy-btn");
+    const copyBtn = target.closest(".copy-btn, .code-copy-btn, .msg-error-btn--copy");
     if (!copyBtn) return false;
     let text = copyBtn.getAttribute("data-copy-text");
     if (!text) {
-      const block = copyBtn.closest(".code-block, .diff-card, .activity-toggle");
+      const block = copyBtn.closest(".code-block, .diff-card, .activity-toggle, .msg-error-card");
       if (block) {
-        text = block.querySelector("code, .activity-toggle-output")?.textContent || "";
+        text = block.querySelector("code, .activity-toggle-output, .msg-error-body")?.textContent || "";
       } else {
         const turn = copyBtn.closest(".turn");
         text = turn?.querySelector(".msg-user-text, .msg.assistant .msg-text")?.textContent || "";

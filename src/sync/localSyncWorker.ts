@@ -66,6 +66,13 @@ export class LocalSyncWorker {
       await this.gistClient.updateOutboxAndDrainInbox(outbox, processedIds, sessions, recentDetails, res.data, CLIENT_VERSION);
     } catch (err) {
       console.error('[SyncWorker Poll Error]', err);
+      try {
+        const currentFp = await this.computeFingerprint((await listSessions(this.workspaceRoot)).slice(0, 40));
+        if (currentFp !== this.lastSessionsFingerprint) {
+          this.lastSessionsFingerprint = currentFp;
+          void this.syncOutboxOnce(undefined, true);
+        }
+      } catch {}
     } finally {
       this.isProcessing = false;
       if (this.isPolling) this.scheduleNextPoll();

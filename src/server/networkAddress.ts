@@ -27,5 +27,11 @@ export function getLocalNetworkAddresses(port: number): NetworkAddressInfo[] {
     }
   }
 
-  return results.sort((a, b) => (b.isTailscale ? 1 : 0) - (a.isTailscale ? 1 : 0));
+  // Sort standard LAN (e.g. Wi-Fi / en0 / 192.168.x.x / 10.x.x.x) first, Tailscale secondary
+  return results.sort((a, b) => {
+    if (Boolean(a.isTailscale) !== Boolean(b.isTailscale)) {
+      return a.isTailscale ? 1 : -1;
+    }
+    return a.name.localeCompare(b.name);
+  });
 }

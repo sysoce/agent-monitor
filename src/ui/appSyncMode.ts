@@ -2,7 +2,7 @@ import type { AppState } from './types';
 import type { TransportMode } from '../sync/types';
 import { SyncStateMachine } from './syncStateMachine';
 import { loadCachedGistConfig, applyGistSyncPayload } from './sessionPlanSync';
-import { hasLiveServer, isStaticDeployment } from './authStore';
+import { hasLiveServer, isStaticDeployment, getServerBaseUrl } from './authStore';
 import { isAutoFallbackEnabled } from './fallbackSettings';
 
 export function createAppSyncMachine(
@@ -59,7 +59,12 @@ export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: 
     mode = saved === 'p2p' ? 'p2p' : saved === 'git-backup' ? 'git-backup' : 'live-sse';
   } else {
     const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
-    mode = saved || (hasLiveServer() ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'live-sse'));
+    const isMixed = typeof window !== 'undefined' && window.location.protocol === 'https:' && (getServerBaseUrl()?.startsWith('http:') ?? true);
+    if (isMixed && cfg?.gistId && !saved) {
+      mode = 'git-backup';
+    } else {
+      mode = saved || (hasLiveServer() && !isMixed ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'live-sse'));
+    }
   }
 
   if (mode === 'p2p') {

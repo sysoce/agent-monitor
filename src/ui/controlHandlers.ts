@@ -11,13 +11,13 @@ export const copyToClipboard = copyTextToClipboard;
 export { handlePlanClick };
 
 export function handleCopyAction(target: HTMLElement): boolean {
-  const copyBtn = target.closest<HTMLElement>('.copy-btn, .code-copy-btn');
+  const copyBtn = target.closest<HTMLElement>('.copy-btn, .code-copy-btn, .msg-error-btn--copy');
   if (!copyBtn) return false;
   let text = copyBtn.getAttribute('data-copy-text');
   if (!text) {
-    const block = copyBtn.closest('.code-block, .diff-card, .activity-toggle');
+    const block = copyBtn.closest('.code-block, .diff-card, .activity-toggle, .msg-error-card');
     if (block) {
-      text = block.querySelector('code, .activity-toggle-output')?.textContent || '';
+      text = block.querySelector('code, .activity-toggle-output, .msg-error-body')?.textContent || '';
     } else {
       const turn = copyBtn.closest('.turn');
       text = turn?.querySelector('.msg-user-text, .msg.assistant .msg-text')?.textContent || '';

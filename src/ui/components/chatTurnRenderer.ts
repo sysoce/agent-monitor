@@ -80,6 +80,7 @@ export function renderAssistantTurn(msg: ChatMessage, isBuildMode = false): stri
         <div class="msg-error-header"><span class="msg-error-icon">⚠️</span><span class="msg-error-title">Model Request Failed</span></div>
         <div class="msg-error-body">${escapeHtml(errPart)}</div>
         <div class="msg-error-actions">
+          <button type="button" class="msg-error-btn msg-error-btn--copy" data-copy-text="${escapeHtml(errPart)}">📋 Copy Error</button>
           <button type="button" class="msg-error-btn msg-error-btn--primary" id="btn-error-settings">⚙️ Configure Settings</button>
           <button type="button" class="msg-error-btn" id="btn-error-retry">🔄 Retry</button>
         </div>
