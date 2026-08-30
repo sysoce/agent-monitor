@@ -32,12 +32,14 @@ export function updateSidebarDOM(state: AppState, container: HTMLElement): void 
     }
   }
 
-  const statsEl = sidebarEl.querySelector<HTMLElement>('.monitor-stats-widget') || sidebarEl.querySelector<HTMLElement>('.monitor-stats-container');
+  const statsEl =
+    sidebarEl.querySelector<HTMLElement>('.sidebar-stats-widget') ||
+    sidebarEl.querySelector<HTMLElement>('.monitor-stats-widget') ||
+    sidebarEl.querySelector<HTMLElement>('.monitor-stats-container');
   const nextStatsHtml = renderMonitorSidebarStats(state);
   if (statsEl) {
     if (!statsEl.dataset || statsEl.dataset.renderedHtml !== nextStatsHtml) {
       statsEl.outerHTML = nextStatsHtml;
-      if (statsEl.dataset) statsEl.dataset.renderedHtml = nextStatsHtml;
     }
   }
 

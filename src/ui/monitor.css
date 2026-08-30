@@ -3037,7 +3037,12 @@ body {
     box-shadow: none;
   }
   .app-header {
-    padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 0 12px;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 0 10px;
+  }
+  .brand-version {
+    height: 30px;
+    padding: 0 7px;
+    font-size: 11.5px;
   }
   .btn-qr-text,
   .btn-settings-text {
@@ -3046,27 +3051,44 @@ body {
   .btn-qr-pill,
   .btn-settings-pill {
     padding: 0 6px;
-    height: 24px;
-    width: 24px;
-    min-width: 24px;
+    height: 30px;
+    width: 30px;
+    min-width: 30px;
   }
   .header-actions {
-    gap: 5px;
+    gap: 6px;
   }
   .connection-indicator-pill {
-    padding: 0 6px;
-    height: 24px;
-    font-size: 10.5px;
-  }
-  .status-pill {
-    padding: 0 7px;
-    height: 24px;
+    padding: 0 8px;
+    height: 30px;
     font-size: 11px;
   }
+  .status-pill {
+    padding: 0 8px;
+    height: 30px;
+    font-size: 11.5px;
+  }
   .btn-logout {
-    height: 24px;
-    width: 24px;
-    min-width: 24px;
+    height: 30px;
+    width: 30px;
+    min-width: 30px;
+  }
+  .composer-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .composer-pill {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+  .btn-send,
+  .send-btn,
+  .btn-stop {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
   }
   .app-composer {
     padding: 8px 10px max(8px, env(safe-area-inset-bottom, 8px)) 10px;

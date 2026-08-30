@@ -25,7 +25,6 @@ export function renderThought(
           ${!isLive ? `<span class="activity-toggle-duration">${formatThoughtDuration(opts?.durationSeconds)}</span>` : ''}
         </span>
         <div class="activity-toggle-right">
-          <button type="button" class="copy-btn copy-btn--compact thought-copy-btn" data-copy-text="${escapeHtml(thought)}" title="Copy thought" aria-label="Copy thought">${COPY_ICON_SVG}</button>
           <span class="activity-toggle-chevron">›</span>
         </div>
       </button>

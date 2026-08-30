@@ -46,6 +46,7 @@ export interface SessionSummary {
   plans?: Array<{ name: string; title: string; path: string }>;
   artifacts?: Array<{ name: string; path: string; type?: string }>;
   isGenerating?: boolean;
+  isPinned?: boolean;
 }
 
 export interface SessionFileStat {

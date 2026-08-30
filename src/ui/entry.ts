@@ -12,10 +12,14 @@ import { getSavedTab } from './tabStore';
 import { initViewportManager } from './viewportManager';
 import { hydrateAllDiagrams } from './markdown/diagram/diagramHydrator';
 
+import { getPinnedSessionIds } from './pinStore';
+
 initViewportManager();
 
 const state: AppState = {
   activeTab: getSavedTab() || 'sidebar',
+  activeFilterTab: 'all',
+  pinnedSessionIds: getPinnedSessionIds(),
   sessions: [],
   plans: [],
   syncStatus: 'connecting',

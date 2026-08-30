@@ -12,7 +12,7 @@ import { renderLoginView } from '../src/ui/components/loginView';
 
 const mockState: AppState = {
   activeTab: 'chat',
-  sessions: [{ id: 'session-123', title: 'Fix auth bug', preview: 'auth.ts fix', createdAt: Date.now() - 120000, updatedAt: Date.now() - 60000, messageCount: 4 }],
+  sessions: [{ id: 'session-123', title: 'Fix auth bug', preview: 'auth.ts fix', createdAt: Date.now() - 120000, updatedAt: Date.now() - 60000, messageCount: 2 }],
   activeSessionId: 'session-123',
   activeSession: {
     id: 'session-123',
@@ -68,7 +68,7 @@ test('renderNavHeader renders brand, live status pill and active tabs across 3 m
 test('renderSidebarView renders session cards with title and badges', () => {
   const html = renderSidebarView(mockState);
   assert.match(html, /Fix auth bug/);
-  assert.match(html, /2 msgs/);
+  assert.match(html, /auth\.ts fix/);
 });
 
 test('renderSessionDetailView renders files, subagents with status and plan navigation', () => {

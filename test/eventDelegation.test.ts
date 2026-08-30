@@ -34,13 +34,16 @@ function createMockEl(opts: { id?: string; className?: string; attrs?: Record<st
     },
     getAttribute: (a: string) => opts.attrs?.[a] || null,
     closest: (sel: string) => {
+      const parts = sel.split(',').map((s) => s.trim());
       let cur: any = el;
       while (cur) {
-        if (sel.startsWith('.') && cur.classList?.contains(sel.slice(1))) return cur;
-        if (sel.startsWith('#') && cur.id === sel.slice(1)) return cur;
-        if (sel.includes('[data-tab]') && cur.getAttribute?.('data-tab')) return cur;
-        if (sel.includes('[data-plan-path]') && cur.getAttribute?.('data-plan-path')) return cur;
-        if (sel.includes('[data-session-id]') && cur.getAttribute?.('data-session-id')) return cur;
+        for (const p of parts) {
+          if (p.startsWith('.') && cur.classList?.contains(p.slice(1))) return cur;
+          if (p.startsWith('#') && cur.id === p.slice(1)) return cur;
+          if (p.includes('[data-tab]') && cur.getAttribute?.('data-tab')) return cur;
+          if (p.includes('[data-plan-path]') && cur.getAttribute?.('data-plan-path')) return cur;
+          if (p.includes('[data-session-id]') && cur.getAttribute?.('data-session-id')) return cur;
+        }
         cur = cur.parentElement;
       }
       return null;

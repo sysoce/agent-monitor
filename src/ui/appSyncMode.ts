@@ -2,7 +2,7 @@ import type { AppState } from './types';
 import type { TransportMode } from '../sync/types';
 import { SyncStateMachine } from './syncStateMachine';
 import { loadCachedGistConfig, applyGistSyncPayload } from './sessionPlanSync';
-import { hasLiveServer, isStaticDeployment, getServerBaseUrl } from './authStore';
+import { hasLiveServer, isStaticDeployment } from './authStore';
 import { isAutoFallbackEnabled } from './fallbackSettings';
 
 export function createAppSyncMachine(
@@ -53,18 +53,14 @@ export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: 
   const cfg = loadCachedGistConfig();
   if (cfg) syncMachine.setGistConfig(cfg);
   syncMachine.setAutoFallback(isAutoFallbackEnabled());
+  const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
   let mode: TransportMode;
-  if (!isStaticDeployment()) {
-    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
-    mode = saved === 'p2p' ? 'p2p' : saved === 'git-backup' ? 'git-backup' : 'live-sse';
+  if (saved) {
+    mode = saved;
+  } else if (!isStaticDeployment()) {
+    mode = 'live-sse';
   } else {
-    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
-    const isMixed = typeof window !== 'undefined' && window.location.protocol === 'https:' && (getServerBaseUrl()?.startsWith('http:') ?? true);
-    if (isMixed && cfg?.gistId) {
-      mode = saved === 'p2p' ? 'p2p' : 'git-backup';
-    } else {
-      mode = saved || (hasLiveServer() && !isMixed ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'live-sse'));
-    }
+    mode = hasLiveServer() ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'p2p');
   }
 
   if (mode === 'p2p') {
@@ -86,17 +82,15 @@ export function setSyncModeAction(
   startSse: () => void,
   sseCleanup?: () => void
 ): void {
-  const isMixed = typeof window !== 'undefined' && window.location.protocol === 'https:' && (getServerBaseUrl()?.startsWith('http:') ?? true);
-  const effectiveMode = (isMixed && targetMode === 'live-sse' && loadCachedGistConfig()?.gistId) ? 'git-backup' : targetMode;
-  if (typeof localStorage !== 'undefined') localStorage.setItem('agent_sync_mode', effectiveMode);
-  state.syncMode = effectiveMode;
-  if (effectiveMode === 'live-sse') {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('agent_sync_mode', targetMode);
+  state.syncMode = targetMode;
+  if (targetMode === 'live-sse') {
     syncMachine.forceLiveSseMode();
     startSse();
-  } else if (effectiveMode === 'git-backup') {
+  } else if (targetMode === 'git-backup') {
     sseCleanup?.();
     syncMachine.forceGitBackupMode();
-  } else if (effectiveMode === 'p2p') {
+  } else if (targetMode === 'p2p') {
     sseCleanup?.();
     syncMachine.forceP2PMode();
   }
@@ -108,13 +102,8 @@ export function toggleSyncModeAction(
   startSse: () => void,
   sseCleanup?: () => void
 ): void {
-  const isMixed = typeof window !== 'undefined' && window.location.protocol === 'https:' && (getServerBaseUrl()?.startsWith('http:') ?? true);
-  const current = state.syncMode || (isMixed ? 'git-backup' : 'p2p');
-  let next: TransportMode;
-  if (isMixed) {
-    next = current === 'git-backup' ? 'p2p' : 'git-backup';
-  } else {
-    next = current === 'p2p' ? 'live-sse' : current === 'live-sse' ? 'git-backup' : 'p2p';
-  }
+  const current = state.syncMode || 'p2p';
+  const next: TransportMode = current === 'p2p' ? 'live-sse' : current === 'live-sse' ? 'git-backup' : 'p2p';
   setSyncModeAction(next, state, syncMachine, startSse, sseCleanup);
 }
+

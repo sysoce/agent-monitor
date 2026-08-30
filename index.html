@@ -2769,211 +2769,392 @@ b {
   padding: 0;
 }
 body {
-  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif);
   font-size: var(--vscode-font-size, 13px);
-  color: var(--vscode-foreground, #cccccc);
-  background-color: var(--vscode-sideBar-background, #181818);
+  color: var(--vscode-foreground, #d1d5db);
+  background-color: var(--vscode-sideBar-background, #141414);
   line-height: 1.4;
   user-select: none;
   overflow-x: hidden;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-.sidebar-container {
+.sidebar-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   width: 100%;
+  height: 100%;
+  background-color: var(--vscode-sideBar-background, #141414);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
-.sidebar-header {
-  padding: 10px 12px 8px 12px;
+.sidebar-actions {
+  padding: 8px 10px 4px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(255, 255, 255, 0.08));
-  background-color: var(--vscode-sideBar-background, #181818);
+  gap: 6px;
+  background-color: transparent;
   flex-shrink: 0;
 }
-.new-chat-btn {
+.sidebar-actions-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  height: 28px;
+}
+.new-session-btn,
+.new-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  background-color: var(--vscode-input-background, #2a2a2a);
-  color: var(--vscode-foreground, #e8e8e8);
-  font-size: 12px;
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--vscode-foreground, #e5e7eb);
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  text-align: left;
   box-sizing: border-box;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
+.new-session-btn:hover,
 .new-chat-btn:hover {
   background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
   border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
+.new-session-btn:active,
+.new-chat-btn:active {
+  background-color: rgba(255, 255, 255, 0.12);
+  transform: scale(0.99);
+}
+.btn-icon,
 .new-chat-icon {
   display: flex;
   align-items: center;
-  color: var(--vscode-icon-foreground, #cccccc);
+  justify-content: center;
+  color: var(--vscode-icon-foreground, #9ca3af);
+  font-size: 14px;
 }
 .search-bar {
   position: relative;
   display: flex;
   align-items: center;
   width: 100%;
-  height: 28px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
 }
 .search-icon {
   position: absolute;
   left: 8px;
-  color: var(--vscode-input-placeholderForeground, #888888);
+  color: var(--vscode-input-placeholderForeground, #8b949e);
   display: flex;
   align-items: center;
+  justify-content: center;
   pointer-events: none;
+  font-size: 13px;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 .search-input {
   width: 100%;
-  height: 28px;
-  padding: 0 42px 0 28px;
-  font-size: 12px;
-  background-color: var(--vscode-input-background, #2a2a2a);
-  color: var(--vscode-input-foreground, #cccccc);
-  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.12));
+  height: 32px;
+  padding: 0 34px 0 28px;
+  font-size: 12.5px;
+  background-color: rgba(255, 255, 255, 0.035);
+  color: var(--vscode-input-foreground, #e5e7eb);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   outline: none;
   user-select: text;
   -webkit-user-select: text;
   box-sizing: border-box;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #8b949e);
+  font-size: 12px;
+}
+.search-input:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 .search-input:focus {
+  background-color: rgba(255, 255, 255, 0.07);
   border-color: var(--vscode-focusBorder, #007fd4);
+  color: #ffffff;
 }
 .search-kbd {
   position: absolute;
-  right: 8px;
-  font-size: 10px;
+  right: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
   line-height: 1;
-  padding: 3px 5px;
+  padding: 2.5px 5px;
   border-radius: 4px;
-  background-color: rgba(0, 0, 0, 0.35);
-  color: var(--vscode-descriptionForeground, #888888);
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--vscode-descriptionForeground, #9ca3af);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .clear-btn {
   position: absolute;
   right: 6px;
   background: transparent;
   border: none;
-  color: var(--vscode-descriptionForeground, #888888);
+  color: var(--vscode-descriptionForeground, #8b949e);
   cursor: pointer;
-  font-size: 11px;
-}
-.session-selector-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.session-active-card {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  padding: 4px 8px;
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  cursor: pointer;
-  min-width: 0;
-}
-.session-active-card:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-.session-active-title {
-  font-weight: 500;
   font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-}
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.icon-button {
-  background: transparent;
-  border: none;
-  color: var(--vscode-icon-foreground, #cccccc);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 3px;
+  padding: 4px 6px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.icon-button:hover {
-  background-color: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
+.clear-btn:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
 }
-.sessions-dropdown {
-  background-color: var(--vscode-sideBar-background, #1e1e1e);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  max-height: 180px;
-  overflow-y: auto;
-  padding: 4px 0;
+.sidebar-stats-widget {
+  padding: 4px 10px 8px 10px;
+  background-color: transparent;
+  flex-shrink: 0;
+  container-type: inline-size;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+}
+.stat-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 7px;
+  background-color: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.stat-card:hover {
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.07));
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.stat-card.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.stat-icon-inset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.stat-icon-inset .stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground, #9ca3af);
+  transition: color 0.15s ease;
+}
+.stat-icon-inset .stat-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.stat-card:hover .stat-icon-inset .stat-icon,
+.stat-card.active .stat-icon-inset .stat-icon {
+  color: #f3f4f6;
+}
+.stat-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--vscode-foreground, #e5e7eb);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  text-align: left;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  transition: all 0.15s ease;
+}
+.stat-card.type-running.has-items .stat-label {
+  color: #4ade80;
+}
+.stat-card.type-pinned.has-items .stat-label {
+  color: #facc15;
+}
+.stat-card.type-artifacts.has-items .stat-label {
+  color: #c084fc;
+}
+.stat-card.type-all.has-items .stat-label {
+  color: #ffffff;
+}
+.stat-card.zero-count .stat-label {
+  color: var(--vscode-descriptionForeground, #8b949e);
+}
+.stat-card:hover .stat-label {
+  color: #ffffff;
+}
+.stat-value {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace);
+  line-height: 1;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--vscode-descriptionForeground, #8b949e);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  min-width: 14px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.stat-card.zero-count .stat-value {
+  color: var(--vscode-descriptionForeground, #6b7280);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: transparent;
+}
+.stat-card.type-running.has-items .stat-value {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.25);
+}
+.stat-card.type-pinned.has-items .stat-value {
+  color: #facc15;
+  background: rgba(234, 179, 8, 0.18);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.25);
+}
+.stat-card.type-all.has-items .stat-value {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.stat-card.type-artifacts.has-items .stat-value {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+  box-shadow: 0 0 6px rgba(192, 132, 252, 0.25);
+}
+.session-list {
+  padding: 0 10px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.session-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+.session-group:first-child {
+  margin-top: 2px;
+}
+.session-group-label {
+  padding: 4px 6px 4px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground, #8b949e);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .session-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  margin: 1px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
   cursor: pointer;
+  min-height: 34px;
+  color: var(--vscode-foreground, #c9d1d9);
+  background-color: transparent;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+  position: relative;
+  box-sizing: border-box;
 }
 .session-item:hover {
   background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
+  color: #ffffff;
 }
 .session-item.active {
-  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.3));
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+.session-item.is-pinned {
+  border-left: 2px solid #facc15;
 }
 .session-status {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.session-status--agent,
-.session-status--error {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
 .session-status--agent {
-  background-color: var(--agent-status-blue, #4daafc);
+  color: #4daafc;
 }
 .session-status--error {
-  background-color: var(--agent-status-orange, #f59e0b);
+  color: #f87171;
 }
 .session-status--plan {
-  color: var(--vscode-descriptionForeground, #888888);
-}
-.session-status--none {
-  visibility: hidden;
+  color: #a78bfa;
 }
 .session-spinner {
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid rgba(77, 170, 252, 0.25);
-  border-top-color: var(--agent-status-blue, #4daafc);
+  width: 12px;
+  height: 12px;
+  border: 1.8px solid rgba(74, 222, 128, 0.25);
+  border-top-color: #4ade80;
   border-radius: 50%;
   animation: session-spin 0.7s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
 }
 @keyframes session-spin {
   to {
@@ -2983,53 +3164,189 @@ body {
 .session-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .session-title {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   user-select: text;
   -webkit-user-select: text;
 }
-.session-meta {
+.session-badge {
   font-size: 10px;
-  color: var(--vscode-descriptionForeground, #888888);
-  user-select: text;
-  -webkit-user-select: text;
+  font-weight: 500;
+  color: var(--vscode-descriptionForeground, #8b949e);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.session-badge--running {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+.session-subtitle {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #8b949e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.session-card-plans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.session-plan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 10.5px;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  border-radius: 4px;
+  color: #c4b5fd;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.2;
+}
+.session-plan-chip:hover {
+  background: rgba(167, 139, 250, 0.22);
+  border-color: rgba(167, 139, 250, 0.4);
+}
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.session-row-action {
+  background: transparent;
+  border: none;
+  color: var(--vscode-icon-foreground, #8b949e);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.session-item:hover .session-row-action {
+  opacity: 1;
+}
+.session-row-action:hover {
+  opacity: 1;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.pin-session-btn.pinned {
+  color: #facc15;
+  opacity: 1;
+}
+.stop-session-btn {
+  color: #f87171;
 }
 .session-time {
   flex-shrink: 0;
   font-size: 11px;
-  color: var(--vscode-descriptionForeground, #888888);
+  color: var(--vscode-descriptionForeground, #8b949e);
   user-select: text;
   -webkit-user-select: text;
+  margin-left: 2px;
 }
-.session-row-action {
-  opacity: 0;
+.running-time {
+  color: #4ade80;
+  font-weight: 500;
+}
+.dashboard-artifacts-section {
+  padding: 4px 10px 12px;
+}
+.sidebar-artifact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.sidebar-artifact-row:hover {
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.artifact-info {
+  flex: 1;
+  min-width: 0;
+}
+.artifact-info .artifact-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.3;
+}
+.artifact-info .artifact-path {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #8b949e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.artifact-open-icon {
+  color: var(--vscode-descriptionForeground, #8b949e);
+  opacity: 0.7;
   flex-shrink: 0;
 }
-.session-item:hover .session-row-action,
-.session-item:focus-within .session-row-action {
+.sidebar-artifact-row:hover .artifact-open-icon {
   opacity: 1;
+  color: #38bdf8;
 }
-.session-item:hover .session-time {
-  display: none;
+.section-divider {
+  display: flex;
+  align-items: center;
+  padding: 10px 10px 4px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #8b949e);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.sidebar-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 4px 16px 4px;
+.session-details-card {
+  padding: 0 10px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .section-header {
   display: flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 6px 8px;
   cursor: pointer;
   user-select: none;
   gap: 6px;
-  border-radius: 4px;
-  margin-top: 8px;
+  border-radius: 6px;
+  margin-top: 4px;
+  transition: background-color 0.12s ease;
 }
 .section-header:first-child {
   margin-top: 0;
@@ -3038,7 +3355,7 @@ body {
   background-color: rgba(255, 255, 255, 0.04);
 }
 .section-title {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   color: #9ca3af;
 }
@@ -3060,27 +3377,13 @@ body {
   justify-content: center;
   width: 12px;
   height: 12px;
-}
-.section-action {
   margin-left: auto;
-  color: #9ca3af;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-.section-action:hover {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.12);
 }
 .section-content {
   display: flex;
   flex-direction: column;
   padding: 2px 0 4px 0;
+  gap: 2px;
 }
 .file-row,
 .artifact-row,
@@ -3092,12 +3395,13 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 10px 4px 14px;
+  padding: 5px 8px;
   cursor: pointer;
-  font-size: 13px;
-  border-radius: 4px;
+  font-size: 12.5px;
+  border-radius: 6px;
   min-width: 0;
-  transition: background 0.1s ease;
+  color: var(--vscode-foreground, #c9d1d9);
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 .file-row:hover,
 .artifact-row:hover,
@@ -3107,6 +3411,7 @@ body {
 .terminal-row:hover,
 .skill-row:hover {
   background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.05));
+  color: #ffffff;
 }
 .file-row--deleted {
   cursor: default;
@@ -3126,8 +3431,8 @@ body {
 .skill-name,
 .terminal-name {
   color: #ffffff;
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 500;
+  font-size: 12.5px;
   flex-shrink: 0;
   line-height: 1.3;
   user-select: text;
@@ -3137,7 +3442,7 @@ body {
 .skill-path,
 .subagent-summary {
   color: #6e7681;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3147,21 +3452,6 @@ body {
   min-width: 0;
   user-select: text;
   -webkit-user-select: text;
-}
-.file-stats {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.diff-stat--add {
-  color: #3fb950;
-}
-.diff-stat--del {
-  color: #f85149;
 }
 .row-icon {
   color: #8b949e;
@@ -3179,387 +3469,127 @@ body {
   flex: 1;
   min-width: 0;
 }
-.task-name {
-  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #ffffff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-  letter-spacing: -0.2px;
-}
-.task-spinner-icon {
-  color: #60a5fa;
-  animation: task-spin 1.2s linear infinite;
-}
-.task-check-icon {
-  color: #4ade80;
-}
-.task-failed-icon {
-  color: #f87171;
-}
-@keyframes task-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.status-pill {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  text-transform: capitalize;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.status-completed {
-  background-color: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-}
-.status-running {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
-.status-failed {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-}
-.see-all-link {
-  font-size: 11.5px;
-  color: var(--vscode-textLink-foreground, #4daafc);
-  padding: 4px 10px 4px 14px;
-  cursor: pointer;
-}
-.see-all-link:hover {
-  text-decoration: underline;
-}
 .empty-item,
+.empty-state,
 .empty-hint {
-  font-size: 11.5px;
+  font-size: 12px;
   color: #6e7681;
-  padding: 4px 10px 4px 14px;
-}
-.session-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 12px;
-}
-.session-group-label {
-  padding: 8px 12px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--vscode-descriptionForeground, #888888);
-}
-.dashboard-body {
-  padding: 4px 0 16px;
-}
-.dashboard-body .session-item {
-  margin: 0 8px;
-  border-radius: 6px;
-}
-.dashboard-body .session-meta {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.summary-view .session-active-card {
-  cursor: default;
-}
-.dashboard-body .empty-hint {
-  text-align: center;
-  padding: 16px 12px;
-  font-style: normal;
-}
-.extend-search-block {
-  padding: 4px 0 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 4px;
-}
-.extend-search-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: calc(100% - 16px);
-  margin: 4px 8px 8px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--vscode-textLink-foreground, #4daafc);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-}
-.extend-search-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-.extend-search-label {
-  padding: 4px 12px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--vscode-descriptionForeground, #888);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.extend-search-list .session-item {
-  margin: 0 8px;
-  border-radius: 6px;
-}
-.summary-view .empty-hint {
   text-align: center;
-  padding: 12px;
-  font-style: normal;
 }
-.sessions-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 28px;
-  box-sizing: border-box;
-}
-.sessions-index-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid rgba(77, 170, 252, 0.25);
-  background: rgba(77, 170, 252, 0.08);
-  color: var(--vscode-textLink-foreground, #4daafc);
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 5px;
-  cursor: pointer;
-  padding: 3px 8px;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-  line-height: 1;
-}
-.sessions-index-link::before {
-  content: "\2190";
-  font-size: 11px;
-  line-height: 1;
-  font-weight: bold;
-  margin-right: 2px;
-}
-.sessions-index-link:hover {
-  background: rgba(77, 170, 252, 0.18);
-  border-color: rgba(77, 170, 252, 0.45);
-  color: #69b9ff;
-}
-.sessions-breadcrumb-sep {
-  color: var(--vscode-descriptionForeground, #666666);
-  font-size: 11px;
-  flex-shrink: 0;
-}
-.sessions-breadcrumb-current {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--vscode-foreground, #cccccc);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
-}
-.sessions-breadcrumb .header-actions {
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.sidebar-stats-widget {
-  padding: 8px 12px 6px;
-  background-color: var(--vscode-sideBar-background, #181818);
-  flex-shrink: 0;
-}
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-.stat-card {
+.session-loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 4px;
-  background-color: var(--vscode-input-background, #242424);
-  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.08));
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-.stat-card:hover {
-  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
-  border-color: rgba(255, 255, 255, 0.2);
-}
-.stat-card.active {
-  background-color: rgba(0, 122, 204, 0.2);
-  border-color: var(--vscode-focusBorder, #007fd4);
-}
-.stat-card-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--vscode-descriptionForeground, #999999);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-.stat-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--vscode-foreground, #ffffff);
-  margin-top: 2px;
-  line-height: 1.1;
-}
-.running-val {
-  color: #4ade80;
-}
-.pinned-val {
-  color: #facc15;
-}
-.stat-pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #6e7681;
-}
-.stat-pulse-dot.live {
-  background-color: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
-  animation: pulse-live 1.8s infinite;
-}
-@keyframes pulse-live {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-}
-.sidebar-filter-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px 12px 6px;
-  overflow-x: auto;
-  flex-shrink: 0;
-  background-color: var(--vscode-sideBar-background, #181818);
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(255, 255, 255, 0.06));
-}
-.sidebar-filter-tabs::-webkit-scrollbar {
-  display: none;
-}
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--vscode-descriptionForeground, #888888);
-  background-color: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-.filter-chip:hover {
-  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
-  color: var(--vscode-foreground, #cccccc);
-}
-.filter-chip.active {
-  background-color: var(--vscode-badge-background, rgba(0, 122, 204, 0.25));
-  border-color: var(--vscode-focusBorder, #007fd4);
-  color: var(--vscode-foreground, #ffffff);
-  font-weight: 600;
-}
-.filter-chip-count {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-}
-.session-pin-indicator {
-  display: inline-flex;
-  align-items: center;
-  color: #facc15;
-  margin-right: 4px;
-  vertical-align: middle;
-}
-.pin-session-btn.pinned {
-  color: #facc15;
-  opacity: 0.9;
-}
-.session-item.is-pinned {
-  border-left: 2px solid #facc15;
-}
-.dashboard-artifacts-section {
-  padding: 4px 8px 12px;
-}
-.sidebar-artifact-row {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-bottom: 3px;
-  background-color: var(--vscode-input-background, rgba(255, 255, 255, 0.03));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: background 0.12s ease;
+  padding: 32px 16px;
+  color: #8b949e;
 }
-.sidebar-artifact-row:hover {
-  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
-  border-color: rgba(255, 255, 255, 0.14);
+.session-loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.artifact-info {
-  flex: 1;
-  min-width: 0;
-}
-.artifact-info .artifact-name {
+.session-loading-text {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--vscode-foreground, #ffffff);
+  font-weight: 500;
 }
-.artifact-info .artifact-path {
-  font-size: 10.5px;
-  color: var(--vscode-descriptionForeground, #888888);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.artifact-open-icon {
-  color: var(--vscode-descriptionForeground, #888888);
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-.sidebar-artifact-row:hover .artifact-open-icon {
-  opacity: 1;
-  color: var(--vscode-textLink-foreground, #4daafc);
-}
-@media (max-width: 360px) {
+@media (max-width: 640px) {
+  .sidebar-actions {
+    padding: 8px 8px 4px 8px;
+    gap: 8px;
+  }
+  .new-session-btn,
+  .new-chat-btn {
+    height: 40px;
+    min-height: 40px;
+    font-size: 13.5px;
+  }
+  .search-bar {
+    height: 38px;
+    min-height: 38px;
+  }
+  .search-input {
+    height: 38px;
+    font-size: 16px;
+    padding: 0 36px 0 32px;
+  }
+  .search-icon {
+    left: 10px;
+  }
+  .clear-btn {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  .sidebar-stats-widget {
+    padding: 4px 8px 6px 8px;
+  }
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
   }
   .stat-card {
-    padding: 4px 2px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 6px;
   }
-  .sidebar-header {
-    padding: 8px 8px 6px;
+  .stat-label {
+    font-size: 11px;
+  }
+  .stat-value {
+    font-size: 11px;
+    padding: 2px 5px;
+  }
+  .session-list {
+    padding: 0 6px 20px 6px;
+  }
+  .session-item {
+    min-height: 44px;
+    padding: 8px 8px;
+    margin: 2px 0;
+  }
+  .session-title {
+    font-size: 13.5px;
+  }
+  .session-subtitle {
+    font-size: 12px;
+  }
+  .session-plan-chip {
+    padding: 3px 8px;
+    font-size: 11.5px;
+    min-height: 28px;
+  }
+  .session-row-action {
+    opacity: 0.85;
+    padding: 6px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .session-time {
+    font-size: 11.5px;
+  }
+  .sidebar-artifact-row {
+    min-height: 42px;
+    padding: 8px 10px;
+  }
+  .file-row,
+  .artifact-row,
+  .upload-row,
+  .subagent-row,
+  .task-row,
+  .terminal-row,
+  .skill-row {
+    min-height: 38px;
+    padding: 6px 10px;
+  }
+  .section-header {
+    min-height: 36px;
+    padding: 8px 10px;
+  }
+}
+@media (max-width: 380px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -6320,7 +6350,12 @@ body {
     box-shadow: none;
   }
   .app-header {
-    padding: calc(6px + env(safe-area-inset-top, 0px)) 12px 0 12px;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 0 10px;
+  }
+  .brand-version {
+    height: 30px;
+    padding: 0 7px;
+    font-size: 11.5px;
   }
   .btn-qr-text,
   .btn-settings-text {
@@ -6329,27 +6364,44 @@ body {
   .btn-qr-pill,
   .btn-settings-pill {
     padding: 0 6px;
-    height: 24px;
-    width: 24px;
-    min-width: 24px;
+    height: 30px;
+    width: 30px;
+    min-width: 30px;
   }
   .header-actions {
-    gap: 5px;
+    gap: 6px;
   }
   .connection-indicator-pill {
-    padding: 0 6px;
-    height: 24px;
-    font-size: 10.5px;
-  }
-  .status-pill {
-    padding: 0 7px;
-    height: 24px;
+    padding: 0 8px;
+    height: 30px;
     font-size: 11px;
   }
+  .status-pill {
+    padding: 0 8px;
+    height: 30px;
+    font-size: 11.5px;
+  }
   .btn-logout {
-    height: 24px;
-    width: 24px;
-    min-width: 24px;
+    height: 30px;
+    width: 30px;
+    min-width: 30px;
+  }
+  .composer-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .composer-pill {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+  .btn-send,
+  .send-btn,
+  .btn-stop {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
   }
   .app-composer {
     padding: 8px 10px max(8px, env(safe-area-inset-bottom, 8px)) 10px;
@@ -8325,7 +8377,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.42" : "1.0.42";
+  var CLIENT_VERSION = true ? "1.0.43" : "1.0.42";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -10205,18 +10257,14 @@ input:checked + .slider:before {
     const cfg = loadCachedGistConfig();
     if (cfg) syncMachine.setGistConfig(cfg);
     syncMachine.setAutoFallback(isAutoFallbackEnabled());
+    const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
     let mode;
-    if (!isStaticDeployment()) {
-      const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-      mode = saved === "p2p" ? "p2p" : saved === "git-backup" ? "git-backup" : "live-sse";
+    if (saved) {
+      mode = saved;
+    } else if (!isStaticDeployment()) {
+      mode = "live-sse";
     } else {
-      const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-      const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
-      if (isMixed && cfg?.gistId) {
-        mode = saved === "p2p" ? "p2p" : "git-backup";
-      } else {
-        mode = saved || (hasLiveServer() && !isMixed ? "live-sse" : cfg?.gistId ? "git-backup" : "live-sse");
-      }
+      mode = hasLiveServer() ? "live-sse" : cfg?.gistId ? "git-backup" : "p2p";
     }
     if (mode === "p2p") {
       syncMachine.forceP2PMode();
@@ -10230,30 +10278,22 @@ input:checked + .slider:before {
     }
   }
   function setSyncModeAction(targetMode, state2, syncMachine, startSse, sseCleanup) {
-    const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
-    const effectiveMode = isMixed && targetMode === "live-sse" && loadCachedGistConfig()?.gistId ? "git-backup" : targetMode;
-    if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", effectiveMode);
-    state2.syncMode = effectiveMode;
-    if (effectiveMode === "live-sse") {
+    if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", targetMode);
+    state2.syncMode = targetMode;
+    if (targetMode === "live-sse") {
       syncMachine.forceLiveSseMode();
       startSse();
-    } else if (effectiveMode === "git-backup") {
+    } else if (targetMode === "git-backup") {
       sseCleanup?.();
       syncMachine.forceGitBackupMode();
-    } else if (effectiveMode === "p2p") {
+    } else if (targetMode === "p2p") {
       sseCleanup?.();
       syncMachine.forceP2PMode();
     }
   }
   function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
-    const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
-    const current = state2.syncMode || (isMixed ? "git-backup" : "p2p");
-    let next;
-    if (isMixed) {
-      next = current === "git-backup" ? "p2p" : "git-backup";
-    } else {
-      next = current === "p2p" ? "live-sse" : current === "live-sse" ? "git-backup" : "p2p";
-    }
+    const current = state2.syncMode || "p2p";
+    const next = current === "p2p" ? "live-sse" : current === "live-sse" ? "git-backup" : "p2p";
     setSyncModeAction(next, state2, syncMachine, startSse, sseCleanup);
   }
 
@@ -12077,6 +12117,37 @@ ${items}
   function escapeHtml3(str) {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
   }
+  function getFileBadgeInfo(ext) {
+    switch (ext.toLowerCase()) {
+      case "md":
+      case "markdown":
+        return { label: "M\u2193", bg: "rgba(77, 170, 252, 0.2)", fg: "#4daafc" };
+      case "ts":
+      case "tsx":
+        return { label: "TS", bg: "rgba(49, 120, 198, 0.25)", fg: "#54a3ff" };
+      case "js":
+      case "jsx":
+      case "mjs":
+      case "cjs":
+        return { label: "JS", bg: "rgba(247, 223, 30, 0.2)", fg: "#f7df1e" };
+      case "py":
+        return { label: "PY", bg: "rgba(53, 114, 165, 0.25)", fg: "#60b5ff" };
+      case "json":
+        return { label: "{}", bg: "rgba(255, 165, 0, 0.2)", fg: "#ffa500" };
+      case "css":
+      case "scss":
+      case "less":
+        return { label: "#", bg: "rgba(168, 85, 247, 0.2)", fg: "#c084fc" };
+      case "html":
+        return { label: "<>", bg: "rgba(227, 76, 38, 0.2)", fg: "#ff6e4a" };
+      case "rs":
+        return { label: "RS", bg: "rgba(222, 90, 56, 0.2)", fg: "#de5a38" };
+      case "go":
+        return { label: "GO", bg: "rgba(0, 173, 216, 0.2)", fg: "#00add8" };
+      default:
+        return { label: ext.toUpperCase().slice(0, 2) || "\u2022\u2022", bg: "rgba(255, 255, 255, 0.1)", fg: "#cccccc" };
+    }
+  }
   var ICONS = {
     search: `<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>`,
     paperPlane: `<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.244 6.636 10.07Zm6.928-8.2L2.559 6.082l4.338 2.76 6.667-6.972Z"/></svg>`,
@@ -12093,6 +12164,7 @@ ${items}
     chevronRight: `<svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>`,
     chevronDown: `<svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`,
     trash: `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>`,
+    archive: `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1v7.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 12.5V5a1 1 0 0 1-1-1V2zm2 3v7.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V5H2zm13-3H1v2h14V2zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5z"/></svg>`,
     copy: `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>`,
     chat: `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>`,
     pin: `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9.828 1.172a2 2 0 0 1 2.828 2.828l-1.414 1.414L10.5 7.5l2 2-1 1-3.5-1-3 3-1.5-1.5 3-3-1-3.5 1-1 2.086.743 1.414-1.414-2.828-2.828"/></svg>`,
@@ -12328,85 +12400,227 @@ ${items}
     return "";
   }
 
-  // src/ui/components/sidebarStatsCard.ts
-  function renderMonitorSidebarStats(state2) {
-    let running = 0;
-    let totalMessages = 0;
-    let totalArtifacts = 0;
+  // src/ui/sidebar/sidebarStatsRender.ts
+  function calculateDashboardStats(stateOrSessions, extraArtifacts = []) {
+    const isState = "sessions" in stateOrSessions && Array.isArray(stateOrSessions.sessions);
+    const state2 = isState ? stateOrSessions : void 0;
+    const sessions = isState ? stateOrSessions.sessions : Array.isArray(stateOrSessions) ? stateOrSessions : [];
+    const pinnedSet = new Set(state2?.pinnedSessionIds || []);
     const seenIds = /* @__PURE__ */ new Set();
-    for (const s of state2.sessions) {
+    let runningCount = 0;
+    let pinnedCount = 0;
+    let totalMessages = 0;
+    let artifactsCount = extraArtifacts.length;
+    for (const s of sessions) {
       seenIds.add(s.id);
-      const isActive = s.id === state2.activeSessionId;
-      const isGen = Boolean(
-        s.isGenerating || isActive && (state2.activeSession?.isGenerating || state2.isAwaitingResponse && (!state2.awaitingSessionId || state2.awaitingSessionId === s.id))
-      );
-      if (isGen) running++;
-      const msgCount = isActive && state2.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0;
+      const isRun = isSessionRunningInState(s, state2);
+      const isPin = s.isPinned || pinnedSet.has(s.id);
+      if (isRun) runningCount++;
+      if (isPin) pinnedCount++;
+      const isAct = s.id === state2?.activeSessionId;
+      const msgCount = isAct && state2?.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0;
       totalMessages += msgCount;
-      const artCount = isActive && state2.activeSession?.artifacts ? state2.activeSession.artifacts.length : s.artifacts?.length || 0;
-      totalArtifacts += artCount;
+      const artCount = isAct && state2?.activeSession?.artifacts ? state2.activeSession.artifacts.length : s.artifacts?.length || 0;
+      artifactsCount += artCount;
     }
-    if (state2.activeSession && !seenIds.has(state2.activeSession.id)) {
-      const isGen = Boolean(state2.activeSession.isGenerating || state2.isAwaitingResponse);
-      if (isGen) running++;
+    if (state2?.activeSession && !seenIds.has(state2.activeSession.id)) {
+      if (state2.activeSession.isGenerating || state2.isAwaitingResponse) runningCount++;
+      if (pinnedSet.has(state2.activeSession.id)) pinnedCount++;
       totalMessages += state2.activeSession.messages?.length || 0;
-      totalArtifacts += state2.activeSession.artifacts?.length || 0;
+      artifactsCount += state2.activeSession.artifacts?.length || 0;
     }
-    const sessionCount = state2.activeSession && !seenIds.has(state2.activeSession.id) ? state2.sessions.length + 1 : state2.sessions.length;
+    const totalSessions = state2?.activeSession && !seenIds.has(state2.activeSession.id) ? sessions.length + 1 : sessions.length;
+    return { runningCount, pinnedCount, totalSessions, totalMessages, artifactsCount };
+  }
+  function renderSidebarStats(stats, activeFilter = "all") {
+    const cards = [
+      { id: "all", label: "All", count: stats.totalSessions, iconSvg: ICONS.chat, typeClass: "type-all" },
+      { id: "running", label: "Running", count: stats.runningCount, iconSvg: ICONS.taskSpinner, typeClass: "type-running" },
+      { id: "pinned", label: "Pinned", count: stats.pinnedCount, iconSvg: ICONS.pin, typeClass: "type-pinned" },
+      { id: "artifacts", label: "Artifacts", count: stats.artifactsCount, iconSvg: ICONS.artifactFile, typeClass: "type-artifacts" }
+    ];
     return `
-    <div class="monitor-stats-widget" role="region" aria-label="Dashboard Metrics">
-      <div class="monitor-stats-grid">
-        <div class="monitor-stat-item">
-          <div class="monitor-stat-label">
-            <span class="pulse-indicator ${running > 0 ? "live" : ""}"></span>
-            Running
-          </div>
-          <div class="monitor-stat-val running-num">${running}</div>
-        </div>
-        <div class="monitor-stat-item">
-          <div class="monitor-stat-label">Sessions</div>
-          <div class="monitor-stat-val">${sessionCount}</div>
-        </div>
-        <div class="monitor-stat-item">
-          <div class="monitor-stat-label">Messages</div>
-          <div class="monitor-stat-val">${totalMessages}</div>
-        </div>
-        <div class="monitor-stat-item">
-          <div class="monitor-stat-label">Artifacts</div>
-          <div class="monitor-stat-val">${totalArtifacts}</div>
-        </div>
+    <div class="sidebar-stats-widget" role="tablist" aria-label="Session Filter">
+      <div class="stats-grid">
+        ${cards.map((c) => {
+      const isActive = activeFilter === c.id;
+      const hasCount = c.count > 0;
+      const cardTypeClass = hasCount ? ` ${c.typeClass} has-items` : " zero-count";
+      return `
+          <button type="button" role="tab" class="stat-card${isActive ? " active" : ""}${cardTypeClass}" data-filter-tab="${c.id}" aria-selected="${isActive}" title="${escapeHtml3(c.label)} (${c.count})">
+            <span class="stat-icon-inset"><span class="stat-icon">${c.iconSvg}</span></span>
+            <span class="stat-label">${escapeHtml3(c.label)}</span>
+            <span class="stat-value">${c.count}</span>
+          </button>`;
+    }).join("")}
       </div>
     </div>
   `;
   }
 
-  // src/ui/sidebarSessionUtils.ts
-  function formatRelativeTime(ts) {
-    if (!ts || ts <= 0) return "";
-    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1e3));
-    if (diffSec < 60) return "just now";
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return `${Math.floor(diffSec / 86400)}d ago`;
+  // src/ui/components/sidebarStatsCard.ts
+  function renderMonitorSidebarStats(state2) {
+    const stats = calculateDashboardStats(state2);
+    return renderSidebarStats(stats, state2.activeFilterTab || "all");
   }
-  function renderCardPlans(plans) {
+
+  // src/ui/sidebar/sidebarSessionGroups.ts
+  var DAY_MS = 24 * 60 * 60 * 1e3;
+  function groupSessionsByRecency(sessions, now = Date.now()) {
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayStart = startOfToday.getTime();
+    const weekStart = todayStart - 6 * DAY_MS;
+    const today = [];
+    const last7 = [];
+    const older = [];
+    const sorted = [...sessions].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    for (const session of sorted) {
+      const time = session.updatedAt || 0;
+      if (time >= todayStart) today.push(session);
+      else if (time >= weekStart) last7.push(session);
+      else older.push(session);
+    }
+    const groups = [];
+    if (today.length) groups.push({ label: "Today", sessions: today });
+    if (last7.length) groups.push({ label: "Last 7 Days", sessions: last7 });
+    if (older.length) groups.push({ label: "Older", sessions: older });
+    return groups;
+  }
+  function partitionSessionsByFilter(sessions, filter = "all") {
+    const running = [];
+    const pinned = [];
+    const recent = [];
+    for (const s of sessions) {
+      if (s.isRunning) {
+        running.push(s);
+      } else if (s.isPinned) {
+        pinned.push(s);
+      }
+      if (filter === "running") {
+        if (s.isRunning) recent.push(s);
+      } else if (filter === "pinned") {
+        if (s.isPinned) recent.push(s);
+      } else if (filter === "all") {
+        if (!s.isPinned && !s.isRunning) recent.push(s);
+      }
+    }
+    return { running, pinned, recent };
+  }
+
+  // src/ui/sidebar/sidebarSessionRow.ts
+  function formatRelativeTime(updatedAt, now = Date.now()) {
+    if (!updatedAt || updatedAt <= 0) return "";
+    const elapsed = Math.max(0, now - updatedAt);
+    const minMs = 6e4;
+    const hourMs = 60 * minMs;
+    const dayMs = 24 * hourMs;
+    if (elapsed < hourMs) {
+      return `${Math.max(1, Math.round(elapsed / minMs))}m`;
+    }
+    if (elapsed < dayMs) {
+      return `${Math.max(1, Math.round(elapsed / hourMs))}h`;
+    }
+    return `${Math.max(1, Math.round(elapsed / dayMs))}d`;
+  }
+  function renderStatusIcon(session) {
+    if (session.isRunning) {
+      return '<span class="session-status session-spinner" aria-label="Running"></span>';
+    }
+    if (session.hasError) {
+      return `<span class="session-status session-status--error" aria-label="Error">${ICONS.errorCircle}</span>`;
+    }
+    if (session.mode === "plan") {
+      return `<span class="session-status session-status--plan" aria-label="Plan">${ICONS.branch}</span>`;
+    }
+    return `<span class="session-status session-status--agent" aria-label="Completed">${ICONS.checkCircle}</span>`;
+  }
+  function renderPlanChips(plans) {
     if (!plans || plans.length === 0) return "";
     return `
     <div class="session-card-plans">
       ${plans.map(
       (p) => `
-        <button type="button" class="session-plan-chip md-plan-link" data-plan-path="${escapeHtml2(p.path)}">
+        <button type="button" class="session-plan-chip md-plan-link" data-plan-path="${escapeHtml3(p.path)}">
           <span class="plan-chip-icon">\u{1F4CB}</span>
-          <span class="plan-chip-title">${escapeHtml2(p.title || p.name || "Plan")}</span>
+          <span class="plan-chip-title">${escapeHtml3(p.title || p.name || "Plan")}</span>
         </button>
       `
     ).join("")}
     </div>
   `;
   }
-  function getSortedSessions(state2) {
+  function renderSessionRow(session) {
+    const time = session.isRunning ? "running" : formatRelativeTime(session.updatedAt);
+    const pinTitle = session.isPinned ? "Unpin" : "Pin";
+    const pinIcon = session.isPinned ? ICONS.pinFilled : ICONS.pin;
+    const subtitleHtml = session.preview ? `<div class="session-subtitle">${escapeHtml3(session.preview)}</div>` : "";
+    const plansHtml = session.plans ? renderPlanChips(session.plans) : "";
+    const badgeHtml = session.messageCount ? `<span class="session-badge ${session.isRunning ? "session-badge--running" : ""}">${session.messageCount} msgs</span>` : "";
+    const actionButtonHtml = session.isRunning ? `<button class="stop-session-btn icon-button session-row-action" data-stop-id="${session.id}" title="Stop" aria-label="Stop Session">${ICONS.stopCircle}</button>` : `<button class="delete-session-btn icon-button session-row-action" data-delete-id="${session.id}" title="Archive" aria-label="Archive Session">${ICONS.archive}</button>`;
+    return `
+    <div class="session-item ${session.isCurrent ? "active" : ""} ${session.isPinned ? "is-pinned" : ""}"
+         data-session-id="${session.id}"
+         data-title="${escapeHtml3(session.title)}"
+         data-running="${session.isRunning ? "true" : "false"}"
+         data-error="${session.hasError ? "true" : "false"}"
+         data-mode="${escapeHtml3(session.mode || "agent")}"
+         data-updated-at="${session.updatedAt || ""}">
+      ${renderStatusIcon(session)}
+      <div class="session-info">
+        <div class="session-title">
+          <span>${escapeHtml3(session.title)}</span>
+          ${badgeHtml}
+        </div>
+        ${subtitleHtml}
+        ${plansHtml}
+      </div>
+      <div class="session-actions">
+        <button class="pin-session-btn icon-button session-row-action ${session.isPinned ? "pinned" : ""}" data-pin-id="${session.id}" title="${pinTitle}" aria-label="${pinTitle}">${pinIcon}</button>
+        ${actionButtonHtml}
+      </div>
+      <span class="session-time ${session.isRunning ? "running-time" : ""}">${escapeHtml3(time)}</span>
+    </div>
+  `;
+  }
+
+  // src/ui/sidebar/sidebarArtifactsRender.ts
+  function renderArtifactRow(artifact) {
+    const parts = artifact.path.split(".");
+    const ext = parts.length > 1 ? parts[parts.length - 1] : "md";
+    const badge = getFileBadgeInfo(ext);
+    return `
+    <div class="sidebar-artifact-row" data-open-artifact="${escapeHtml3(artifact.path)}" title="Open ${escapeHtml3(artifact.path)}">
+      <span class="file-badge" style="background:${badge.bg};color:${badge.fg}">${badge.label}</span>
+      <div class="artifact-info">
+        <div class="artifact-name">${escapeHtml3(artifact.name)}</div>
+        <div class="artifact-path">${escapeHtml3(artifact.path)}</div>
+      </div>
+      <span class="artifact-open-icon">${ICONS.document}</span>
+    </div>
+  `;
+  }
+  function renderDashboardArtifactsSection(artifacts, searchQuery = "") {
+    const q = searchQuery.toLowerCase().trim();
+    const filtered = q ? artifacts.filter((a) => a.name.toLowerCase().includes(q) || a.path.toLowerCase().includes(q)) : artifacts;
+    if (filtered.length === 0) {
+      return `<div class="empty-hint">${q ? "No matching deliverables or artifacts" : "No deliverables generated yet"}</div>`;
+    }
+    return `
+    <div class="dashboard-artifacts-section">
+      <div class="artifacts-list">
+        ${filtered.map(renderArtifactRow).join("")}
+      </div>
+    </div>
+  `;
+  }
+
+  // src/ui/sidebar/sidebarDashboardRender.ts
+  function toSidebarSummaries(state2) {
+    const pinnedSet = new Set(state2.pinnedSessionIds || []);
     const list = [...state2.sessions];
-    if (state2.activeSession && !list.some((s) => s.id === state2.activeSession.id)) {
+    const seenIds = new Set(list.map((s) => s.id));
+    if (state2.activeSession && !seenIds.has(state2.activeSession.id)) {
       list.unshift({
         id: state2.activeSession.id,
         title: state2.activeSession.title || state2.activeSession.id,
@@ -12415,71 +12629,98 @@ ${items}
         messageCount: state2.activeSession.messages?.length || 0,
         preview: state2.activeSession.messages?.[0]?.content?.slice(0, 80) || "(empty session)",
         isGenerating: state2.activeSession.isGenerating,
-        plans: state2.activeSession.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path })),
-        artifacts: state2.activeSession.artifacts?.map((a) => ({ name: a.name, path: a.path, type: a.type }))
+        plans: state2.activeSession.plans,
+        artifacts: state2.activeSession.artifacts
       });
     }
-    return sortSessions(list, state2);
-  }
-  function renderSessionCard(s, state2) {
-    const isGenerating = isSessionRunningInState(s, state2);
-    const msgCount = s.id === state2.activeSessionId && state2.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0;
-    const updatedTs = s.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state2.activeSession.updatedAt) : s.updatedAt || s.createdAt || 0;
-    const timeStr = isGenerating ? "running" : formatRelativeTime(updatedTs);
-    return `
-    <div
-      class="session-card ${s.id === state2.activeSessionId ? "active" : ""} ${isGenerating ? "running" : ""}"
-      data-session-id="${s.id}"
-    >
-      <div class="session-card-header">
-        <span class="session-card-title">${isGenerating ? '<span class="pulse-indicator live" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span>' : ""}${escapeHtml2(s.title)}</span>
-        <span class="session-card-time ${isGenerating ? "running-time" : ""}">${timeStr}</span>
-      </div>
-      <div class="session-card-preview">${escapeHtml2(s.preview || "No messages yet")}</div>
-      ${renderCardPlans(s.plans || [])}
-      <div class="session-card-footer">
-        <span class="session-badge ${isGenerating ? "session-badge--running" : ""}">${msgCount} msgs</span>
-        <span class="session-card-id">${s.id}</span>
-      </div>
-    </div>
-  `;
-  }
-  function renderSessionListHtml(state2) {
-    const q = state2.searchQuery.toLowerCase().trim();
-    const sorted = getSortedSessions(state2);
-    const filtered = sorted.filter((s) => {
-      if (!q) return true;
-      if (s.title.toLowerCase().includes(q) || s.preview?.toLowerCase().includes(q)) return true;
-      if (s.plans?.some((p) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
-      if (s.artifacts?.some((a) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
-      return false;
+    return list.map((s) => {
+      const isRunning = isSessionRunningInState(s, state2);
+      const isPinned = Boolean(s.isPinned || pinnedSet.has(s.id));
+      const isCurrent = s.id === state2.activeSessionId;
+      return {
+        id: s.id,
+        title: s.title || s.id,
+        mode: s.mode || "agent",
+        model: s.model || "",
+        messageCount: s.id === state2.activeSessionId && state2.activeSession?.messages ? state2.activeSession.messages.length : s.messageCount || 0,
+        updatedAt: s.id === state2.activeSessionId && state2.activeSession?.updatedAt ? Math.max(s.updatedAt || 0, state2.activeSession.updatedAt) : s.updatedAt || s.createdAt || 0,
+        isCurrent,
+        isRunning,
+        isPinned,
+        hasError: false,
+        preview: s.preview || "",
+        plans: s.plans?.map((p) => ({ name: p.name, title: p.title, path: p.path })),
+        artifacts: s.artifacts?.map((a) => ({ name: a.name, path: a.path, type: a.type })),
+        searchText: `${s.title || ""} ${s.preview || ""} ${s.plans?.map((p) => p.title || p.name).join(" ") || ""} ${s.artifacts?.map((a) => a.name || a.path).join(" ") || ""}`.toLowerCase()
+      };
     });
-    const displaySessions = q ? filtered : filtered.slice(0, 8);
-    if (displaySessions.length === 0) {
+  }
+  function renderGroup(label, rows) {
+    if (rows.length === 0) return "";
+    return `<div class="session-group"><div class="session-group-label">${escapeHtml3(label)}</div>${rows.join("")}</div>`;
+  }
+  function collectArtifacts(state2) {
+    const artifacts = [];
+    const seen = /* @__PURE__ */ new Set();
+    const add = (name, path, type) => {
+      if (!path || seen.has(path)) return;
+      seen.add(path);
+      artifacts.push({ name: name || path, path, type });
+    };
+    if (state2.activeSession?.artifacts) {
+      for (const a of state2.activeSession.artifacts) add(a.name, a.path, a.type);
+    }
+    for (const s of state2.sessions) {
+      if (s.artifacts) {
+        for (const a of s.artifacts) add(a.name, a.path, a.type);
+      }
+    }
+    return artifacts;
+  }
+  function renderDashboardResults(state2) {
+    const tab = state2.activeFilterTab || "all";
+    const q = state2.searchQuery.toLowerCase().trim();
+    if (tab === "artifacts") {
+      return renderDashboardArtifactsSection(collectArtifacts(state2), state2.searchQuery);
+    }
+    const summaries = toSidebarSummaries(state2);
+    const filtered = summaries.filter((s) => !q || s.searchText?.includes(q));
+    if (filtered.length === 0) {
       return state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>`;
     }
-    return displaySessions.map((s) => renderSessionCard(s, state2)).join("");
+    if (q) {
+      const groups = groupSessionsByRecency(filtered);
+      return groups.map((g) => renderGroup(g.label, g.sessions.map(renderSessionRow))).join("");
+    }
+    const { running, pinned, recent } = partitionSessionsByFilter(filtered, tab);
+    const out = [];
+    if (tab === "all") {
+      if (running.length > 0) out.push(renderGroup("Running", running.map(renderSessionRow)));
+      if (pinned.length > 0) out.push(renderGroup("Pinned", pinned.map(renderSessionRow)));
+      const recencyGroups = groupSessionsByRecency(recent);
+      for (const g of recencyGroups) out.push(renderGroup(g.label, g.sessions.map(renderSessionRow)));
+    } else if (tab === "running") {
+      out.push(renderGroup("Running Sessions", running.map(renderSessionRow)));
+    } else if (tab === "pinned") {
+      out.push(renderGroup("Pinned Sessions", pinned.map(renderSessionRow)));
+    }
+    return out.filter(Boolean).join("") || `<div class="empty-state">No sessions in this view</div>`;
+  }
+
+  // src/ui/sidebarSessionUtils.ts
+  function renderSessionListHtml(state2) {
+    return renderDashboardResults(state2);
   }
 
   // src/ui/components/sidebarView.ts
   function renderSidebarView(state2) {
-    const q = state2.searchQuery.toLowerCase().trim();
-    const sorted = getSortedSessions(state2);
-    const filtered = sorted.filter((s) => {
-      if (!q) return true;
-      if (s.title.toLowerCase().includes(q) || s.preview?.toLowerCase().includes(q)) return true;
-      if (s.plans?.some((p) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
-      if (s.artifacts?.some((a) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
-      return false;
-    });
-    const displaySessions = q ? filtered : filtered.slice(0, 8);
     const active = state2.activeSession;
     return `
     <div class="sidebar-view">
       ${renderConnectionNotice(state2)}
       <div class="sidebar-actions">
         <div class="sidebar-actions-row">
-          <button type="button" class="btn btn-primary new-session-btn" id="btn-new-session">
+          <button type="button" class="btn btn-primary new-session-btn" id="btn-new-session" title="Start New Session">
             <span class="btn-icon">+</span>
             <span>New Session</span>
           </button>
@@ -12492,19 +12733,16 @@ ${items}
             class="search-input"
             placeholder="Search sessions, plans & artifacts..."
             value="${escapeHtml2(state2.searchQuery)}"
+            aria-label="Search sessions"
           />
-          ${state2.searchQuery ? '<button type="button" id="btn-clear-search" class="clear-btn">\u2715</button>' : ""}
+          ${state2.searchQuery ? '<button type="button" id="btn-clear-search" class="clear-btn" aria-label="Clear Search">\u2715</button>' : ""}
         </div>
       </div>
 
       ${renderMonitorSidebarStats(state2)}
 
-      <div class="section-divider">
-        <span>${q ? `FOUND (${filtered.length})` : `RECENT SESSIONS (${displaySessions.length})`}</span>
-      </div>
-
       <div class="session-list">
-        ${displaySessions.length === 0 ? state2.isLoadingSessions ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>` : `<div class="empty-state">No matching sessions, plans, or artifacts</div>` : displaySessions.map((s) => renderSessionCard(s, state2)).join("")}
+        ${renderDashboardResults(state2)}
       </div>
 
       ${active ? `
@@ -13099,7 +13337,6 @@ ${resText}` : ""
           ${!isLive ? `<span class="activity-toggle-duration">${formatThoughtDuration(opts?.durationSeconds)}</span>` : ""}
         </span>
         <div class="activity-toggle-right">
-          <button type="button" class="copy-btn copy-btn--compact thought-copy-btn" data-copy-text="${escapeHtml2(thought)}" title="Copy thought" aria-label="Copy thought">${COPY_ICON_SVG}</button>
           <span class="activity-toggle-chevron">\u203A</span>
         </div>
       </button>
@@ -14936,12 +15173,11 @@ ${resText}` : ""
         clearBtn.remove();
       }
     }
-    const statsEl = sidebarEl.querySelector(".monitor-stats-widget") || sidebarEl.querySelector(".monitor-stats-container");
+    const statsEl = sidebarEl.querySelector(".sidebar-stats-widget") || sidebarEl.querySelector(".monitor-stats-widget") || sidebarEl.querySelector(".monitor-stats-container");
     const nextStatsHtml = renderMonitorSidebarStats(state2);
     if (statsEl) {
       if (!statsEl.dataset || statsEl.dataset.renderedHtml !== nextStatsHtml) {
         statsEl.outerHTML = nextStatsHtml;
-        if (statsEl.dataset) statsEl.dataset.renderedHtml = nextStatsHtml;
       }
     }
     const listEl = sidebarEl.querySelector(".session-list");
@@ -15922,21 +16158,73 @@ ${resText}` : ""
     return true;
   }
 
-  // src/ui/eventDelegation.ts
-  function handleDelegatedClick(target, state2, callbacks) {
-    if (!target) return false;
-    if (handleCopyAction(target)) return true;
-    const tabBtn = target.closest(".tab-btn");
-    if (tabBtn) {
-      const tab = tabBtn.getAttribute("data-tab") || "chat";
-      state2.activeTab = tab;
-      saveActiveTab(tab);
-      callbacks.onRender();
+  // src/ui/pinStore.ts
+  var PIN_STORAGE_KEY = "agent_monitor_pinned_sessions";
+  var memoryPinnedIds = [];
+  function getPinnedSessionIds() {
+    if (typeof localStorage === "undefined") return [...memoryPinnedIds];
+    try {
+      const raw = localStorage.getItem(PIN_STORAGE_KEY);
+      if (!raw) return [...memoryPinnedIds];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(String) : [...memoryPinnedIds];
+    } catch {
+      return [...memoryPinnedIds];
+    }
+  }
+  function setPinnedSessionIds(ids) {
+    memoryPinnedIds = [...ids];
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(ids));
+    } catch {
+    }
+  }
+  function togglePinnedSession(sessionId) {
+    const current = getPinnedSessionIds();
+    const index = current.indexOf(sessionId);
+    let next;
+    let isPinnedNow;
+    if (index >= 0) {
+      next = current.filter((id) => id !== sessionId);
+      isPinnedNow = false;
+    } else {
+      next = [...current, sessionId];
+      isPinnedNow = true;
+    }
+    setPinnedSessionIds(next);
+    return isPinnedNow;
+  }
+
+  // src/ui/sidebar/sidebarClickEvents.ts
+  function handleSidebarDelegatedClick(target, state2, callbacks) {
+    const filterTabBtn = target.closest("[data-filter-tab]");
+    if (filterTabBtn) {
+      const filter = filterTabBtn.getAttribute("data-filter-tab");
+      if (filter) {
+        state2.activeFilterTab = filter;
+        callbacks.onRender();
+        return true;
+      }
+    }
+    const pinBtn = target.closest("[data-pin-id]");
+    if (pinBtn) {
+      const pinId = pinBtn.getAttribute("data-pin-id");
+      if (pinId) {
+        togglePinnedSession(pinId);
+        state2.pinnedSessionIds = getPinnedSessionIds();
+        callbacks.onRender();
+        return true;
+      }
+    }
+    const stopBtn = target.closest("[data-stop-id]");
+    if (stopBtn) {
+      void callbacks.onStopSession?.();
       return true;
     }
-    const sessionCard = target.closest(".session-card");
-    if (sessionCard) {
-      const id = sessionCard.getAttribute("data-session-id");
+    const sessionItem = target.closest(".session-item, .session-card");
+    if (sessionItem && !target.closest(".session-row-action, .session-plan-chip")) {
+      const id = sessionItem.getAttribute("data-session-id");
       if (id) {
         state2.activePlan = void 0;
         state2.activePlanName = void 0;
@@ -15971,6 +16259,22 @@ ${resText}` : ""
         return true;
       }
     }
+    return false;
+  }
+
+  // src/ui/eventDelegation.ts
+  function handleDelegatedClick(target, state2, callbacks) {
+    if (!target) return false;
+    if (handleCopyAction(target)) return true;
+    const tabBtn = target.closest(".tab-btn");
+    if (tabBtn) {
+      const tab = tabBtn.getAttribute("data-tab") || "chat";
+      state2.activeTab = tab;
+      saveActiveTab(tab);
+      callbacks.onRender();
+      return true;
+    }
+    if (handleSidebarDelegatedClick(target, state2, callbacks)) return true;
     const toggleHeader = target.closest(".activity-toggle-header");
     if (toggleHeader) {
       toggleHeader.closest(".activity-toggle")?.classList.toggle("expanded");
@@ -16537,6 +16841,8 @@ ${resText}` : ""
   initViewportManager();
   var state = {
     activeTab: getSavedTab() || "sidebar",
+    activeFilterTab: "all",
+    pinnedSessionIds: getPinnedSessionIds(),
     sessions: [],
     plans: [],
     syncStatus: "connecting",

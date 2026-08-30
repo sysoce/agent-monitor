@@ -72,23 +72,8 @@ export function renderSessionCard(s: SessionSummary, state: AppState): string {
   `;
 }
 
+import { renderDashboardResults } from './sidebar/sidebarDashboardRender';
+
 export function renderSessionListHtml(state: AppState): string {
-  const q = state.searchQuery.toLowerCase().trim();
-  const sorted = getSortedSessions(state);
-  const filtered = sorted.filter((s) => {
-    if (!q) return true;
-    if (s.title.toLowerCase().includes(q) || (s.preview?.toLowerCase().includes(q))) return true;
-    if (s.plans?.some((p: { name?: string; title?: string }) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
-    if (s.artifacts?.some((a: { name?: string; path?: string }) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
-    return false;
-  });
-  const displaySessions = q ? filtered : filtered.slice(0, 8);
-
-  if (displaySessions.length === 0) {
-    return state.isLoadingSessions
-      ? `<div class="session-loading-state" aria-live="polite" aria-busy="true"><div class="session-loading-spinner"><svg class="task-spinner-icon" viewBox="0 0 16 16" width="22" height="22" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg></div><div class="session-loading-text">Loading sessions...</div></div>`
-      : `<div class="empty-state">No matching sessions, plans, or artifacts</div>`;
-  }
-
-  return displaySessions.map((s) => renderSessionCard(s, state)).join('');
+  return renderDashboardResults(state);
 }

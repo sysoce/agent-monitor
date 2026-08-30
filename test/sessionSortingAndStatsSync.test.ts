@@ -79,16 +79,16 @@ test('renderMonitorSidebarStats calculates running agent count and stats with ac
   });
 
   const html = renderMonitorSidebarStats(state);
-  assert.ok(html.includes('class="monitor-stat-val running-num">2</div>'), 'Should count both sess_2 and active generating sess_1 as running');
-  assert.ok(html.includes('pulse-indicator live'));
-  assert.ok(html.includes('class="monitor-stat-val">3</div>'), 'Total 3 sessions');
-  assert.ok(html.includes('class="monitor-stat-val">1</div>'), 'Total 1 artifact from active session');
+  assert.ok(html.includes('data-filter-tab="running"'), 'Should render running filter tab');
+  assert.ok(html.includes('<span class="stat-value">2</span>'), 'Should count both sess_2 and active generating sess_1 as running');
+  assert.ok(html.includes('<span class="stat-value">3</span>'), 'Total 3 sessions');
+  assert.ok(html.includes('<span class="stat-value">1</span>'), 'Total 1 artifact from active session');
 });
 
-test('updateSidebarDOM patches .monitor-stats-widget when session stats change', () => {
-  let statsOuterHtml = '<div class="monitor-stats-widget"><div class="monitor-stat-val running-num">0</div></div>';
+test('updateSidebarDOM patches .sidebar-stats-widget when session stats change', () => {
+  let statsOuterHtml = '<div class="sidebar-stats-widget"><div class="stat-value">0</div></div>';
   const statsWidget: any = {
-    className: 'monitor-stats-widget',
+    className: 'sidebar-stats-widget',
     get outerHTML() { return statsOuterHtml; },
     set outerHTML(val: string) { statsOuterHtml = val; },
   };
@@ -96,7 +96,7 @@ test('updateSidebarDOM patches .monitor-stats-widget when session stats change',
   const sidebarEl: any = {
     className: 'sidebar-view',
     querySelector(sel: string) {
-      if (sel === '.monitor-stats-widget') return statsWidget;
+      if (sel === '.sidebar-stats-widget' || sel === '.monitor-stats-widget') return statsWidget;
       if (sel === '#session-search') return { value: '' };
       if (sel === '.session-list') return { dataset: {}, set innerHTML(_v: string) {} };
       return null;
@@ -119,10 +119,10 @@ test('updateSidebarDOM patches .monitor-stats-widget when session stats change',
   });
 
   updateSidebarDOM(state, container);
-  assert.ok(statsOuterHtml.includes('running-num">1</div>'), 'Stats widget outerHTML must be updated with running count 1');
+  assert.ok(statsOuterHtml.includes('class="stat-value">1</span>'), 'Stats widget outerHTML must be updated with running count 1');
 });
 
-test('renderSidebarView sorts running sessions first and displays live pulse indicator', () => {
+test('renderSidebarView sorts running sessions first and displays running status', () => {
   const state = createMockState();
   const html = renderSidebarView(state);
 
@@ -132,5 +132,5 @@ test('renderSidebarView sorts running sessions first and displays live pulse ind
 
   assert.ok(runningIdx < recentIdx, 'sess_2 (running) must appear before sess_3 (recent)');
   assert.ok(recentIdx < idleIdx, 'sess_3 (recent) must appear before sess_1 (older)');
-  assert.ok(html.includes('pulse-indicator live'), 'Running session card must display pulse indicator');
+  assert.ok(html.includes('session-spinner'), 'Running session card must display running status indicator');
 });

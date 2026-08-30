@@ -13,6 +13,8 @@ export interface SidebarSessionSummary {
   isPinned?: boolean;
   hasError: boolean;
   preview?: string;
+  plans?: Array<{ path: string; title?: string; name?: string }>;
+  artifacts?: Array<{ path: string; name?: string; type?: string }>;
   searchText?: string;
 }
 

@@ -5,6 +5,9 @@ export type { AttachmentItem, MentionSuggestionItem };
 import type { ClientPresence } from '../sync/types';
 import type { NetworkAddressInfo } from '../server/networkAddress';
 
+import type { SidebarFilterTab } from './sidebar/types';
+export type { SidebarFilterTab };
+
 export type ActiveTab = 'sidebar' | 'chat' | 'plans';
 
 export type SyncStatus = 'connected' | 'syncing' | 'disconnected' | 'connecting';
@@ -28,6 +31,8 @@ export interface AppState {
   activePlan?: PlanDetail;
   syncStatus: SyncStatus;
   searchQuery: string;
+  activeFilterTab?: SidebarFilterTab;
+  pinnedSessionIds?: string[];
   composerMode: 'agent' | 'plan' | 'ask';
   selectedModel: string;
   availableModels: ModelOption[];

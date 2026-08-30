@@ -10,6 +10,7 @@ import {
   copyToClipboard,
 } from './controlHandlers';
 import { handleFileClick } from './fileClickHandler';
+import { handleSidebarDelegatedClick } from './sidebar/sidebarClickEvents';
 
 export { handleCopyAction, handlePlanClick, handleControlClick, copyToClipboard, handleFileClick };
 
@@ -25,51 +26,15 @@ export function handleDelegatedClick(target: HTMLElement | null, state: AppState
     callbacks.onRender();
     return true;
   }
-  const sessionCard = target.closest<HTMLElement>('.session-card');
-  if (sessionCard) {
-    const id = sessionCard.getAttribute('data-session-id');
-    if (id) {
-      state.activePlan = undefined;
-      state.activePlanName = undefined;
-      void callbacks.onSelectSession(id);
-      return true;
-    }
-  }
 
-  const sectionHeader = target.closest<HTMLElement>('.section-header');
-  if (sectionHeader) {
-    const sectionKey = sectionHeader.getAttribute('data-section');
-    if (sectionKey) {
-      state.expandedSections = {
-        subagents: true,
-        filesChanged: true,
-        artifacts: true,
-        uploads: true,
-        tasks: true,
-        ...(state.expandedSections || {}),
-      };
-      state.expandedSections[sectionKey] = !state.expandedSections[sectionKey];
-      callbacks.onRender();
-      return true;
-    }
-  }
-
-  const seeAll = target.closest<HTMLElement>('.see-all-link');
-  if (seeAll) {
-    const toggleKey = seeAll.getAttribute('data-toggle-see-all');
-    if (toggleKey) {
-      state.showAllItems = state.showAllItems || {};
-      state.showAllItems[toggleKey] = !state.showAllItems[toggleKey];
-      callbacks.onRender();
-      return true;
-    }
-  }
+  if (handleSidebarDelegatedClick(target, state, callbacks)) return true;
 
   const toggleHeader = target.closest<HTMLElement>('.activity-toggle-header');
   if (toggleHeader) {
     toggleHeader.closest('.activity-toggle')?.classList.toggle('expanded');
     return true;
   }
+
   const shellBtn = target.closest<HTMLElement>('.shell-btn');
   if (shellBtn) {
     const cmdId = shellBtn.getAttribute('data-command-id') || '';
@@ -79,6 +44,7 @@ export function handleDelegatedClick(target: HTMLElement | null, state: AppState
       return true;
     }
   }
+
   const tasksToggle = target.closest<HTMLElement>('#btn-toggle-background-tasks, .tasks-toggle-btn');
   if (tasksToggle) {
     const card = tasksToggle.closest('.background-tasks-card');
@@ -90,6 +56,7 @@ export function handleDelegatedClick(target: HTMLElement | null, state: AppState
     }
     return true;
   }
+
   const queuedAction = target.closest<HTMLElement>('[data-action^="queued-"]');
   if (queuedAction) {
     const action = queuedAction.getAttribute('data-action');

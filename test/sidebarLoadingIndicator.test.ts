@@ -54,5 +54,5 @@ test('renderSidebarView renders session cards when sessions exist', () => {
   const html = renderSidebarView(state);
   assert.doesNotMatch(html, /session-loading-state/);
   assert.match(html, /Test Session/);
-  assert.match(html, /3 msgs/);
+  assert.match(html, /preview text/);
 });
