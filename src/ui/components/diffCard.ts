@@ -1,5 +1,6 @@
 import { highlight } from '../markdown/highlight';
 import { escapeHtml } from './markdown';
+import { COPY_ICON_SVG } from '../copyActions';
 
 export interface DiffLine {
   type: 'context' | 'added' | 'deleted';
@@ -51,6 +52,10 @@ export function renderDiffCard(opts: DiffCardOptions): string {
       ? `<span class="diff-stats">${opts.additions ? `<span class="diff-stat--add">+${opts.additions}</span>` : ''}${opts.deletions ? `<span class="diff-stat--del">-${opts.deletions}</span>` : ''}</span>`
       : '';
 
+  const rawDiffText = lines
+    .map((l) => `${l.type === 'deleted' ? '-' : l.type === 'added' ? '+' : ' '} ${l.content}`)
+    .join('\n');
+
   const rowsHtml = lines
     .map((line) => {
       const sign = line.type === 'deleted' ? '-' : line.type === 'added' ? '+' : ' ';
@@ -75,6 +80,9 @@ export function renderDiffCard(opts: DiffCardOptions): string {
           <span class="diff-badge ${badge.className}">${badge.label}</span>
           <span class="diff-filename" title="${escapeHtml(opts.filePath)}">${escapeHtml(fileName)}</span>
           ${statsHtml}
+        </div>
+        <div class="diff-header-right">
+          <button type="button" class="copy-btn copy-btn--compact diff-copy-btn"${rawDiffText ? ` data-copy-text="${escapeHtml(rawDiffText)}"` : ''} title="Copy diff content" aria-label="Copy diff content">${COPY_ICON_SVG}</button>
         </div>
       </div>
       <div class="diff-body">${rowsHtml}</div>

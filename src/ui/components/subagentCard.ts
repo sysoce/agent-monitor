@@ -1,4 +1,5 @@
 import { escapeHtml, renderMarkdownDocument } from './markdown';
+import { COPY_ICON_SVG } from '../copyActions';
 
 export interface SubagentCardOptions {
   id?: string;
@@ -30,10 +31,18 @@ export function renderSubagentCard(opts: SubagentCardOptions): string {
   if (prompt) {
     bodyContent += `<div class="subagent-prompt-block"><span class="subagent-prompt-label">Goal:</span> <span class="subagent-prompt-text">${prompt}</span></div>`;
   }
+  let resText = '';
   if (opts.result != null) {
-    const resText = typeof opts.result === 'object' ? JSON.stringify(opts.result, null, 2) : String(opts.result);
+    resText = typeof opts.result === 'object' ? JSON.stringify(opts.result, null, 2) : String(opts.result);
     bodyContent += `<div class="subagent-result-block"><div class="subagent-result-label">Result:</div><pre class="activity-toggle-output"><code>${escapeHtml(resText)}</code></pre></div>`;
   }
+
+  const copyParts = [
+    opts.role ? `Subagent: ${opts.role}` : '',
+    opts.prompt ? `Goal: ${opts.prompt}` : '',
+    resText ? `Output:\n${resText}` : '',
+  ].filter(Boolean);
+  const copyStr = copyParts.join('\n\n');
 
   return `
     <div class="activity-toggle activity-toggle--subagent subagent-card ${isRunning ? 'activity-toggle--live' : ''} ${isExpanded ? 'expanded' : ''}"${idAttr}>
@@ -44,6 +53,7 @@ export function renderSubagentCard(opts: SubagentCardOptions): string {
           ${prompt ? `<span class="activity-toggle-label subagent-prompt-preview">${prompt}</span>` : ''}
         </div>
         <div class="activity-toggle-right">
+          <button type="button" class="copy-btn copy-btn--compact subagent-copy-btn"${copyStr ? ` data-copy-text="${escapeHtml(copyStr)}"` : ''} title="Copy subagent details" aria-label="Copy subagent details">${COPY_ICON_SVG}</button>
           ${statusIcon ? `<span class="subagent-status-icon">${statusIcon}</span>` : ''}
           <span class="activity-toggle-chevron">›</span>
         </div>

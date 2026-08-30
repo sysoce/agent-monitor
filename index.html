@@ -12716,103 +12716,6 @@ ${thought.trim()}` : thought.trim();
     };
   }
 
-  // src/ui/components/diffCard.ts
-  function getExtBadge(filePath) {
-    const ext = (filePath.split(".").pop() || "").toLowerCase();
-    const map = {
-      ts: { label: "TS", className: "badge-ts" },
-      tsx: { label: "TSX", className: "badge-ts" },
-      js: { label: "JS", className: "badge-js" },
-      jsx: { label: "JSX", className: "badge-js" },
-      css: { label: "CSS", className: "badge-css" },
-      py: { label: "PY", className: "badge-py" },
-      json: { label: "JSON", className: "badge-json" },
-      md: { label: "MD", className: "badge-md" },
-      html: { label: "HTML", className: "badge-html" },
-      rs: { label: "RS", className: "badge-rs" },
-      go: { label: "GO", className: "badge-go" }
-    };
-    return map[ext] || { label: ext.toUpperCase() || "FILE", className: "badge-default" };
-  }
-  function renderHighlightedContent(content, ext) {
-    const pieces = highlight(content || " ", ext);
-    return pieces.map((p) => p.kind === "plain" ? escapeHtml2(p.value) : `<span class="tok-${p.kind}">${escapeHtml2(p.value)}</span>`).join("");
-  }
-  function renderDiffCard(opts) {
-    const badge = getExtBadge(opts.filePath);
-    const fileName = opts.filePath.split(/[\\/]/).pop() || opts.filePath;
-    const ext = (opts.filePath.split(".").pop() || "").toLowerCase();
-    const lines = opts.lines || [];
-    const statsHtml = opts.additions || opts.deletions ? `<span class="diff-stats">${opts.additions ? `<span class="diff-stat--add">+${opts.additions}</span>` : ""}${opts.deletions ? `<span class="diff-stat--del">-${opts.deletions}</span>` : ""}</span>` : "";
-    const rowsHtml = lines.map((line) => {
-      const sign = line.type === "deleted" ? "-" : line.type === "added" ? "+" : " ";
-      const lineNumStr = line.lineNum != null ? String(line.lineNum) : "";
-      const codeHtml = renderHighlightedContent(line.content, ext);
-      return `
-        <div class="diff-row diff-row--${line.type}">
-          <div class="diff-gutter">
-            <span class="diff-line-num">${lineNumStr}</span>
-            <span class="diff-line-sign">${sign}</span>
-          </div>
-          <div class="diff-line-code">${codeHtml}</div>
-        </div>
-      `;
-    }).join("");
-    return `
-    <div class="diff-card">
-      <div class="diff-header">
-        <div class="diff-header-left">
-          <span class="diff-badge ${badge.className}">${badge.label}</span>
-          <span class="diff-filename" title="${escapeHtml2(opts.filePath)}">${escapeHtml2(fileName)}</span>
-          ${statsHtml}
-        </div>
-      </div>
-      <div class="diff-body">${rowsHtml}</div>
-    </div>
-  `;
-  }
-
-  // src/ui/components/subagentCard.ts
-  var SPINNER_SVG2 = `<svg class="task-spinner subagent-spinner" viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg>`;
-  var CHECK_SVG2 = `<svg class="task-icon--completed subagent-completed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  var FAIL_SVG2 = `<svg class="task-icon--failed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-  function renderSubagentCard(opts) {
-    const isRunning = opts.status === "running";
-    const isCompleted = opts.status === "completed" || opts.status === "idle";
-    const isFailed = opts.status === "failed" || opts.status === "aborted";
-    const isExpanded = Boolean(opts.expanded);
-    const role = escapeHtml2(opts.role || "Subagent");
-    const prompt = opts.prompt ? escapeHtml2(opts.prompt) : "";
-    const idAttr = opts.id ? ` data-subagent-id="${escapeHtml2(opts.id)}"` : "";
-    const statusIcon = isRunning ? SPINNER_SVG2 : isCompleted ? CHECK_SVG2 : isFailed ? FAIL_SVG2 : "";
-    let bodyContent = "";
-    if (prompt) {
-      bodyContent += `<div class="subagent-prompt-block"><span class="subagent-prompt-label">Goal:</span> <span class="subagent-prompt-text">${prompt}</span></div>`;
-    }
-    if (opts.result != null) {
-      const resText = typeof opts.result === "object" ? JSON.stringify(opts.result, null, 2) : String(opts.result);
-      bodyContent += `<div class="subagent-result-block"><div class="subagent-result-label">Result:</div><pre class="activity-toggle-output"><code>${escapeHtml2(resText)}</code></pre></div>`;
-    }
-    return `
-    <div class="activity-toggle activity-toggle--subagent subagent-card ${isRunning ? "activity-toggle--live" : ""} ${isExpanded ? "expanded" : ""}"${idAttr}>
-      <button type="button" class="activity-toggle-header">
-        <div class="activity-toggle-left">
-          <span class="subagent-bot-icon">\u{1F916}</span>
-          <span class="subagent-role-badge">${role}</span>
-          ${prompt ? `<span class="activity-toggle-label subagent-prompt-preview">${prompt}</span>` : ""}
-        </div>
-        <div class="activity-toggle-right">
-          ${statusIcon ? `<span class="subagent-status-icon">${statusIcon}</span>` : ""}
-          <span class="activity-toggle-chevron">\u203A</span>
-        </div>
-      </button>
-      <div class="activity-toggle-body">
-        ${bodyContent}
-      </div>
-    </div>
-  `;
-  }
-
   // src/ui/copyActions.ts
   var COPY_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--copy" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="1.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/><rect x="1.5" y="4.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/></svg>';
   var COPY_CHECK_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -12888,6 +12791,116 @@ ${thought.trim()}` : thought.trim();
       btn.title = origTitle;
       btn.setAttribute("aria-label", origTitle);
     }, 1500);
+  }
+
+  // src/ui/components/diffCard.ts
+  function getExtBadge(filePath) {
+    const ext = (filePath.split(".").pop() || "").toLowerCase();
+    const map = {
+      ts: { label: "TS", className: "badge-ts" },
+      tsx: { label: "TSX", className: "badge-ts" },
+      js: { label: "JS", className: "badge-js" },
+      jsx: { label: "JSX", className: "badge-js" },
+      css: { label: "CSS", className: "badge-css" },
+      py: { label: "PY", className: "badge-py" },
+      json: { label: "JSON", className: "badge-json" },
+      md: { label: "MD", className: "badge-md" },
+      html: { label: "HTML", className: "badge-html" },
+      rs: { label: "RS", className: "badge-rs" },
+      go: { label: "GO", className: "badge-go" }
+    };
+    return map[ext] || { label: ext.toUpperCase() || "FILE", className: "badge-default" };
+  }
+  function renderHighlightedContent(content, ext) {
+    const pieces = highlight(content || " ", ext);
+    return pieces.map((p) => p.kind === "plain" ? escapeHtml2(p.value) : `<span class="tok-${p.kind}">${escapeHtml2(p.value)}</span>`).join("");
+  }
+  function renderDiffCard(opts) {
+    const badge = getExtBadge(opts.filePath);
+    const fileName = opts.filePath.split(/[\\/]/).pop() || opts.filePath;
+    const ext = (opts.filePath.split(".").pop() || "").toLowerCase();
+    const lines = opts.lines || [];
+    const statsHtml = opts.additions || opts.deletions ? `<span class="diff-stats">${opts.additions ? `<span class="diff-stat--add">+${opts.additions}</span>` : ""}${opts.deletions ? `<span class="diff-stat--del">-${opts.deletions}</span>` : ""}</span>` : "";
+    const rawDiffText = lines.map((l) => `${l.type === "deleted" ? "-" : l.type === "added" ? "+" : " "} ${l.content}`).join("\n");
+    const rowsHtml = lines.map((line) => {
+      const sign = line.type === "deleted" ? "-" : line.type === "added" ? "+" : " ";
+      const lineNumStr = line.lineNum != null ? String(line.lineNum) : "";
+      const codeHtml = renderHighlightedContent(line.content, ext);
+      return `
+        <div class="diff-row diff-row--${line.type}">
+          <div class="diff-gutter">
+            <span class="diff-line-num">${lineNumStr}</span>
+            <span class="diff-line-sign">${sign}</span>
+          </div>
+          <div class="diff-line-code">${codeHtml}</div>
+        </div>
+      `;
+    }).join("");
+    return `
+    <div class="diff-card">
+      <div class="diff-header">
+        <div class="diff-header-left">
+          <span class="diff-badge ${badge.className}">${badge.label}</span>
+          <span class="diff-filename" title="${escapeHtml2(opts.filePath)}">${escapeHtml2(fileName)}</span>
+          ${statsHtml}
+        </div>
+        <div class="diff-header-right">
+          <button type="button" class="copy-btn copy-btn--compact diff-copy-btn"${rawDiffText ? ` data-copy-text="${escapeHtml2(rawDiffText)}"` : ""} title="Copy diff content" aria-label="Copy diff content">${COPY_ICON_SVG}</button>
+        </div>
+      </div>
+      <div class="diff-body">${rowsHtml}</div>
+    </div>
+  `;
+  }
+
+  // src/ui/components/subagentCard.ts
+  var SPINNER_SVG2 = `<svg class="task-spinner subagent-spinner" viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/></svg>`;
+  var CHECK_SVG2 = `<svg class="task-icon--completed subagent-completed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  var FAIL_SVG2 = `<svg class="task-icon--failed" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  function renderSubagentCard(opts) {
+    const isRunning = opts.status === "running";
+    const isCompleted = opts.status === "completed" || opts.status === "idle";
+    const isFailed = opts.status === "failed" || opts.status === "aborted";
+    const isExpanded = Boolean(opts.expanded);
+    const role = escapeHtml2(opts.role || "Subagent");
+    const prompt = opts.prompt ? escapeHtml2(opts.prompt) : "";
+    const idAttr = opts.id ? ` data-subagent-id="${escapeHtml2(opts.id)}"` : "";
+    const statusIcon = isRunning ? SPINNER_SVG2 : isCompleted ? CHECK_SVG2 : isFailed ? FAIL_SVG2 : "";
+    let bodyContent = "";
+    if (prompt) {
+      bodyContent += `<div class="subagent-prompt-block"><span class="subagent-prompt-label">Goal:</span> <span class="subagent-prompt-text">${prompt}</span></div>`;
+    }
+    let resText = "";
+    if (opts.result != null) {
+      resText = typeof opts.result === "object" ? JSON.stringify(opts.result, null, 2) : String(opts.result);
+      bodyContent += `<div class="subagent-result-block"><div class="subagent-result-label">Result:</div><pre class="activity-toggle-output"><code>${escapeHtml2(resText)}</code></pre></div>`;
+    }
+    const copyParts = [
+      opts.role ? `Subagent: ${opts.role}` : "",
+      opts.prompt ? `Goal: ${opts.prompt}` : "",
+      resText ? `Output:
+${resText}` : ""
+    ].filter(Boolean);
+    const copyStr = copyParts.join("\n\n");
+    return `
+    <div class="activity-toggle activity-toggle--subagent subagent-card ${isRunning ? "activity-toggle--live" : ""} ${isExpanded ? "expanded" : ""}"${idAttr}>
+      <button type="button" class="activity-toggle-header">
+        <div class="activity-toggle-left">
+          <span class="subagent-bot-icon">\u{1F916}</span>
+          <span class="subagent-role-badge">${role}</span>
+          ${prompt ? `<span class="activity-toggle-label subagent-prompt-preview">${prompt}</span>` : ""}
+        </div>
+        <div class="activity-toggle-right">
+          <button type="button" class="copy-btn copy-btn--compact subagent-copy-btn"${copyStr ? ` data-copy-text="${escapeHtml2(copyStr)}"` : ""} title="Copy subagent details" aria-label="Copy subagent details">${COPY_ICON_SVG}</button>
+          ${statusIcon ? `<span class="subagent-status-icon">${statusIcon}</span>` : ""}
+          <span class="activity-toggle-chevron">\u203A</span>
+        </div>
+      </button>
+      <div class="activity-toggle-body">
+        ${bodyContent}
+      </div>
+    </div>
+  `;
   }
 
   // src/ui/components/activityView.ts
