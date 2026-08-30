@@ -8056,6 +8056,7 @@ input:checked + .slider:before {
     if (!res.ok) throw new Error(`Failed to send message: ${res.statusText}`);
   }
   async function stopSession(sessionId) {
+    if (!hasLiveServer()) return false;
     try {
       const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/stop`), {
         method: "POST",
@@ -8067,6 +8068,7 @@ input:checked + .slider:before {
     }
   }
   async function resolveSessionApproval(sessionId, commandId, allowed) {
+    if (!hasLiveServer()) return false;
     try {
       const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/approvals`), {
         method: "POST",
@@ -8300,7 +8302,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.40" : "1.0.39";
+  var CLIENT_VERSION = true ? "1.0.41" : "1.0.41";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8665,10 +8667,40 @@ input:checked + .slider:before {
         const ok = await stopSession(sid);
         if (ok) {
           state2.errorMessage = void 0;
-        } else {
-          state2.errorMessage = "Failed to stop agent: stop signal was not received by the server.";
+          return;
         }
+        if (syncMachine) {
+          try {
+            await syncMachine.pushInboxMessage({
+              id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              sessionId: sid,
+              content: "",
+              role: "user",
+              action: "abort",
+              timestamp: Date.now()
+            });
+            state2.errorMessage = void 0;
+            return;
+          } catch {
+          }
+        }
+        state2.errorMessage = "Failed to stop agent: stop signal was not received by the server.";
       } catch {
+        if (syncMachine) {
+          try {
+            await syncMachine.pushInboxMessage({
+              id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              sessionId: sid,
+              content: "",
+              role: "user",
+              action: "abort",
+              timestamp: Date.now()
+            });
+            state2.errorMessage = void 0;
+            return;
+          } catch {
+          }
+        }
         state2.errorMessage = "Failed to stop agent: could not reach server.";
       }
     }
@@ -8719,22 +8751,39 @@ input:checked + .slider:before {
         }
       }
     } else {
-      const exists = state2.sessions.some((s) => s.id === state2.activeSessionId);
-      if (!state2.activeSessionId || !exists) {
-        const newSess = await createSession(text || attachments?.[0]?.label || "New Session");
-        state2.activeSessionId = newSess.id;
-        state2.awaitingSessionId = newSess.id;
-        if (state2.activeSession) state2.activeSession.id = newSess.id;
+      try {
+        const exists = state2.sessions.some((s) => s.id === state2.activeSessionId);
+        if (!state2.activeSessionId || !exists) {
+          const newSess = await createSession(text || attachments?.[0]?.label || "New Session");
+          state2.activeSessionId = newSess.id;
+          state2.awaitingSessionId = newSess.id;
+          if (state2.activeSession) state2.activeSession.id = newSess.id;
+        }
+        await sendSessionMessage(
+          state2.activeSessionId,
+          text,
+          "user",
+          state2.selectedModel,
+          state2.composerMode,
+          attachments,
+          clientTimestamp
+        );
+      } catch (err) {
+        if (syncMachine && syncMachine.getAutoFallback()) {
+          await syncMachine.pushInboxMessage({
+            id: `msg-${clientTimestamp}-${Math.random().toString(36).slice(2, 7)}`,
+            sessionId: sid,
+            content: text,
+            role: "user",
+            model: state2.selectedModel,
+            mode: state2.composerMode,
+            attachments,
+            timestamp: clientTimestamp
+          });
+          return;
+        }
+        throw err;
       }
-      await sendSessionMessage(
-        state2.activeSessionId,
-        text,
-        "user",
-        state2.selectedModel,
-        state2.composerMode,
-        attachments,
-        clientTimestamp
-      );
     }
   }
   async function submitMessageFlow(state2, syncMachine, text, onReload, onRender, options) {
@@ -10140,8 +10189,8 @@ input:checked + .slider:before {
     } else {
       const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
       const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
-      if (isMixed && cfg?.gistId && !saved) {
-        mode = "git-backup";
+      if (isMixed && cfg?.gistId) {
+        mode = saved === "p2p" ? "p2p" : "git-backup";
       } else {
         mode = saved || (hasLiveServer() && !isMixed ? "live-sse" : cfg?.gistId ? "git-backup" : "live-sse");
       }
@@ -10158,28 +10207,29 @@ input:checked + .slider:before {
     }
   }
   function setSyncModeAction(targetMode, state2, syncMachine, startSse, sseCleanup) {
-    if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", targetMode);
-    state2.syncMode = targetMode;
-    if (targetMode === "live-sse") {
+    const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
+    const effectiveMode = isMixed && targetMode === "live-sse" && loadCachedGistConfig()?.gistId ? "git-backup" : targetMode;
+    if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", effectiveMode);
+    state2.syncMode = effectiveMode;
+    if (effectiveMode === "live-sse") {
       syncMachine.forceLiveSseMode();
       startSse();
-    } else if (targetMode === "git-backup") {
+    } else if (effectiveMode === "git-backup") {
       sseCleanup?.();
       syncMachine.forceGitBackupMode();
-    } else if (targetMode === "p2p") {
+    } else if (effectiveMode === "p2p") {
       sseCleanup?.();
       syncMachine.forceP2PMode();
     }
   }
   function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
-    const current = state2.syncMode || "p2p";
-    let next = "p2p";
-    if (current === "p2p") {
-      next = "live-sse";
-    } else if (current === "live-sse") {
-      next = "git-backup";
+    const isMixed = typeof window !== "undefined" && window.location.protocol === "https:" && (getServerBaseUrl()?.startsWith("http:") ?? true);
+    const current = state2.syncMode || (isMixed ? "git-backup" : "p2p");
+    let next;
+    if (isMixed) {
+      next = current === "git-backup" ? "p2p" : "git-backup";
     } else {
-      next = "p2p";
+      next = current === "p2p" ? "live-sse" : current === "live-sse" ? "git-backup" : "p2p";
     }
     setSyncModeAction(next, state2, syncMachine, startSse, sseCleanup);
   }

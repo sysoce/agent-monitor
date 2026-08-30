@@ -39,10 +39,38 @@ export async function stopCurrentSession(state: AppState, syncMachine?: SyncStat
       const ok = await stopSession(sid);
       if (ok) {
         state.errorMessage = undefined;
-      } else {
-        state.errorMessage = 'Failed to stop agent: stop signal was not received by the server.';
+        return;
       }
+      if (syncMachine) {
+        try {
+          await syncMachine.pushInboxMessage({
+            id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            sessionId: sid,
+            content: '',
+            role: 'user',
+            action: 'abort' as any,
+            timestamp: Date.now(),
+          });
+          state.errorMessage = undefined;
+          return;
+        } catch {}
+      }
+      state.errorMessage = 'Failed to stop agent: stop signal was not received by the server.';
     } catch {
+      if (syncMachine) {
+        try {
+          await syncMachine.pushInboxMessage({
+            id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            sessionId: sid,
+            content: '',
+            role: 'user',
+            action: 'abort' as any,
+            timestamp: Date.now(),
+          });
+          state.errorMessage = undefined;
+          return;
+        } catch {}
+      }
       state.errorMessage = 'Failed to stop agent: could not reach server.';
     }
   }

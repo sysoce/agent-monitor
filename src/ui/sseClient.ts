@@ -1,5 +1,5 @@
 import type { SyncStatus } from './types';
-import { getStoredToken, buildApiUrl, getServerBaseUrl, isStaticDeployment } from './authStore';
+import { getStoredToken, buildApiUrl, getServerBaseUrl, isStaticDeployment, isMixedContentBlocked } from './authStore';
 
 export interface SseClientOptions {
   onStatusChange: (status: SyncStatus) => void;

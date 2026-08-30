@@ -111,6 +111,7 @@ export async function sendSessionMessage(
 }
 
 export async function stopSession(sessionId: string): Promise<boolean> {
+  if (!hasLiveServer()) return false;
   try {
     const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/stop`), {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -120,6 +121,7 @@ export async function stopSession(sessionId: string): Promise<boolean> {
 }
 
 export async function resolveSessionApproval(sessionId: string, commandId: string, allowed: boolean): Promise<boolean> {
+  if (!hasLiveServer()) return false;
   try {
     const res = await fetch(buildApiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/approvals`), {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },

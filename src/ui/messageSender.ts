@@ -47,22 +47,39 @@ export async function submitUserMessage(
       }
     }
   } else {
-    const exists = state.sessions.some((s) => s.id === state.activeSessionId);
-    if (!state.activeSessionId || !exists) {
-      const newSess = await createSession(text || attachments?.[0]?.label || 'New Session');
-      state.activeSessionId = newSess.id;
-      state.awaitingSessionId = newSess.id;
-      if (state.activeSession) state.activeSession.id = newSess.id;
+    try {
+      const exists = state.sessions.some((s) => s.id === state.activeSessionId);
+      if (!state.activeSessionId || !exists) {
+        const newSess = await createSession(text || attachments?.[0]?.label || 'New Session');
+        state.activeSessionId = newSess.id;
+        state.awaitingSessionId = newSess.id;
+        if (state.activeSession) state.activeSession.id = newSess.id;
+      }
+      await sendSessionMessage(
+        state.activeSessionId,
+        text,
+        'user',
+        state.selectedModel,
+        state.composerMode,
+        attachments,
+        clientTimestamp
+      );
+    } catch (err) {
+      if (syncMachine && syncMachine.getAutoFallback()) {
+        await syncMachine.pushInboxMessage({
+          id: `msg-${clientTimestamp}-${Math.random().toString(36).slice(2, 7)}`,
+          sessionId: sid,
+          content: text,
+          role: 'user',
+          model: state.selectedModel,
+          mode: state.composerMode,
+          attachments,
+          timestamp: clientTimestamp,
+        });
+        return;
+      }
+      throw err;
     }
-    await sendSessionMessage(
-      state.activeSessionId,
-      text,
-      'user',
-      state.selectedModel,
-      state.composerMode,
-      attachments,
-      clientTimestamp
-    );
   }
 }
 

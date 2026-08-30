@@ -1,6 +1,6 @@
 declare const __MONITOR_VERSION__: string | undefined;
 
-export const CLIENT_VERSION = typeof __MONITOR_VERSION__ !== 'undefined' ? __MONITOR_VERSION__ : '1.0.39';
+export const CLIENT_VERSION = typeof __MONITOR_VERSION__ !== 'undefined' ? __MONITOR_VERSION__ : '1.0.41';
 
 export function parseSemver(ver: string): [number, number, number] {
   if (!ver || typeof ver !== 'string') return [0, 0, 0];

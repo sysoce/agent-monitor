@@ -88,3 +88,38 @@ test('getServerBaseUrl returns empty string for direct non-static host without h
   (globalThis as any).window = originalWindow;
   (globalThis as any).localStorage = originalLocalStorage;
 });
+
+test('applyPersistedSyncMode forces git-backup when running on HTTPS with HTTP server and gist configured', () => {
+  const originalWindow = (globalThis as any).window;
+  const originalLocalStorage = (globalThis as any).localStorage;
+  const store: Record<string, string> = {
+    agent_gist_sync: JSON.stringify({ gistId: 'gist-123', token: 'token-abc' }),
+    agent_server_url: 'http://192.168.1.111:4200',
+    agent_sync_mode: 'live-sse',
+  };
+
+  (globalThis as any).window = {
+    location: { protocol: 'https:', hostname: 'sysoce.github.io', origin: 'https://sysoce.github.io', search: '', pathname: '/agent-monitor/' },
+  };
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store[k] || null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+  };
+
+  let activeMode = '';
+  let sseStarted = false;
+  const sm = new SyncStateMachine({
+    onModeChange: (m) => { activeMode = m; },
+    onStatusChange: () => {},
+    onDataUpdate: () => {},
+  });
+
+  applyPersistedSyncMode(sm, () => { sseStarted = true; });
+
+  assert.equal(activeMode, 'git-backup', 'Should override saved live-sse with git-backup on HTTPS');
+  assert.equal(sseStarted, false, 'Should not start SSE on HTTPS with HTTP server');
+
+  (globalThis as any).window = originalWindow;
+  (globalThis as any).localStorage = originalLocalStorage;
+});
