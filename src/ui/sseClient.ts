@@ -1,5 +1,5 @@
 import type { SyncStatus } from './types';
-import { getStoredToken, buildApiUrl, getServerBaseUrl } from './authStore';
+import { getStoredToken, buildApiUrl, getServerBaseUrl, isStaticDeployment } from './authStore';
 
 export interface SseClientOptions {
   onStatusChange: (status: SyncStatus) => void;
@@ -7,10 +7,7 @@ export interface SseClientOptions {
 }
 
 export function isStaticHostEnvironment(): boolean {
-  if (typeof window === 'undefined') return false;
-  const { hostname, protocol } = window.location;
-  const isStatic = protocol === 'file:' || hostname.endsWith('github.io') || hostname.endsWith('.pages.dev');
-  return isStatic && !getServerBaseUrl();
+  return isStaticDeployment() && !getServerBaseUrl();
 }
 
 export function initSseClient(opts: SseClientOptions): () => void {

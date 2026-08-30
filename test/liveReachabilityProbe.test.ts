@@ -67,3 +67,38 @@ test('LiveReachabilityProbe checkReachability returns false when fetch fails', a
   (globalThis as any).window = originalWindow;
   (globalThis as any).localStorage = originalLocalStorage;
 });
+
+test('LiveReachabilityProbe checkReachability recognizes 401/403 on password protected LAN server', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = (globalThis as any).window;
+  const originalLocalStorage = (globalThis as any).localStorage;
+
+  (globalThis as any).window = {
+    location: { protocol: 'https:', hostname: 'sysoce.github.io', search: '' },
+  };
+  (globalThis as any).localStorage = {
+    getItem: (key: string) => (key === 'agent_server_url' ? 'http://192.168.1.150:4200' : null),
+  };
+
+  let probedUrl = '';
+  globalThis.fetch = (async (url: string) => {
+    probedUrl = url;
+    return { ok: false, status: 401 } as any;
+  }) as any;
+
+  let reached = false;
+  const probe = new LiveReachabilityProbe({
+    onReachable: () => { reached = true; },
+  });
+
+  const res = await probe.checkReachability();
+  assert.equal(res, true);
+  assert.equal(reached, true);
+  assert.ok(probedUrl.includes('http://192.168.1.150:4200/api/version'));
+
+  probe.stop();
+  globalThis.fetch = originalFetch;
+  (globalThis as any).window = originalWindow;
+  (globalThis as any).localStorage = originalLocalStorage;
+});
+

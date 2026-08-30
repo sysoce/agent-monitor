@@ -82,8 +82,10 @@ export function getServerBaseUrl(): string {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(SERVER_KEY) : null;
     if (stored === 'none') return '';
     if (stored) return stored.replace(/\/+$/, '');
-    const def = getDefaultServerUrl();
-    if (def) return def.replace(/\/+$/, '');
+    if (isStaticDeployment()) {
+      const def = getDefaultServerUrl();
+      if (def) return def.replace(/\/+$/, '');
+    }
   } catch {}
   return '';
 }

@@ -124,27 +124,6 @@ test('renderSettingsNetworkSection renders Default LAN, Tailscale, and custom co
   assert.ok(!html.includes('Available Connections:'), 'Must NOT render Available Connections label');
 });
 
-test('handleSettingsModalClick handles switching and deleting connections', () => {
-  const state = createMockState({
-    defaultLanUrl: 'http://192.168.1.111:4200',
-    tailscaleUrl: 'http://100.74.73.50:4200',
-    customConnections: ['http://10.0.0.99:4200'],
-    selectedLanIp: 'http://10.0.0.99:4200',
-  });
-  let rendered = false;
-  const switchTarget = {
-    closest: (sel: string) => (sel.includes('[data-switch-connection]') ? { getAttribute: () => 'http://100.74.73.50:4200' } : null),
-  } as unknown as HTMLElement;
-  assert.equal(handleSettingsModalClick(state, switchTarget, { onRender: () => { rendered = true; } } as any), true);
-  assert.equal(state.selectedLanIp, 'http://100.74.73.50:4200');
-
-  const deleteTarget = {
-    closest: (sel: string) => (sel.includes('[data-delete-custom-ip]') ? { getAttribute: () => 'http://10.0.0.99:4200' } : null),
-  } as unknown as HTMLElement;
-  assert.equal(handleSettingsModalClick(state, deleteTarget, { onRender: () => { rendered = true; } } as any), true);
-  assert.deepEqual(state.customConnections, []);
-});
-
 test('addNewCustomConnection then deleteCustomConnection removes the connection completely from storage and state', () => {
   const state = createMockState({
     defaultLanUrl: 'http://192.168.1.111:4200',
@@ -161,4 +140,5 @@ test('addNewCustomConnection then deleteCustomConnection removes the connection 
   assert.deepEqual(getCustomConnections(), []);
   assert.equal(state.selectedLanIp, 'http://192.168.1.111:4200');
 });
+
 

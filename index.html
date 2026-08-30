@@ -7867,8 +7867,10 @@ input:checked + .slider:before {
       const stored = typeof localStorage !== "undefined" ? localStorage.getItem(SERVER_KEY2) : null;
       if (stored === "none") return "";
       if (stored) return stored.replace(/\/+$/, "");
-      const def = getDefaultServerUrl();
-      if (def) return def.replace(/\/+$/, "");
+      if (isStaticDeployment()) {
+        const def = getDefaultServerUrl();
+        if (def) return def.replace(/\/+$/, "");
+      }
     } catch {
     }
     return "";
@@ -8020,10 +8022,7 @@ input:checked + .slider:before {
 
   // src/ui/sseClient.ts
   function isStaticHostEnvironment() {
-    if (typeof window === "undefined") return false;
-    const { hostname, protocol } = window.location;
-    const isStatic = protocol === "file:" || hostname.endsWith("github.io") || hostname.endsWith(".pages.dev");
-    return isStatic && !getServerBaseUrl();
+    return isStaticDeployment() && !getServerBaseUrl();
   }
   function initSseClient(opts) {
     let es = null;
@@ -9033,12 +9032,12 @@ input:checked + .slider:before {
       try {
         const controller2 = typeof AbortController !== "undefined" ? new AbortController() : null;
         const timeout = controller2 ? setTimeout(() => controller2.abort(), 2500) : null;
-        const res = await fetch(buildApiUrl("/api/models"), {
+        const res = await fetch(buildApiUrl("/api/version"), {
           signal: controller2?.signal,
           cache: "no-store"
         });
         if (timeout) clearTimeout(timeout);
-        if (res && res.ok) {
+        if (res && (res.ok || res.status === 401 || res.status === 403)) {
           this.opts.onReachable();
           return true;
         }
@@ -10178,7 +10177,7 @@ input:checked + .slider:before {
       const token = parsed.t || parsed.token;
       const password = parsed.p || parsed.password;
       const serverUrl = parsed.s || parsed.serverUrl;
-      if (!gistId && !token && !serverUrl) return null;
+      if (!gistId && !token && !serverUrl && !password) return null;
       const res = {};
       if (gistId) res.gistId = gistId;
       if (token) res.token = token;
@@ -10197,12 +10196,12 @@ input:checked + .slider:before {
     if (hash.startsWith("setup=")) {
       const payload = hash.slice(6).split("&")[0];
       const decoded = decodeSetupPayload(payload);
-      if (decoded?.gistId || decoded?.token || decoded?.serverUrl) {
+      if (decoded?.gistId || decoded?.token || decoded?.serverUrl || decoded?.password) {
         return { gistId: decoded.gistId, token: decoded.token, password: decoded.password, serverUrl: decoded.serverUrl };
       }
     }
     const directDecoded = decodeSetupPayload(hash);
-    if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl) {
+    if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl || directDecoded?.password) {
       return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password, serverUrl: directDecoded.serverUrl };
     }
     const params = new URLSearchParams(hash);
@@ -10212,13 +10211,13 @@ input:checked + .slider:before {
     const serverUrl = params.get("server") || params.get("serverUrl") || params.get("s") || void 0;
     const fbParam = params.get("fallback") ?? params.get("autoFallback");
     const autoFallback = fbParam !== null ? fbParam !== "0" && fbParam !== "false" : void 0;
-    if (gistId || token || serverUrl || autoFallback !== void 0) {
+    if (gistId || token || serverUrl || password || autoFallback !== void 0) {
       return { gistId, token, password, serverUrl, autoFallback };
     }
     return null;
   }
   function applyConfigToStorage(config, storage = typeof localStorage !== "undefined" ? localStorage : {}) {
-    if (!config.gistId && !config.token && !config.serverUrl && config.autoFallback === void 0) return false;
+    if (!config.gistId && !config.token && !config.serverUrl && !config.password && config.autoFallback === void 0) return false;
     try {
       if (config.autoFallback !== void 0) {
         storage.setItem("agent_auto_fallback", String(config.autoFallback));
@@ -10702,6 +10701,12 @@ input:checked + .slider:before {
     async handleBuildPlan(planPath, planTitle) {
       this.state.composerMode = "agent";
       await submitMessageFlow(this.state, this.syncMachine, buildPlanHandoffPrompt(planPath, planTitle), () => this.reloadData(false), this.render);
+    }
+    async handleSwitchConnection(url) {
+      setServerBaseUrl(url);
+      this.setSyncMode("live-sse");
+      await this.reloadData(true);
+      void probeAllConnections(this.state, this.render);
     }
     async reloadData(isInitial = false) {
       await reloadSessionData(this.state, isInitial, () => {
@@ -13545,7 +13550,7 @@ ${thought.trim()}` : thought.trim();
 
   // src/ui/components/settingsModal/settingsQrSection.ts
   function renderSettingsQrSection(state2) {
-    const target = state2.qrModalTarget || "gh_pages";
+    const target = state2.qrModalTarget || (isStaticDeployment() ? "gh_pages" : "lan");
     const payload = getCurrentClientPayload(state2);
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:4200";
     const activeUrl = buildSettingsQrUrl({
@@ -13753,7 +13758,7 @@ ${thought.trim()}` : thought.trim();
     const networks = state2.serverSetupInfo?.networks || [];
     const payload = getCurrentClientPayload(state2);
     const copyFeedback = state2.settingsCopyFeedback || "";
-    const currentBaseUrl = getServerBaseUrl() || state2.selectedLanIp || "";
+    const currentBaseUrl = getServerBaseUrl() || state2.selectedLanIp || (typeof window !== "undefined" && window.location?.origin ? window.location.origin.replace(/\/+$/, "") : "") || "";
     const isConnectionAdded = copyFeedback === "connection-added" || copyFeedback === "server-saved";
     const customIp = state2.customServerIp || getCustomServerIp() || "";
     const defaultLanUrl = state2.defaultLanUrl || getDefaultLanUrl() || networks.find((n) => !n.isTailscale)?.url || customIp;
@@ -15214,7 +15219,7 @@ ${thought.trim()}` : thought.trim();
     setupModelSearchInput(state2, callbacks);
   }
 
-  // src/ui/settingsConnectionSwitcher.ts
+  // src/ui/settingsSetupFetcher.ts
   async function fetchServerSetupInfo(state2, onRender, force = false) {
     if (!state2.defaultLanUrl) state2.defaultLanUrl = getDefaultLanUrl() || void 0;
     if (!state2.tailscaleUrl) state2.tailscaleUrl = getTailscaleUrl() || void 0;
@@ -15242,31 +15247,37 @@ ${thought.trim()}` : thought.trim();
     } catch {
     }
   }
-  function selectActiveConnection(state2, url, onRender) {
+
+  // src/ui/settingsConnectionSwitcher.ts
+  function selectActiveConnection(state2, url, onRender, onSwitchConnection) {
     const clean = url.trim().replace(/\/+$/, "");
     state2.selectedLanIp = clean;
     state2.qrModalTarget = "lan";
     setServerBaseUrl(clean);
     state2.settingsCopyFeedback = `switched-${extractHostFromUrl(clean)}`;
     onRender();
+    if (onSwitchConnection) {
+      void onSwitchConnection(clean);
+    }
     void fetchServerSetupInfo(state2, onRender, true);
   }
-  function selectLanIp(state2, ipUrl, onRender) {
-    selectActiveConnection(state2, ipUrl, onRender);
+  function selectLanIp(state2, ipUrl, onRender, onSwitchConnection) {
+    selectActiveConnection(state2, ipUrl, onRender, onSwitchConnection);
   }
-  function switchToTailscale(state2, onRender) {
+  function switchToTailscale(state2, onRender, onSwitchConnection) {
     const tsUrl = state2.tailscaleUrl || getTailscaleUrl() || state2.serverSetupInfo?.networks?.find((n) => n.isTailscale)?.url;
-    if (tsUrl) selectActiveConnection(state2, tsUrl, onRender);
+    if (tsUrl) selectActiveConnection(state2, tsUrl, onRender, onSwitchConnection);
   }
-  function switchToSetIp(state2, onRender) {
+  function switchToSetIp(state2, onRender, onSwitchConnection) {
     const customIp = state2.customServerIp || getCustomServerIp();
     const rawList = state2.customConnections || getCustomConnections();
     const firstUrl = rawList[0] ? typeof rawList[0] === "string" ? rawList[0] : rawList[0].url : "";
     const target = customIp || firstUrl || state2.defaultLanUrl || getDefaultLanUrl();
-    if (target) selectActiveConnection(state2, target, onRender);
+    if (target) selectActiveConnection(state2, target, onRender, onSwitchConnection);
   }
-  function addNewCustomConnection(state2, rawUrl, name, tag, onRender) {
+  function addNewCustomConnection(state2, rawUrl, name, tag, onRender, onSwitchConnection) {
     const renderFn = typeof name === "function" ? name : typeof tag === "function" ? tag : onRender;
+    const switchFn = typeof tag === "function" && tag !== renderFn ? tag : onSwitchConnection;
     const nameStr = typeof name === "string" ? name : void 0;
     const tagStr = typeof tag === "string" ? tag : void 0;
     let clean = rawUrl.trim().replace(/\/+$/, "");
@@ -15279,11 +15290,11 @@ ${thought.trim()}` : thought.trim();
     state2.customServerIp = clean;
     setCustomServerIp(clean);
     selectActiveConnection(state2, clean, renderFn || (() => {
-    }));
+    }), switchFn);
     state2.settingsCopyFeedback = "server-saved";
     renderFn?.();
   }
-  function deleteCustomConnection(state2, url, onRender) {
+  function deleteCustomConnection(state2, url, onRender, onSwitchConnection) {
     const clean = url.trim().replace(/\/+$/, "");
     const updated = removeCustomConnection(clean);
     state2.customConnections = updated;
@@ -15295,7 +15306,7 @@ ${thought.trim()}` : thought.trim();
       const firstCustUrl = updated[0]?.url || "";
       const fallback = state2.defaultLanUrl || getDefaultLanUrl() || state2.tailscaleUrl || getTailscaleUrl() || firstCustUrl;
       if (fallback) {
-        selectActiveConnection(state2, fallback, onRender);
+        selectActiveConnection(state2, fallback, onRender, onSwitchConnection);
       } else {
         clearServerBaseUrl();
         state2.selectedLanIp = void 0;
@@ -15304,9 +15315,9 @@ ${thought.trim()}` : thought.trim();
     state2.settingsCopyFeedback = "connection-deleted";
     onRender();
   }
-  function saveCustomServerUrl(state2, url, onRender) {
+  function saveCustomServerUrl(state2, url, onRender, onSwitchConnection) {
     if (url.trim()) {
-      addNewCustomConnection(state2, url, onRender);
+      addNewCustomConnection(state2, url, onRender, onSwitchConnection);
     } else {
       clearServerBaseUrl();
       clearCustomServerIp();
@@ -15437,27 +15448,27 @@ ${thought.trim()}` : thought.trim();
     const deleteBtn = target.closest("[data-delete-custom-ip]");
     if (deleteBtn) {
       const deleteUrl = deleteBtn.getAttribute("data-delete-custom-ip") || "";
-      if (deleteUrl) deleteCustomConnection(state2, deleteUrl, callbacks.onRender);
+      if (deleteUrl) deleteCustomConnection(state2, deleteUrl, callbacks.onRender, callbacks.onSwitchConnection);
       return true;
     }
     if (target.closest("#btn-switch-tailscale")) {
-      switchToTailscale(state2, callbacks.onRender);
+      switchToTailscale(state2, callbacks.onRender, callbacks.onSwitchConnection);
       return true;
     }
     if (target.closest("#btn-switch-set-ip")) {
-      switchToSetIp(state2, callbacks.onRender);
+      switchToSetIp(state2, callbacks.onRender, callbacks.onSwitchConnection);
       return true;
     }
     const switchBtn = target.closest("[data-switch-connection]");
     if (switchBtn) {
       const targetUrl = switchBtn.getAttribute("data-switch-connection") || "";
-      if (targetUrl) selectActiveConnection(state2, targetUrl, callbacks.onRender);
+      if (targetUrl) selectActiveConnection(state2, targetUrl, callbacks.onRender, callbacks.onSwitchConnection);
       return true;
     }
     const useIpBtn = target.closest("[data-use-ip]");
     if (useIpBtn) {
       const ipUrl = useIpBtn.getAttribute("data-use-ip") || "";
-      if (ipUrl) selectLanIp(state2, ipUrl, callbacks.onRender);
+      if (ipUrl) selectLanIp(state2, ipUrl, callbacks.onRender, callbacks.onSwitchConnection);
       return true;
     }
     if (target.closest("#btn-save-custom-ip")) {
@@ -15466,14 +15477,14 @@ ${thought.trim()}` : thought.trim();
       const val = ipInput?.value || "";
       const name = nameInput?.value || "";
       if (val.trim()) {
-        addNewCustomConnection(state2, val, name, name, callbacks.onRender);
+        addNewCustomConnection(state2, val, name, name, callbacks.onRender, callbacks.onSwitchConnection);
         if (ipInput) ipInput.value = "";
         if (nameInput) nameInput.value = "";
       }
       return true;
     }
     if (target.closest("#btn-clear-custom-ip")) {
-      saveCustomServerUrl(state2, "", callbacks.onRender);
+      saveCustomServerUrl(state2, "", callbacks.onRender, callbacks.onSwitchConnection);
       return true;
     }
     if (target.closest("#btn-copy-qr-link")) {
@@ -16363,6 +16374,9 @@ ${thought.trim()}` : thought.trim();
       onToggleSyncMode: () => controller.toggleSyncMode(),
       onSetSyncMode: (mode) => controller.setSyncMode(mode),
       onToggleAutoFallback: (enabled) => controller.toggleAutoFallback(enabled),
+      onSwitchConnection: async (url) => {
+        await controller.handleSwitchConnection(url);
+      },
       onRender: render
     });
     restoreScrollState(focusSnapshot, state.activeTab);

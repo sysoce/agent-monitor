@@ -81,24 +81,24 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   const deleteBtn = target.closest<HTMLElement>('[data-delete-custom-ip]');
   if (deleteBtn) {
     const deleteUrl = deleteBtn.getAttribute('data-delete-custom-ip') || '';
-    if (deleteUrl) deleteCustomConnection(state, deleteUrl, callbacks.onRender);
+    if (deleteUrl) deleteCustomConnection(state, deleteUrl, callbacks.onRender, callbacks.onSwitchConnection);
     return true;
   }
 
-  if (target.closest('#btn-switch-tailscale')) { switchToTailscale(state, callbacks.onRender); return true; }
-  if (target.closest('#btn-switch-set-ip')) { switchToSetIp(state, callbacks.onRender); return true; }
+  if (target.closest('#btn-switch-tailscale')) { switchToTailscale(state, callbacks.onRender, callbacks.onSwitchConnection); return true; }
+  if (target.closest('#btn-switch-set-ip')) { switchToSetIp(state, callbacks.onRender, callbacks.onSwitchConnection); return true; }
 
   const switchBtn = target.closest<HTMLElement>('[data-switch-connection]');
   if (switchBtn) {
     const targetUrl = switchBtn.getAttribute('data-switch-connection') || '';
-    if (targetUrl) selectActiveConnection(state, targetUrl, callbacks.onRender);
+    if (targetUrl) selectActiveConnection(state, targetUrl, callbacks.onRender, callbacks.onSwitchConnection);
     return true;
   }
 
   const useIpBtn = target.closest<HTMLElement>('[data-use-ip]');
   if (useIpBtn) {
     const ipUrl = useIpBtn.getAttribute('data-use-ip') || '';
-    if (ipUrl) selectLanIp(state, ipUrl, callbacks.onRender);
+    if (ipUrl) selectLanIp(state, ipUrl, callbacks.onRender, callbacks.onSwitchConnection);
     return true;
   }
   if (target.closest('#btn-save-custom-ip')) {
@@ -107,14 +107,14 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
     const val = ipInput?.value || '';
     const name = nameInput?.value || '';
     if (val.trim()) {
-      addNewCustomConnection(state, val, name, name, callbacks.onRender);
+      addNewCustomConnection(state, val, name, name, callbacks.onRender, callbacks.onSwitchConnection);
       if (ipInput) ipInput.value = '';
       if (nameInput) nameInput.value = '';
     }
     return true;
   }
   if (target.closest('#btn-clear-custom-ip')) {
-    saveCustomServerUrl(state, '', callbacks.onRender);
+    saveCustomServerUrl(state, '', callbacks.onRender, callbacks.onSwitchConnection);
     return true;
   }
   if (target.closest('#btn-copy-qr-link')) { void copyQrLink(state, callbacks.onRender); return true; }

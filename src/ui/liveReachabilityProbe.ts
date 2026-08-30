@@ -28,12 +28,12 @@ export class LiveReachabilityProbe {
     try {
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeout = controller ? setTimeout(() => controller.abort(), 2500) : null;
-      const res = await fetch(buildApiUrl('/api/models'), {
+      const res = await fetch(buildApiUrl('/api/version'), {
         signal: controller?.signal,
         cache: 'no-store',
       });
       if (timeout) clearTimeout(timeout);
-      if (res && res.ok) {
+      if (res && (res.ok || res.status === 401 || res.status === 403)) {
         this.opts.onReachable();
         return true;
       }

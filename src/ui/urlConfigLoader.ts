@@ -16,13 +16,13 @@ export function parseUrlConfig(rawInput: string): ParsedMobileConfig | null {
   if (hash.startsWith('setup=')) {
     const payload = hash.slice(6).split('&')[0];
     const decoded = decodeSetupPayload(payload);
-    if (decoded?.gistId || decoded?.token || decoded?.serverUrl) {
+    if (decoded?.gistId || decoded?.token || decoded?.serverUrl || decoded?.password) {
       return { gistId: decoded.gistId, token: decoded.token, password: decoded.password, serverUrl: decoded.serverUrl };
     }
   }
 
   const directDecoded = decodeSetupPayload(hash);
-  if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl) {
+  if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl || directDecoded?.password) {
     return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password, serverUrl: directDecoded.serverUrl };
   }
 
@@ -34,7 +34,7 @@ export function parseUrlConfig(rawInput: string): ParsedMobileConfig | null {
   const fbParam = params.get('fallback') ?? params.get('autoFallback');
   const autoFallback = fbParam !== null ? (fbParam !== '0' && fbParam !== 'false') : undefined;
 
-  if (gistId || token || serverUrl || autoFallback !== undefined) {
+  if (gistId || token || serverUrl || password || autoFallback !== undefined) {
     return { gistId, token, password, serverUrl, autoFallback };
   }
 
@@ -45,7 +45,7 @@ export function applyConfigToStorage(
   config: ParsedMobileConfig,
   storage: Storage = typeof localStorage !== 'undefined' ? localStorage : ({} as Storage)
 ): boolean {
-  if (!config.gistId && !config.token && !config.serverUrl && config.autoFallback === undefined) return false;
+  if (!config.gistId && !config.token && !config.serverUrl && !config.password && config.autoFallback === undefined) return false;
   try {
     if (config.autoFallback !== undefined) {
       storage.setItem('agent_auto_fallback', String(config.autoFallback));

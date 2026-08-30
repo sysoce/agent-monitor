@@ -5,6 +5,7 @@ import { formatThoughtDuration } from '../../utils/thoughtCard';
 import { tryExtractDiffOptions } from '../../utils/toolDiffHelper';
 import { renderDiffCard } from './diffCard';
 import { renderSubagentCard } from './subagentCard';
+import { COPY_ICON_SVG } from '../copyActions';
 
 export { formatToolSummary, formatThoughtDuration };
 
@@ -23,7 +24,10 @@ export function renderThought(
           <span class="activity-toggle-title">${isLive ? 'Thinking…' : 'Thought'}</span>
           ${!isLive ? `<span class="activity-toggle-duration">${formatThoughtDuration(opts?.durationSeconds)}</span>` : ''}
         </span>
-        <span class="activity-toggle-chevron">›</span>
+        <div class="activity-toggle-right">
+          <button type="button" class="copy-btn copy-btn--compact thought-copy-btn" data-copy-text="${escapeHtml(thought)}" title="Copy thought" aria-label="Copy thought">${COPY_ICON_SVG}</button>
+          <span class="activity-toggle-chevron">›</span>
+        </div>
       </button>
       <div class="activity-toggle-body">
         <div class="activity-toggle-thought-text">${renderMarkdownDocument(thought)}</div>
@@ -87,6 +91,7 @@ export function renderToolCard(
         </div>
         <div class="activity-toggle-right">
           ${tagsHtml}
+          <button type="button" class="copy-btn copy-btn--compact tool-copy-btn"${outStr ? ` data-copy-text="${escapeHtml(outStr)}"` : ''} title="Copy tool output" aria-label="Copy tool output">${COPY_ICON_SVG}</button>
           <span class="activity-toggle-chevron">›</span>
         </div>
       </button>

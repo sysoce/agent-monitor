@@ -1,13 +1,9 @@
 import type { AppState } from './types';
 import {
-  buildApiUrl,
   setServerBaseUrl,
   clearServerBaseUrl,
-  hasLiveServer,
   getTailscaleUrl,
-  setTailscaleUrl,
   getDefaultLanUrl,
-  setDefaultLanUrl,
   getCustomConnections,
   addCustomConnection,
   removeCustomConnection,
@@ -15,70 +11,69 @@ import {
   setCustomServerIp,
   clearCustomServerIp,
 } from './authStore';
-import { detectIsTailscale, extractHostFromUrl } from './components/connectionEndpointInfo';
+import { extractHostFromUrl } from './components/connectionEndpointInfo';
+import { fetchServerSetupInfo } from './settingsSetupFetcher';
 
-export async function fetchServerSetupInfo(state: AppState, onRender: () => void, force = false): Promise<void> {
-  if (!state.defaultLanUrl) state.defaultLanUrl = getDefaultLanUrl() || undefined;
-  if (!state.tailscaleUrl) state.tailscaleUrl = getTailscaleUrl() || undefined;
-  if (!state.customConnections) state.customConnections = getCustomConnections();
-  if (!state.customServerIp) state.customServerIp = getCustomServerIp() || undefined;
-  if (!force && state.serverSetupInfo?.networks && state.serverSetupInfo.networks.length > 0) return;
-  if (!hasLiveServer()) return;
-  try {
-    const res = await fetch(buildApiUrl('/api/setup-info'));
-    if (res.ok) {
-      const data = await res.json();
-      state.serverSetupInfo = data;
-      const tsNet = data.networks?.find((n: any) => n.isTailscale);
-      if (tsNet) {
-        state.tailscaleUrl = tsNet.url;
-        setTailscaleUrl(tsNet.url);
-      }
-      const lanNet = data.networks?.find((n: any) => !n.isTailscale) || (data.lanUrl ? { url: data.lanUrl.split('/#')[0] } : undefined);
-      if (lanNet?.url) {
-        state.defaultLanUrl = lanNet.url;
-        setDefaultLanUrl(lanNet.url);
-      }
-      onRender();
-    }
-  } catch {}
-}
+export { fetchServerSetupInfo };
 
-export function selectActiveConnection(state: AppState, url: string, onRender: () => void): void {
+export function selectActiveConnection(
+  state: AppState,
+  url: string,
+  onRender: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
+): void {
   const clean = url.trim().replace(/\/+$/, '');
   state.selectedLanIp = clean;
   state.qrModalTarget = 'lan';
   setServerBaseUrl(clean);
   state.settingsCopyFeedback = `switched-${extractHostFromUrl(clean)}`;
   onRender();
+  if (onSwitchConnection) {
+    void onSwitchConnection(clean);
+  }
   void fetchServerSetupInfo(state, onRender, true);
 }
 
-export function selectLanIp(state: AppState, ipUrl: string, onRender: () => void): void {
-  selectActiveConnection(state, ipUrl, onRender);
+export function selectLanIp(
+  state: AppState,
+  ipUrl: string,
+  onRender: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
+): void {
+  selectActiveConnection(state, ipUrl, onRender, onSwitchConnection);
 }
 
-export function switchToTailscale(state: AppState, onRender: () => void): void {
+export function switchToTailscale(
+  state: AppState,
+  onRender: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
+): void {
   const tsUrl = state.tailscaleUrl || getTailscaleUrl() || state.serverSetupInfo?.networks?.find((n) => n.isTailscale)?.url;
-  if (tsUrl) selectActiveConnection(state, tsUrl, onRender);
+  if (tsUrl) selectActiveConnection(state, tsUrl, onRender, onSwitchConnection);
 }
 
-export function switchToSetIp(state: AppState, onRender: () => void): void {
+export function switchToSetIp(
+  state: AppState,
+  onRender: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
+): void {
   const customIp = state.customServerIp || getCustomServerIp();
   const rawList = state.customConnections || getCustomConnections();
   const firstUrl = rawList[0] ? (typeof rawList[0] === 'string' ? rawList[0] : rawList[0].url) : '';
   const target = customIp || firstUrl || state.defaultLanUrl || getDefaultLanUrl();
-  if (target) selectActiveConnection(state, target, onRender);
+  if (target) selectActiveConnection(state, target, onRender, onSwitchConnection);
 }
 
 export function addNewCustomConnection(
   state: AppState,
   rawUrl: string,
   name?: string | (() => void),
-  tag?: string,
-  onRender?: () => void
+  tag?: string | (() => void) | ((url: string) => void | Promise<void>),
+  onRender?: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
 ): void {
-  const renderFn = typeof name === 'function' ? name : (typeof tag === 'function' ? tag : onRender);
+  const renderFn = typeof name === 'function' ? name : (typeof tag === 'function' ? (tag as () => void) : onRender);
+  const switchFn = typeof tag === 'function' && tag !== renderFn ? (tag as (url: string) => void | Promise<void>) : onSwitchConnection;
   const nameStr = typeof name === 'string' ? name : undefined;
   const tagStr = typeof tag === 'string' ? tag : undefined;
 
@@ -91,12 +86,17 @@ export function addNewCustomConnection(
   state.customConnections = updated;
   state.customServerIp = clean;
   setCustomServerIp(clean);
-  selectActiveConnection(state, clean, renderFn || (() => {}));
+  selectActiveConnection(state, clean, renderFn || (() => {}), switchFn);
   state.settingsCopyFeedback = 'server-saved';
   renderFn?.();
 }
 
-export function deleteCustomConnection(state: AppState, url: string, onRender: () => void): void {
+export function deleteCustomConnection(
+  state: AppState,
+  url: string,
+  onRender: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
+): void {
   const clean = url.trim().replace(/\/+$/, '');
   const updated = removeCustomConnection(clean);
   state.customConnections = updated;
@@ -108,7 +108,7 @@ export function deleteCustomConnection(state: AppState, url: string, onRender: (
     const firstCustUrl = updated[0]?.url || '';
     const fallback = state.defaultLanUrl || getDefaultLanUrl() || state.tailscaleUrl || getTailscaleUrl() || firstCustUrl;
     if (fallback) {
-      selectActiveConnection(state, fallback, onRender);
+      selectActiveConnection(state, fallback, onRender, onSwitchConnection);
     } else {
       clearServerBaseUrl();
       state.selectedLanIp = undefined;
@@ -118,9 +118,14 @@ export function deleteCustomConnection(state: AppState, url: string, onRender: (
   onRender();
 }
 
-export function saveCustomServerUrl(state: AppState, url: string, onRender: () => void): void {
+export function saveCustomServerUrl(
+  state: AppState,
+  url: string,
+  onRender: () => void,
+  onSwitchConnection?: (url: string) => void | Promise<void>
+): void {
   if (url.trim()) {
-    addNewCustomConnection(state, url, onRender);
+    addNewCustomConnection(state, url, onRender, onSwitchConnection);
   } else {
     clearServerBaseUrl();
     clearCustomServerIp();

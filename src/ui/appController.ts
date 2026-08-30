@@ -2,7 +2,7 @@ import type { AppState } from './types';
 import type { SessionDetail } from '../server/types';
 import type { TransportMode } from '../sync/types';
 import { fetchSessionDetail, verifyAuthStatus, resolveSessionApproval } from './apiClient';
-import { clearStoredToken, hasLiveServer } from './authStore';
+import { clearStoredToken, hasLiveServer, setServerBaseUrl } from './authStore';
 import { initSseClient } from './sseClient';
 import { SyncStateMachine } from './syncStateMachine';
 import { syncSessionPlans, selectPlanDetail } from './sessionPlanSync';
@@ -17,12 +17,10 @@ import {
   handleQueueOrSendMessage, handleSendNowQueuedMessage, handleEditQueuedMessage,
   handleDeleteQueuedMessage, handleToggleQueuedCollapseAction, processNextQueuedMessageIfReady,
 } from './queuedMessagesOps';
-
 import { isAutoFallbackEnabled, setAutoFallbackEnabled } from './fallbackSettings';
 import { probeAllConnections } from './connectionAvailabilityProbe';
 
 export class AppController {
-
   private sseCleanup: (() => void) | null = null;
   private syncMachine: SyncStateMachine;
 
@@ -88,14 +86,12 @@ export class AppController {
     this.syncMachine.setAwaitingResponse(false); this.render();
     void stopCurrentSession(this.state, this.syncMachine).then(() => this.render());
   }
-
   async handleResolveApproval(commandId: string, allowed: boolean): Promise<void> {
     if (!this.state.activeSessionId) return;
     await resolveSessionApproval(this.state.activeSessionId, commandId, allowed);
     if (this.state.activeSession?.pendingApprovals) this.state.activeSession.pendingApprovals = this.state.activeSession.pendingApprovals.filter((a) => a.commandId !== commandId);
     this.render();
   }
-
   async handleSendMessage(): Promise<void> { await handleQueueOrSendMessage(this.state, this.syncMachine, (init) => this.reloadData(init), this.render); }
   async handleSendNowQueued(id: string): Promise<void> { await handleSendNowQueuedMessage(this.state, this.syncMachine, id, () => this.handleStopSession(), (init) => this.reloadData(init), this.render); }
   handleEditQueued(id: string): void { handleEditQueuedMessage(this.state, id, this.render); }
@@ -104,6 +100,13 @@ export class AppController {
   async handleBuildPlan(planPath: string, planTitle?: string): Promise<void> {
     this.state.composerMode = 'agent';
     await submitMessageFlow(this.state, this.syncMachine, buildPlanHandoffPrompt(planPath, planTitle), () => this.reloadData(false), this.render);
+  }
+
+  async handleSwitchConnection(url: string): Promise<void> {
+    setServerBaseUrl(url);
+    this.setSyncMode('live-sse');
+    await this.reloadData(true);
+    void probeAllConnections(this.state, this.render);
   }
 
   async reloadData(isInitial = false): Promise<void> {
@@ -145,4 +148,3 @@ export class AppController {
     }
   }
 }
-

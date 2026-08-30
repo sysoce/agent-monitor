@@ -37,7 +37,7 @@ export function decodeSetupPayload(raw: string): Partial<GistSyncConfig> | null 
     const token = parsed.t || parsed.token;
     const password = parsed.p || parsed.password;
     const serverUrl = parsed.s || parsed.serverUrl;
-    if (!gistId && !token && !serverUrl) return null;
+    if (!gistId && !token && !serverUrl && !password) return null;
     const res: Partial<GistSyncConfig> = {};
     if (gistId) res.gistId = gistId;
     if (token) res.token = token;

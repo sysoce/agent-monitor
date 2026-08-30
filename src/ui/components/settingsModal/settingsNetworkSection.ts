@@ -9,7 +9,7 @@ export function renderSettingsNetworkSection(state: AppState): string {
   const networks = state.serverSetupInfo?.networks || [];
   const payload = getCurrentClientPayload(state);
   const copyFeedback = state.settingsCopyFeedback || '';
-  const currentBaseUrl = getServerBaseUrl() || state.selectedLanIp || '';
+  const currentBaseUrl = getServerBaseUrl() || state.selectedLanIp || (typeof window !== 'undefined' && window.location?.origin ? window.location.origin.replace(/\/+$/, '') : '') || '';
   const isConnectionAdded = copyFeedback === 'connection-added' || copyFeedback === 'server-saved';
 
   const customIp = state.customServerIp || getCustomServerIp() || '';

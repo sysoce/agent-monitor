@@ -92,6 +92,7 @@ function render() {
     onToggleSyncMode: () => controller.toggleSyncMode(),
     onSetSyncMode: (mode) => controller.setSyncMode(mode),
     onToggleAutoFallback: (enabled) => controller.toggleAutoFallback(enabled),
+    onSwitchConnection: async (url) => { await controller.handleSwitchConnection(url); },
     onRender: render,
   });
 

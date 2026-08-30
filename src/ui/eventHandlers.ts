@@ -27,6 +27,7 @@ export interface EventHandlerCallbacks {
   onToggleSyncMode?: () => void;
   onSetSyncMode?: (mode: TransportMode) => void;
   onToggleAutoFallback?: (enabled: boolean) => void;
+  onSwitchConnection?: (url: string) => void | Promise<void>;
   onRender: () => void;
 }
 

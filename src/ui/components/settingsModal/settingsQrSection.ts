@@ -2,11 +2,12 @@ import type { AppState } from '../../types';
 import { escapeHtml } from '../markdown';
 import { generateQrMatrix } from '../../../qr/qrEncoder';
 import { renderQrToSvg } from '../../../qr/qrRenderer';
+import { isStaticDeployment } from '../../authStore';
 import type { QrTarget } from './types';
 import { buildSettingsQrUrl, getCurrentClientPayload } from './settingsQrBuilder';
 
 export function renderSettingsQrSection(state: AppState): string {
-  const target: QrTarget = state.qrModalTarget || 'gh_pages';
+  const target: QrTarget = state.qrModalTarget || (isStaticDeployment() ? 'gh_pages' : 'lan');
   const payload = getCurrentClientPayload(state);
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4200';
   const activeUrl = buildSettingsQrUrl({
