@@ -8235,7 +8235,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.36" : "1.0.33";
+  var CLIENT_VERSION = true ? "1.0.37" : "1.0.33";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -12813,6 +12813,83 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
+  // src/ui/copyActions.ts
+  var COPY_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--copy" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="1.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/><rect x="1.5" y="4.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/></svg>';
+  var COPY_CHECK_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function formatMessageTime(time) {
+    if (time === void 0 || time === null || time === "" || typeof time === "number" && isNaN(time)) {
+      return "";
+    }
+    if (typeof time === "string") {
+      const trimmed = time.trim();
+      if (/^\d{1,2}:\d{2}(\s*(?:AM|PM|am|pm))?$/.test(trimmed)) {
+        return trimmed;
+      }
+    }
+    const date = new Date(time);
+    if (isNaN(date.getTime())) {
+      return "";
+    }
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  function escapeAttr(s) {
+    return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function renderMessageCopyActionsHtml(opts = {}) {
+    const isUser = Boolean(opts.user);
+    const title = opts.title || (isUser ? "Copy Message" : "Copy Answer");
+    const dataAttr = opts.copyText ? ` data-copy-text="${escapeAttr(opts.copyText)}"` : "";
+    const timeFormatted = formatMessageTime(opts.time);
+    const timeHtml = timeFormatted ? `<span class="msg-time">${escapeAttr(timeFormatted)}</span>` : "";
+    const btnHtml = `<button type="button" class="copy-btn copy-btn--compact"${dataAttr} title="${title}" aria-label="${title}">${COPY_ICON_SVG}</button>`;
+    const innerHtml = isUser ? `${timeHtml}${btnHtml}` : `${btnHtml}${timeHtml}`;
+    return `<div class="msg-copy-actions${isUser ? " msg-copy-actions--user" : ""}">${innerHtml}</div>`;
+  }
+  async function copyTextToClipboard(text) {
+    if (!text) return false;
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+      }
+    }
+    if (typeof document !== "undefined") {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "-9999px";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        return ok;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+  function flashCopyButton(btn) {
+    const origTitle = btn.getAttribute("aria-label") || btn.title || "Copy";
+    btn.classList.add("copied");
+    btn.classList.add("copy-btn--done");
+    btn.innerHTML = COPY_CHECK_ICON_SVG;
+    btn.title = "Copied";
+    btn.setAttribute("aria-label", "Copied");
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.classList.remove("copy-btn--done");
+      btn.innerHTML = COPY_ICON_SVG;
+      btn.title = origTitle;
+      btn.setAttribute("aria-label", origTitle);
+    }, 1500);
+  }
+
   // src/ui/components/activityView.ts
   function renderThought(thought, opts) {
     if (!thought?.trim()) return "";
@@ -12825,7 +12902,10 @@ ${thought.trim()}` : thought.trim();
           <span class="activity-toggle-title">${isLive ? "Thinking\u2026" : "Thought"}</span>
           ${!isLive ? `<span class="activity-toggle-duration">${formatThoughtDuration(opts?.durationSeconds)}</span>` : ""}
         </span>
-        <span class="activity-toggle-chevron">\u203A</span>
+        <div class="activity-toggle-right">
+          <button type="button" class="copy-btn copy-btn--compact thought-copy-btn" data-copy-text="${escapeHtml2(thought)}" title="Copy thought" aria-label="Copy thought">${COPY_ICON_SVG}</button>
+          <span class="activity-toggle-chevron">\u203A</span>
+        </div>
       </button>
       <div class="activity-toggle-body">
         <div class="activity-toggle-thought-text">${renderMarkdownDocument(thought)}</div>
@@ -12879,6 +12959,7 @@ ${thought.trim()}` : thought.trim();
         </div>
         <div class="activity-toggle-right">
           ${tagsHtml}
+          <button type="button" class="copy-btn copy-btn--compact tool-copy-btn"${outStr ? ` data-copy-text="${escapeHtml2(outStr)}"` : ""} title="Copy tool output" aria-label="Copy tool output">${COPY_ICON_SVG}</button>
           <span class="activity-toggle-chevron">\u203A</span>
         </div>
       </button>
@@ -13044,83 +13125,6 @@ ${thought.trim()}` : thought.trim();
       ${removeBtnHtml}
     </span>
   `;
-  }
-
-  // src/ui/copyActions.ts
-  var COPY_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--copy" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="1.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/><rect x="1.5" y="4.5" width="9" height="11" rx="1.25" stroke="currentColor" stroke-width="1.25"/></svg>';
-  var COPY_CHECK_ICON_SVG = '<svg class="copy-btn-icon copy-btn-icon--check" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  function formatMessageTime(time) {
-    if (time === void 0 || time === null || time === "" || typeof time === "number" && isNaN(time)) {
-      return "";
-    }
-    if (typeof time === "string") {
-      const trimmed = time.trim();
-      if (/^\d{1,2}:\d{2}(\s*(?:AM|PM|am|pm))?$/.test(trimmed)) {
-        return trimmed;
-      }
-    }
-    const date = new Date(time);
-    if (isNaN(date.getTime())) {
-      return "";
-    }
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  function escapeAttr(s) {
-    return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function renderMessageCopyActionsHtml(opts = {}) {
-    const isUser = Boolean(opts.user);
-    const title = opts.title || (isUser ? "Copy Message" : "Copy Answer");
-    const dataAttr = opts.copyText ? ` data-copy-text="${escapeAttr(opts.copyText)}"` : "";
-    const timeFormatted = formatMessageTime(opts.time);
-    const timeHtml = timeFormatted ? `<span class="msg-time">${escapeAttr(timeFormatted)}</span>` : "";
-    const btnHtml = `<button type="button" class="copy-btn copy-btn--compact"${dataAttr} title="${title}" aria-label="${title}">${COPY_ICON_SVG}</button>`;
-    const innerHtml = isUser ? `${timeHtml}${btnHtml}` : `${btnHtml}${timeHtml}`;
-    return `<div class="msg-copy-actions${isUser ? " msg-copy-actions--user" : ""}">${innerHtml}</div>`;
-  }
-  async function copyTextToClipboard(text) {
-    if (!text) return false;
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch {
-      }
-    }
-    if (typeof document !== "undefined") {
-      try {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        textarea.style.top = "-9999px";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(textarea);
-        return ok;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  }
-  function flashCopyButton(btn) {
-    const origTitle = btn.getAttribute("aria-label") || btn.title || "Copy";
-    btn.classList.add("copied");
-    btn.classList.add("copy-btn--done");
-    btn.innerHTML = COPY_CHECK_ICON_SVG;
-    btn.title = "Copied";
-    btn.setAttribute("aria-label", "Copied");
-    setTimeout(() => {
-      btn.classList.remove("copied");
-      btn.classList.remove("copy-btn--done");
-      btn.innerHTML = COPY_ICON_SVG;
-      btn.title = origTitle;
-      btn.setAttribute("aria-label", origTitle);
-    }, 1500);
   }
 
   // src/ui/components/chatTurnRenderer.ts
