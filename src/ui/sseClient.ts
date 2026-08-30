@@ -17,6 +17,7 @@ export function initSseClient(opts: SseClientOptions): () => void {
   let es: EventSource | null = null;
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
+  let retryCount = 0;
 
   if (isStaticHostEnvironment()) {
     setTimeout(() => {
@@ -29,7 +30,7 @@ export function initSseClient(opts: SseClientOptions): () => void {
 
   function connect() {
     if (closed) return;
-    opts.onStatusChange('syncing');
+    opts.onStatusChange(retryCount > 0 ? 'connecting' : 'syncing');
     const token = getStoredToken();
     const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events';
     const url = buildApiUrl(relative);
@@ -42,6 +43,7 @@ export function initSseClient(opts: SseClientOptions): () => void {
 
     es.onopen = () => {
       if (closed) return;
+      retryCount = 0;
       opts.onStatusChange('connected');
     };
 
@@ -52,7 +54,12 @@ export function initSseClient(opts: SseClientOptions): () => void {
 
     es.onerror = () => {
       if (closed) return;
-      opts.onStatusChange('disconnected');
+      retryCount++;
+      if (retryCount >= 3) {
+        opts.onStatusChange('disconnected');
+      } else {
+        opts.onStatusChange('connecting');
+      }
       es?.close();
       if (!closed) {
         retryTimeout = setTimeout(connect, 3000);

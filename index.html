@@ -7214,9 +7214,10 @@ input:checked + .slider:before {
   border-color: #388bfd;
   background: #242938;
 }
-.network-ip-item.selected {
-  border-color: #388bfd;
-  background: #1c2333;
+.network-ip-item.selected,
+.network-ip-item.active-connection {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.05);
 }
 .network-ip-header {
   display: flex;
@@ -7257,20 +7258,28 @@ input:checked + .slider:before {
   color: #58a6ff;
   border: 1px solid rgba(88, 166, 255, 0.3);
 }
-.network-ip-active-tag {
-  font-size: 10px;
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
-  border: 1px solid rgba(56, 139, 253, 0.4);
-  padding: 1px 6px;
-  border-radius: 4px;
+.network-status-badge {
+  font-size: 10.5px;
+  padding: 1.5px 7px;
+  border-radius: 10px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+.network-status--active {
+  background: rgba(34, 197, 94, 0.16);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+.network-status--disabled {
+  background: rgba(156, 163, 175, 0.1);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.2);
 }
 .network-ip-actions {
   display: flex;
   gap: 6px;
 }
-.network-btn-use-qr,
 .network-btn-copy,
 .network-btn-delete {
   padding: 4px 8px;
@@ -7284,11 +7293,6 @@ input:checked + .slider:before {
 .network-btn-delete:hover {
   background: rgba(248, 81, 73, 0.15);
   border-color: #f85149;
-}
-.network-btn-use-qr.active {
-  background: #0e639c;
-  color: #ffffff;
-  border-color: #0e639c;
 }
 .network-ip-address-text {
   font-size: 11.5px;
@@ -7699,20 +7703,28 @@ input:checked + .slider:before {
     try {
       if (typeof localStorage === "undefined") return [];
       const raw = localStorage.getItem(CUSTOM_CONNECTIONS_KEY);
-      const list = raw ? JSON.parse(raw) : [];
+      const rawList = raw ? JSON.parse(raw) : [];
+      const list = rawList.map(
+        (item) => typeof item === "string" ? { url: item } : item
+      ).filter((item) => Boolean(item && item.url));
       const legacy = getCustomServerIp();
-      if (legacy && !list.includes(legacy)) list.unshift(legacy);
-      return list.filter(Boolean);
+      if (legacy && !list.some((c) => c.url === legacy)) {
+        list.unshift({ url: legacy });
+      }
+      return list;
     } catch {
       return [];
     }
   }
-  function addCustomConnection(url) {
+  function addCustomConnection(url, name, tag) {
     try {
       const clean = url.trim().replace(/\/+$/, "");
       if (!clean || typeof localStorage === "undefined") return getCustomConnections();
-      const current = getCustomConnections().filter((u) => u !== clean);
-      current.push(clean);
+      const current = getCustomConnections().filter((c) => c.url !== clean);
+      const rec = { url: clean };
+      if (name?.trim()) rec.name = name.trim();
+      if (tag?.trim()) rec.tag = tag.trim();
+      current.push(rec);
       localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
       return current;
     } catch {
@@ -7723,7 +7735,7 @@ input:checked + .slider:before {
     try {
       const clean = url.trim().replace(/\/+$/, "");
       if (typeof localStorage === "undefined") return [];
-      const current = getCustomConnections().filter((u) => u !== clean);
+      const current = getCustomConnections().filter((c) => c.url !== clean);
       localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
       if (getCustomServerIp() === clean) clearCustomServerIp();
       return current;
@@ -7777,10 +7789,8 @@ input:checked + .slider:before {
       const stored = typeof localStorage !== "undefined" ? localStorage.getItem(SERVER_KEY2) : null;
       if (stored === "none") return "";
       if (stored) return stored.replace(/\/+$/, "");
-      if (isStaticDeployment()) {
-        const def = getDefaultServerUrl();
-        if (def) return def.replace(/\/+$/, "");
-      }
+      const def = getDefaultServerUrl();
+      if (def) return def.replace(/\/+$/, "");
     } catch {
     }
     return "";
@@ -7941,6 +7951,7 @@ input:checked + .slider:before {
     let es = null;
     let retryTimeout = null;
     let closed = false;
+    let retryCount = 0;
     if (isStaticHostEnvironment()) {
       setTimeout(() => {
         if (!closed) opts.onStatusChange("disconnected");
@@ -7951,7 +7962,7 @@ input:checked + .slider:before {
     }
     function connect() {
       if (closed) return;
-      opts.onStatusChange("syncing");
+      opts.onStatusChange(retryCount > 0 ? "connecting" : "syncing");
       const token = getStoredToken();
       const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : "/api/events";
       const url = buildApiUrl(relative);
@@ -7963,6 +7974,7 @@ input:checked + .slider:before {
       }
       es.onopen = () => {
         if (closed) return;
+        retryCount = 0;
         opts.onStatusChange("connected");
       };
       es.addEventListener("change", () => {
@@ -7971,7 +7983,12 @@ input:checked + .slider:before {
       });
       es.onerror = () => {
         if (closed) return;
-        opts.onStatusChange("disconnected");
+        retryCount++;
+        if (retryCount >= 3) {
+          opts.onStatusChange("disconnected");
+        } else {
+          opts.onStatusChange("connecting");
+        }
         es?.close();
         if (!closed) {
           retryTimeout = setTimeout(connect, 3e3);
@@ -8141,7 +8158,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.33" : "1.0.33";
+  var CLIENT_VERSION = true ? "1.0.34" : "1.0.33";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -9565,9 +9582,15 @@ input:checked + .slider:before {
   };
 
   // src/p2p/p2pSignalingExchange.ts
+  function resolveLanSignalUrl(baseUrl) {
+    if (baseUrl) return baseUrl;
+    if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
+    return "http://localhost:4200";
+  }
   async function postSignalToLan(baseUrl, signal) {
     try {
-      const url = new URL("/api/p2p/signal", baseUrl).toString();
+      const base = resolveLanSignalUrl(baseUrl);
+      const url = new URL("/api/p2p/signal", base).toString();
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -9580,7 +9603,8 @@ input:checked + .slider:before {
   }
   async function fetchSignalsFromLan(baseUrl, recipientId) {
     try {
-      const url = new URL("/api/p2p/signal", baseUrl);
+      const base = resolveLanSignalUrl(baseUrl);
+      const url = new URL("/api/p2p/signal", base);
       if (recipientId) url.searchParams.set("recipientId", recipientId);
       const res = await fetch(url.toString(), { method: "GET" });
       if (!res.ok) return [];
@@ -9687,7 +9711,7 @@ input:checked + .slider:before {
     ctx.callbacks.onModeChange("p2p");
     ctx.callbacks.onError?.("");
     ctx.p2pCoord?.stop();
-    const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig);
+    const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig, getServerBaseUrl());
     if (!coord) ctx.callbacks.onStatusChange("connected");
     return coord;
   }
@@ -9942,7 +9966,7 @@ input:checked + .slider:before {
     let mode;
     if (!isStaticDeployment()) {
       const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
-      mode = saved === "p2p" ? "p2p" : "live-sse";
+      mode = saved === "p2p" ? "p2p" : saved === "git-backup" ? "git-backup" : "live-sse";
     } else {
       const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
       mode = saved || (hasLiveServer() ? "live-sse" : cfg?.gistId ? "git-backup" : "live-sse");
@@ -10124,14 +10148,12 @@ input:checked + .slider:before {
       if (config.serverUrl) {
         storage.setItem("agent_server_url", config.serverUrl);
         setServerBaseUrl(config.serverUrl);
+        storage.setItem("agent_sync_mode", "live-sse");
       }
       if (config.gistId && config.token) {
         const gistSync = { gistId: config.gistId, token: config.token };
         storage.setItem("agent_gist_sync", JSON.stringify(gistSync));
         if (!config.serverUrl) storage.setItem("agent_sync_mode", "git-backup");
-      }
-      if (config.serverUrl && !config.gistId) {
-        storage.setItem("agent_sync_mode", "live-sse");
       }
       if (config.password) {
         storage.setItem("agent_monitor_token", config.password);
@@ -10554,7 +10576,7 @@ input:checked + .slider:before {
           const changed = this.state.syncStatus !== s;
           this.state.syncStatus = s;
           if (s === "disconnected") {
-            this.syncMachine.handlePrimarySseFailure();
+            if (this.state.syncMode === "live-sse") this.syncMachine.handlePrimarySseFailure();
           } else if (s === "connected") {
             this.syncMachine.restorePrimaryLive();
             void this.reloadData(false);
@@ -13452,48 +13474,52 @@ ${thought.trim()}` : thought.trim();
   }
 
   // src/ui/components/settingsModal/settingsConnectionCards.ts
+  function normalizeConnectionUrl(url) {
+    if (!url) return "";
+    let clean = url.trim().replace(/\/+$/, "");
+    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+      clean = `http://${clean}`;
+    }
+    return clean.toLowerCase();
+  }
   function renderNetworkConnectionItem(item, currentBaseUrl, defaultLanUrl, payload, copyFeedback) {
-    const isSelected = currentBaseUrl === item.url || !currentBaseUrl && item.url === defaultLanUrl;
+    const normCurrent = normalizeConnectionUrl(currentBaseUrl);
+    const normItem = normalizeConnectionUrl(item.url);
+    const normDefault = normalizeConnectionUrl(defaultLanUrl);
+    const isSelected = normCurrent ? normCurrent === normItem : normItem === normDefault || Boolean(item.isDefault);
     const isCopied = copyFeedback === `ip-${item.address}`;
     const fullSetupUrl = `${item.url}/#setup=${payload}`;
     let badgeClass = "badge-lan";
-    let badgeLabel = "\u{1F3E0} Local LAN";
+    let badgeLabel = item.tag ? `\u{1F3E0} ${item.tag}` : item.isDefault ? "\u{1F3E0} Default LAN" : "\u{1F3E0} Local LAN";
     if (item.isTailscale) {
       badgeClass = "badge-tailscale";
-      badgeLabel = "\u{1F512} Tailscale";
+      badgeLabel = item.tag ? `\u{1F512} ${item.tag}` : "\u{1F512} Tailscale (Default)";
     } else if (item.isCustom) {
       badgeClass = "badge-custom";
-      badgeLabel = "\u{1F310} Custom IP";
+      badgeLabel = item.tag ? `\u{1F3F7}\uFE0F ${item.tag}` : "\u{1F310} Custom IP";
     }
-    const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : "";
+    const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : item.isDefault || item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : "";
     return `
     <div
-      class="network-ip-item ${isSelected ? "selected" : ""}"
+      class="network-ip-item ${isSelected ? "selected active-connection" : "inactive-connection"}"
       data-switch-connection="${escapeHtml2(item.url)}"
       data-ip-url="${escapeHtml2(item.url)}"
       ${btnId}
       role="button"
       tabindex="0"
-      title="Click to switch to ${escapeHtml2(item.name)} (${escapeHtml2(item.url)})"
+      title="Click to activate ${escapeHtml2(item.name)} (${escapeHtml2(item.url)})"
     >
       <div class="network-ip-header">
         <div class="network-ip-title-group">
           <span class="network-ip-name">${escapeHtml2(item.name)}</span>
           <span class="network-ip-badge ${badgeClass}">
-            ${badgeLabel}
+            ${escapeHtml2(badgeLabel)}
           </span>
-          ${isSelected ? '<span class="network-ip-active-tag">\u25CF Active</span>' : ""}
+          <span class="network-status-badge ${isSelected ? "network-status--active" : "network-status--disabled"}">
+            ${isSelected ? "\u25CF Active" : "\u25CB Disabled"}
+          </span>
         </div>
         <div class="network-ip-actions">
-          <button
-            type="button"
-            class="btn btn-secondary network-btn-use-qr ${isSelected ? "active" : ""}"
-            data-switch-connection="${escapeHtml2(item.url)}"
-            data-use-ip="${escapeHtml2(item.url)}"
-            title="${isSelected ? "Active connection" : `Switch to ${escapeHtml2(item.url)}`}"
-          >
-            ${isSelected ? "\u2713 Active" : "\u{1F4F2} Set as Active"}
-          </button>
           <button
             type="button"
             class="btn btn-secondary network-btn-copy"
@@ -13530,17 +13556,18 @@ ${thought.trim()}` : thought.trim();
     const customIp = state2.customServerIp || getCustomServerIp() || "";
     const defaultLanUrl = state2.defaultLanUrl || getDefaultLanUrl() || networks.find((n) => !n.isTailscale)?.url || customIp;
     const tailscaleUrl = state2.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || "";
-    const customList = (state2.customConnections || getCustomConnections()).filter(
-      (u) => u && u !== defaultLanUrl && u !== tailscaleUrl
-    );
+    const rawCustom = state2.customConnections || getCustomConnections();
+    const customList = rawCustom.map((item) => typeof item === "string" ? { url: item } : item).filter((c) => Boolean(c && c.url && c.url !== defaultLanUrl && c.url !== tailscaleUrl));
     const itemsMap = /* @__PURE__ */ new Map();
     for (const net of networks) {
       const clean = net.url.trim().replace(/\/+$/, "");
       if (clean && !itemsMap.has(clean)) {
         itemsMap.set(clean, {
-          name: net.name || (net.isTailscale ? "Tailscale" : "Local LAN"),
+          name: net.isTailscale ? "Tailscale VPN" : net.name ? `Machine LAN (${net.name})` : "Machine Local LAN",
           url: clean,
           address: net.address || extractHostFromUrl(clean),
+          tag: "Default",
+          isDefault: !net.isTailscale,
           isTailscale: Boolean(net.isTailscale),
           isCustom: false
         });
@@ -13550,9 +13577,10 @@ ${thought.trim()}` : thought.trim();
       const cleanTs = tailscaleUrl.trim().replace(/\/+$/, "");
       if (cleanTs && !itemsMap.has(cleanTs)) {
         itemsMap.set(cleanTs, {
-          name: "Tailscale",
+          name: "Tailscale VPN",
           url: cleanTs,
           address: extractHostFromUrl(cleanTs),
+          tag: "Default",
           isTailscale: true,
           isCustom: false
         });
@@ -13562,21 +13590,24 @@ ${thought.trim()}` : thought.trim();
       const cleanLan = defaultLanUrl.trim().replace(/\/+$/, "");
       if (cleanLan && !itemsMap.has(cleanLan)) {
         itemsMap.set(cleanLan, {
-          name: "Default LAN",
+          name: "Machine Local LAN",
           url: cleanLan,
           address: extractHostFromUrl(cleanLan),
+          tag: "Default",
+          isDefault: true,
           isTailscale: false,
           isCustom: false
         });
       }
     }
-    for (const customUrl of customList) {
-      const cleanCust = customUrl.trim().replace(/\/+$/, "");
+    for (const record of customList) {
+      const cleanCust = record.url.trim().replace(/\/+$/, "");
       if (cleanCust && !itemsMap.has(cleanCust)) {
         itemsMap.set(cleanCust, {
-          name: `Custom Server (${extractHostFromUrl(cleanCust)})`,
+          name: record.name || `Custom Server (${extractHostFromUrl(cleanCust)})`,
           url: cleanCust,
           address: extractHostFromUrl(cleanCust),
+          tag: record.tag || (record.name ? record.name : detectIsTailscale(cleanCust) ? "Tailscale" : "Custom"),
           isTailscale: detectIsTailscale(cleanCust),
           isCustom: true
         });
@@ -13599,22 +13630,28 @@ ${thought.trim()}` : thought.trim();
       </div>
 
       <div class="server-ip-config-box" style="margin-bottom: 12px;">
-        <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
+        <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary, #9ca3af);">
           Add New Server Address (LAN, Remote, or Tunnel IP):
         </label>
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <input
+            id="input-custom-server-name"
+            class="search-input"
+            type="text"
+            placeholder="Name / Tag (e.g. Office PC)"
+            style="flex: 1; min-width: 130px;"
+          />
           <input
             id="input-custom-server-ip"
             class="search-input"
             type="text"
             placeholder="http://192.168.1.111:4200"
             value="${escapeHtml2(customIp)}"
-            style="flex: 1;"
+            style="flex: 2; min-width: 180px;"
           />
           <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
             ${isConnectionAdded ? "\u2705 Added!" : "\u2795 Add Connection"}
           </button>
-          ${customIp ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ""}
         </div>
       </div>
 
@@ -15015,23 +15052,28 @@ ${thought.trim()}` : thought.trim();
   }
   function switchToSetIp(state2, onRender) {
     const customIp = state2.customServerIp || getCustomServerIp();
-    const customList = state2.customConnections || getCustomConnections();
-    const target = customIp || customList[0] || state2.defaultLanUrl || getDefaultLanUrl();
+    const rawList = state2.customConnections || getCustomConnections();
+    const firstUrl = rawList[0] ? typeof rawList[0] === "string" ? rawList[0] : rawList[0].url : "";
+    const target = customIp || firstUrl || state2.defaultLanUrl || getDefaultLanUrl();
     if (target) selectActiveConnection(state2, target, onRender);
   }
-  function addNewCustomConnection(state2, rawUrl, onRender) {
+  function addNewCustomConnection(state2, rawUrl, name, tag, onRender) {
+    const renderFn = typeof name === "function" ? name : typeof tag === "function" ? tag : onRender;
+    const nameStr = typeof name === "string" ? name : void 0;
+    const tagStr = typeof tag === "string" ? tag : void 0;
     let clean = rawUrl.trim().replace(/\/+$/, "");
     if (!clean) return;
     if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
       clean = `http://${clean}`;
     }
-    const updated = addCustomConnection(clean);
+    const updated = addCustomConnection(clean, nameStr, tagStr);
     state2.customConnections = updated;
     state2.customServerIp = clean;
     setCustomServerIp(clean);
-    selectActiveConnection(state2, clean, onRender);
+    selectActiveConnection(state2, clean, renderFn || (() => {
+    }));
     state2.settingsCopyFeedback = "server-saved";
-    onRender();
+    renderFn?.();
   }
   function deleteCustomConnection(state2, url, onRender) {
     const clean = url.trim().replace(/\/+$/, "");
@@ -15042,7 +15084,8 @@ ${thought.trim()}` : thought.trim();
       clearCustomServerIp();
     }
     if (state2.selectedLanIp === clean) {
-      const fallback = state2.defaultLanUrl || getDefaultLanUrl() || state2.tailscaleUrl || getTailscaleUrl() || updated[0] || "";
+      const firstCustUrl = updated[0]?.url || "";
+      const fallback = state2.defaultLanUrl || getDefaultLanUrl() || state2.tailscaleUrl || getTailscaleUrl() || firstCustUrl;
       if (fallback) {
         selectActiveConnection(state2, fallback, onRender);
       } else {
@@ -15209,11 +15252,14 @@ ${thought.trim()}` : thought.trim();
       return true;
     }
     if (target.closest("#btn-save-custom-ip")) {
-      const input = document.getElementById("input-custom-server-ip");
-      const val = input?.value || "";
+      const ipInput = document.getElementById("input-custom-server-ip");
+      const nameInput = document.getElementById("input-custom-server-name");
+      const val = ipInput?.value || "";
+      const name = nameInput?.value || "";
       if (val.trim()) {
-        addNewCustomConnection(state2, val, callbacks.onRender);
-        if (input) input.value = "";
+        addNewCustomConnection(state2, val, name, name, callbacks.onRender);
+        if (ipInput) ipInput.value = "";
+        if (nameInput) nameInput.value = "";
       }
       return true;
     }

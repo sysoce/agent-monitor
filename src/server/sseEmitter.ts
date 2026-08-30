@@ -15,6 +15,8 @@ export class SseEmitter {
 
   addClient(res: ServerResponse): void {
     res.socket?.setNoDelay(true);
+    res.socket?.setKeepAlive?.(true);
+    res.socket?.setTimeout?.(0);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
@@ -22,6 +24,7 @@ export class SseEmitter {
       'X-Accel-Buffering': 'no',
       'Access-Control-Allow-Origin': '*',
     });
+    if (typeof (res as any).flushHeaders === 'function') (res as any).flushHeaders();
     res.write('retry: 3000\n\n');
     res.write(`data: ${JSON.stringify({ type: 'connected', time: Date.now() })}\n\n`);
 

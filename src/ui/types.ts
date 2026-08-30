@@ -72,7 +72,7 @@ export interface AppState {
   defaultLanUrl?: string;
   customServerIp?: string;
   tailscaleUrl?: string;
-  customConnections?: string[];
+  customConnections?: Array<string | { url: string; name?: string; tag?: string }>;
   serverSetupInfo?: {
     githubPagesUrl?: string;
     lanUrl?: string;

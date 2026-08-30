@@ -99,11 +99,14 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
     return true;
   }
   if (target.closest('#btn-save-custom-ip')) {
-    const input = document.getElementById('input-custom-server-ip') as HTMLInputElement | null;
-    const val = input?.value || '';
+    const ipInput = document.getElementById('input-custom-server-ip') as HTMLInputElement | null;
+    const nameInput = document.getElementById('input-custom-server-name') as HTMLInputElement | null;
+    const val = ipInput?.value || '';
+    const name = nameInput?.value || '';
     if (val.trim()) {
-      addNewCustomConnection(state, val, callbacks.onRender);
-      if (input) input.value = '';
+      addNewCustomConnection(state, val, name, name, callbacks.onRender);
+      if (ipInput) ipInput.value = '';
+      if (nameInput) nameInput.value = '';
     }
     return true;
   }

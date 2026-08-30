@@ -53,25 +53,39 @@ export function clearDefaultLanUrl(): void {
   try { if (typeof localStorage !== 'undefined') localStorage.removeItem(DEFAULT_LAN_KEY); } catch {}
 }
 
-export function getCustomConnections(): string[] {
+export interface CustomConnectionRecord {
+  url: string;
+  name?: string;
+  tag?: string;
+}
+
+export function getCustomConnections(): CustomConnectionRecord[] {
   try {
     if (typeof localStorage === 'undefined') return [];
     const raw = localStorage.getItem(CUSTOM_CONNECTIONS_KEY);
-    const list: string[] = raw ? JSON.parse(raw) : [];
+    const rawList: Array<string | CustomConnectionRecord> = raw ? JSON.parse(raw) : [];
+    const list: CustomConnectionRecord[] = rawList.map((item) =>
+      typeof item === 'string' ? { url: item } : item
+    ).filter((item) => Boolean(item && item.url));
     const legacy = getCustomServerIp();
-    if (legacy && !list.includes(legacy)) list.unshift(legacy);
-    return list.filter(Boolean);
+    if (legacy && !list.some((c) => c.url === legacy)) {
+      list.unshift({ url: legacy });
+    }
+    return list;
   } catch {
     return [];
   }
 }
 
-export function addCustomConnection(url: string): string[] {
+export function addCustomConnection(url: string, name?: string, tag?: string): CustomConnectionRecord[] {
   try {
     const clean = url.trim().replace(/\/+$/, '');
     if (!clean || typeof localStorage === 'undefined') return getCustomConnections();
-    const current = getCustomConnections().filter((u) => u !== clean);
-    current.push(clean);
+    const current = getCustomConnections().filter((c) => c.url !== clean);
+    const rec: CustomConnectionRecord = { url: clean };
+    if (name?.trim()) rec.name = name.trim();
+    if (tag?.trim()) rec.tag = tag.trim();
+    current.push(rec);
     localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
     return current;
   } catch {
@@ -79,11 +93,11 @@ export function addCustomConnection(url: string): string[] {
   }
 }
 
-export function removeCustomConnection(url: string): string[] {
+export function removeCustomConnection(url: string): CustomConnectionRecord[] {
   try {
     const clean = url.trim().replace(/\/+$/, '');
     if (typeof localStorage === 'undefined') return [];
-    const current = getCustomConnections().filter((u) => u !== clean);
+    const current = getCustomConnections().filter((c) => c.url !== clean);
     localStorage.setItem(CUSTOM_CONNECTIONS_KEY, JSON.stringify(current));
     if (getCustomServerIp() === clean) clearCustomServerIp();
     return current;

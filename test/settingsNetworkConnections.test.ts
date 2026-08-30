@@ -32,24 +32,13 @@ beforeEach(() => {
     clear: () => { mockStorage = {}; },
   };
 });
-
-afterEach(() => {
-  (globalThis as any).localStorage = originalStorage;
-});
+afterEach(() => { (globalThis as any).localStorage = originalStorage; });
 
 function createMockState(overrides: Partial<AppState> = {}): AppState {
   return {
-    activeTab: 'sidebar',
-    sessions: [],
-    plans: [],
-    syncStatus: 'connected',
-    searchQuery: '',
-    composerMode: 'agent',
-    selectedModel: 'gemini-3.7-flash',
-    availableModels: [],
-    isSending: false,
-    isAuthenticated: true,
-    ...overrides,
+    activeTab: 'sidebar', sessions: [], plans: [], syncStatus: 'connected',
+    searchQuery: '', composerMode: 'agent', selectedModel: 'gemini-3.7-flash',
+    availableModels: [], isSending: false, isAuthenticated: true, ...overrides,
   };
 }
 
@@ -64,10 +53,15 @@ test('authStore manages defaultLanUrl, tailscaleUrl, and customConnections list 
 
   assert.equal(getDefaultLanUrl(), 'http://192.168.1.111:4200');
   assert.equal(getTailscaleUrl(), 'http://100.74.73.50:4200');
-  assert.deepEqual(getCustomConnections(), ['http://10.0.0.99:4200', 'http://custom-node.local:4200']);
+  assert.deepEqual(getCustomConnections(), [
+    { url: 'http://10.0.0.99:4200' },
+    { url: 'http://custom-node.local:4200' },
+  ]);
 
   removeCustomConnection('http://10.0.0.99:4200');
-  assert.deepEqual(getCustomConnections(), ['http://custom-node.local:4200']);
+  assert.deepEqual(getCustomConnections(), [
+    { url: 'http://custom-node.local:4200' },
+  ]);
   assert.equal(getDefaultLanUrl(), 'http://192.168.1.111:4200');
   assert.equal(getTailscaleUrl(), 'http://100.74.73.50:4200');
 });
@@ -84,7 +78,9 @@ test('addNewCustomConnection adds to list, sets active server URL, and preserves
 
   assert.equal(state.selectedLanIp, 'http://10.0.0.99:4200');
   assert.equal(getServerBaseUrl(), 'http://10.0.0.99:4200');
-  assert.deepEqual(state.customConnections, ['http://10.0.0.99:4200']);
+  assert.deepEqual(state.customConnections, [
+    { url: 'http://10.0.0.99:4200' },
+  ]);
   assert.equal(state.defaultLanUrl, 'http://192.168.1.111:4200');
   assert.equal(state.tailscaleUrl, 'http://100.74.73.50:4200');
   assert.equal(rendered, true);

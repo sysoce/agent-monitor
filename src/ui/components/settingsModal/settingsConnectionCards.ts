@@ -4,8 +4,19 @@ export interface NetworkConnectionItem {
   name: string;
   url: string;
   address: string;
+  tag?: string;
+  isDefault?: boolean;
   isTailscale?: boolean;
   isCustom?: boolean;
+}
+
+export function normalizeConnectionUrl(url: string): string {
+  if (!url) return '';
+  let clean = url.trim().replace(/\/+$/, '');
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    clean = `http://${clean}`;
+  }
+  return clean.toLowerCase();
 }
 
 export function renderNetworkConnectionItem(
@@ -15,50 +26,48 @@ export function renderNetworkConnectionItem(
   payload: string,
   copyFeedback: string
 ): string {
-  const isSelected = currentBaseUrl === item.url || (!currentBaseUrl && item.url === defaultLanUrl);
+  const normCurrent = normalizeConnectionUrl(currentBaseUrl);
+  const normItem = normalizeConnectionUrl(item.url);
+  const normDefault = normalizeConnectionUrl(defaultLanUrl);
+  const isSelected = normCurrent
+    ? normCurrent === normItem
+    : (normItem === normDefault || Boolean(item.isDefault));
   const isCopied = copyFeedback === `ip-${item.address}`;
   const fullSetupUrl = `${item.url}/#setup=${payload}`;
 
   let badgeClass = 'badge-lan';
-  let badgeLabel = '🏠 Local LAN';
+  let badgeLabel = item.tag ? `🏠 ${item.tag}` : (item.isDefault ? '🏠 Default LAN' : '🏠 Local LAN');
   if (item.isTailscale) {
     badgeClass = 'badge-tailscale';
-    badgeLabel = '🔒 Tailscale';
+    badgeLabel = item.tag ? `🔒 ${item.tag}` : '🔒 Tailscale (Default)';
   } else if (item.isCustom) {
     badgeClass = 'badge-custom';
-    badgeLabel = '🌐 Custom IP';
+    badgeLabel = item.tag ? `🏷️ ${item.tag}` : '🌐 Custom IP';
   }
 
-  const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : (item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : '');
+  const btnId = item.isTailscale ? 'id="btn-switch-tailscale"' : (item.isDefault || item.url === defaultLanUrl ? 'id="btn-switch-set-ip"' : '');
 
   return `
     <div
-      class="network-ip-item ${isSelected ? 'selected' : ''}"
+      class="network-ip-item ${isSelected ? 'selected active-connection' : 'inactive-connection'}"
       data-switch-connection="${escapeHtml(item.url)}"
       data-ip-url="${escapeHtml(item.url)}"
       ${btnId}
       role="button"
       tabindex="0"
-      title="Click to switch to ${escapeHtml(item.name)} (${escapeHtml(item.url)})"
+      title="Click to activate ${escapeHtml(item.name)} (${escapeHtml(item.url)})"
     >
       <div class="network-ip-header">
         <div class="network-ip-title-group">
           <span class="network-ip-name">${escapeHtml(item.name)}</span>
           <span class="network-ip-badge ${badgeClass}">
-            ${badgeLabel}
+            ${escapeHtml(badgeLabel)}
           </span>
-          ${isSelected ? '<span class="network-ip-active-tag">● Active</span>' : ''}
+          <span class="network-status-badge ${isSelected ? 'network-status--active' : 'network-status--disabled'}">
+            ${isSelected ? '● Active' : '○ Disabled'}
+          </span>
         </div>
         <div class="network-ip-actions">
-          <button
-            type="button"
-            class="btn btn-secondary network-btn-use-qr ${isSelected ? 'active' : ''}"
-            data-switch-connection="${escapeHtml(item.url)}"
-            data-use-ip="${escapeHtml(item.url)}"
-            title="${isSelected ? 'Active connection' : `Switch to ${escapeHtml(item.url)}`}"
-          >
-            ${isSelected ? '✓ Active' : '📲 Set as Active'}
-          </button>
           <button
             type="button"
             class="btn btn-secondary network-btn-copy"

@@ -56,7 +56,7 @@ export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: 
   let mode: TransportMode;
   if (!isStaticDeployment()) {
     const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
-    mode = saved === 'p2p' ? 'p2p' : 'live-sse';
+    mode = saved === 'p2p' ? 'p2p' : saved === 'git-backup' ? 'git-backup' : 'live-sse';
   } else {
     const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
     mode = saved || (hasLiveServer() ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'live-sse'));

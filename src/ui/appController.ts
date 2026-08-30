@@ -118,8 +118,12 @@ export class AppController {
       onStatusChange: (s) => {
         const changed = this.state.syncStatus !== s;
         this.state.syncStatus = s;
-        if (s === 'disconnected') { this.syncMachine.handlePrimarySseFailure(); }
-        else if (s === 'connected') { this.syncMachine.restorePrimaryLive(); void this.reloadData(false); }
+        if (s === 'disconnected') {
+          if (this.state.syncMode === 'live-sse') this.syncMachine.handlePrimarySseFailure();
+        } else if (s === 'connected') {
+          this.syncMachine.restorePrimaryLive();
+          void this.reloadData(false);
+        }
         if (changed) this.render();
       },
       onChange: () => { void this.reloadData(false); },

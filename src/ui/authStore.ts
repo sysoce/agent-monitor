@@ -17,6 +17,7 @@ import {
   getCustomConnections,
   addCustomConnection,
   removeCustomConnection,
+  type CustomConnectionRecord,
 } from './networkStore';
 
 export {
@@ -35,6 +36,7 @@ export {
   getCustomConnections,
   addCustomConnection,
   removeCustomConnection,
+  type CustomConnectionRecord,
 } from './networkStore';
 
 export function getStoredToken(): string | null {
@@ -80,10 +82,8 @@ export function getServerBaseUrl(): string {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(SERVER_KEY) : null;
     if (stored === 'none') return '';
     if (stored) return stored.replace(/\/+$/, '');
-    if (isStaticDeployment()) {
-      const def = getDefaultServerUrl();
-      if (def) return def.replace(/\/+$/, '');
-    }
+    const def = getDefaultServerUrl();
+    if (def) return def.replace(/\/+$/, '');
   } catch {}
   return '';
 }

@@ -65,24 +65,35 @@ export function switchToTailscale(state: AppState, onRender: () => void): void {
 
 export function switchToSetIp(state: AppState, onRender: () => void): void {
   const customIp = state.customServerIp || getCustomServerIp();
-  const customList = state.customConnections || getCustomConnections();
-  const target = customIp || customList[0] || state.defaultLanUrl || getDefaultLanUrl();
+  const rawList = state.customConnections || getCustomConnections();
+  const firstUrl = rawList[0] ? (typeof rawList[0] === 'string' ? rawList[0] : rawList[0].url) : '';
+  const target = customIp || firstUrl || state.defaultLanUrl || getDefaultLanUrl();
   if (target) selectActiveConnection(state, target, onRender);
 }
 
-export function addNewCustomConnection(state: AppState, rawUrl: string, onRender: () => void): void {
+export function addNewCustomConnection(
+  state: AppState,
+  rawUrl: string,
+  name?: string | (() => void),
+  tag?: string,
+  onRender?: () => void
+): void {
+  const renderFn = typeof name === 'function' ? name : (typeof tag === 'function' ? tag : onRender);
+  const nameStr = typeof name === 'string' ? name : undefined;
+  const tagStr = typeof tag === 'string' ? tag : undefined;
+
   let clean = rawUrl.trim().replace(/\/+$/, '');
   if (!clean) return;
   if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
     clean = `http://${clean}`;
   }
-  const updated = addCustomConnection(clean);
+  const updated = addCustomConnection(clean, nameStr, tagStr);
   state.customConnections = updated;
   state.customServerIp = clean;
   setCustomServerIp(clean);
-  selectActiveConnection(state, clean, onRender);
+  selectActiveConnection(state, clean, renderFn || (() => {}));
   state.settingsCopyFeedback = 'server-saved';
-  onRender();
+  renderFn?.();
 }
 
 export function deleteCustomConnection(state: AppState, url: string, onRender: () => void): void {
@@ -94,7 +105,8 @@ export function deleteCustomConnection(state: AppState, url: string, onRender: (
     clearCustomServerIp();
   }
   if (state.selectedLanIp === clean) {
-    const fallback = state.defaultLanUrl || getDefaultLanUrl() || state.tailscaleUrl || getTailscaleUrl() || updated[0] || '';
+    const firstCustUrl = updated[0]?.url || '';
+    const fallback = state.defaultLanUrl || getDefaultLanUrl() || state.tailscaleUrl || getTailscaleUrl() || firstCustUrl;
     if (fallback) {
       selectActiveConnection(state, fallback, onRender);
     } else {

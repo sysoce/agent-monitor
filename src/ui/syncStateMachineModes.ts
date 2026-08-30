@@ -1,6 +1,7 @@
 import type { GistSyncConfig, TransportMode } from '../sync/types';
 import type { SyncStateMachineCallbacks } from './syncStateMachineTypes';
 import { startP2PCoordination } from './syncStateMachineP2P';
+import { getServerBaseUrl } from './authStore';
 import type { P2PClientCoordinator } from '../p2p/p2pClientCoordinator';
 import type { LiveReachabilityProbe } from './liveReachabilityProbe';
 import type { GitPollController } from './syncStateMachinePoll';
@@ -22,7 +23,7 @@ export function switchP2PMode(ctx: ModeContext): P2PClientCoordinator | null {
   ctx.callbacks.onModeChange('p2p');
   ctx.callbacks.onError?.('');
   ctx.p2pCoord?.stop();
-  const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig);
+  const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig, getServerBaseUrl());
   if (!coord) ctx.callbacks.onStatusChange('connected');
   return coord;
 }

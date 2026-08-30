@@ -15,9 +15,10 @@ export function renderSettingsNetworkSection(state: AppState): string {
   const customIp = state.customServerIp || getCustomServerIp() || '';
   const defaultLanUrl = state.defaultLanUrl || getDefaultLanUrl() || networks.find((n) => !n.isTailscale)?.url || customIp;
   const tailscaleUrl = state.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || '';
-  const customList = (state.customConnections || getCustomConnections()).filter(
-    (u) => u && u !== defaultLanUrl && u !== tailscaleUrl
-  );
+  const rawCustom = state.customConnections || getCustomConnections();
+  const customList = rawCustom
+    .map((item) => (typeof item === 'string' ? { url: item } : item))
+    .filter((c) => Boolean(c && c.url && c.url !== defaultLanUrl && c.url !== tailscaleUrl));
 
   const itemsMap = new Map<string, NetworkConnectionItem>();
 
@@ -25,9 +26,11 @@ export function renderSettingsNetworkSection(state: AppState): string {
     const clean = net.url.trim().replace(/\/+$/, '');
     if (clean && !itemsMap.has(clean)) {
       itemsMap.set(clean, {
-        name: net.name || (net.isTailscale ? 'Tailscale' : 'Local LAN'),
+        name: net.isTailscale ? 'Tailscale VPN' : (net.name ? `Machine LAN (${net.name})` : 'Machine Local LAN'),
         url: clean,
         address: net.address || extractHostFromUrl(clean),
+        tag: 'Default',
+        isDefault: !net.isTailscale,
         isTailscale: Boolean(net.isTailscale),
         isCustom: false,
       });
@@ -38,9 +41,10 @@ export function renderSettingsNetworkSection(state: AppState): string {
     const cleanTs = tailscaleUrl.trim().replace(/\/+$/, '');
     if (cleanTs && !itemsMap.has(cleanTs)) {
       itemsMap.set(cleanTs, {
-        name: 'Tailscale',
+        name: 'Tailscale VPN',
         url: cleanTs,
         address: extractHostFromUrl(cleanTs),
+        tag: 'Default',
         isTailscale: true,
         isCustom: false,
       });
@@ -51,22 +55,25 @@ export function renderSettingsNetworkSection(state: AppState): string {
     const cleanLan = defaultLanUrl.trim().replace(/\/+$/, '');
     if (cleanLan && !itemsMap.has(cleanLan)) {
       itemsMap.set(cleanLan, {
-        name: 'Default LAN',
+        name: 'Machine Local LAN',
         url: cleanLan,
         address: extractHostFromUrl(cleanLan),
+        tag: 'Default',
+        isDefault: true,
         isTailscale: false,
         isCustom: false,
       });
     }
   }
 
-  for (const customUrl of customList) {
-    const cleanCust = customUrl.trim().replace(/\/+$/, '');
+  for (const record of customList) {
+    const cleanCust = record.url.trim().replace(/\/+$/, '');
     if (cleanCust && !itemsMap.has(cleanCust)) {
       itemsMap.set(cleanCust, {
-        name: `Custom Server (${extractHostFromUrl(cleanCust)})`,
+        name: record.name || `Custom Server (${extractHostFromUrl(cleanCust)})`,
         url: cleanCust,
         address: extractHostFromUrl(cleanCust),
+        tag: record.tag || (record.name ? record.name : (detectIsTailscale(cleanCust) ? 'Tailscale' : 'Custom')),
         isTailscale: detectIsTailscale(cleanCust),
         isCustom: true,
       });
@@ -74,7 +81,6 @@ export function renderSettingsNetworkSection(state: AppState): string {
   }
 
   const items = Array.from(itemsMap.values());
-
   const renderedList = items.length > 0
     ? items.map((item) => renderNetworkConnectionItem(item, currentBaseUrl, defaultLanUrl, payload, copyFeedback)).join('')
     : `
@@ -94,22 +100,28 @@ export function renderSettingsNetworkSection(state: AppState): string {
       </div>
 
       <div class="server-ip-config-box" style="margin-bottom: 12px;">
-        <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
+        <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary, #9ca3af);">
           Add New Server Address (LAN, Remote, or Tunnel IP):
         </label>
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <input
+            id="input-custom-server-name"
+            class="search-input"
+            type="text"
+            placeholder="Name / Tag (e.g. Office PC)"
+            style="flex: 1; min-width: 130px;"
+          />
           <input
             id="input-custom-server-ip"
             class="search-input"
             type="text"
             placeholder="http://192.168.1.111:4200"
             value="${escapeHtml(customIp)}"
-            style="flex: 1;"
+            style="flex: 2; min-width: 180px;"
           />
           <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
             ${isConnectionAdded ? '✅ Added!' : '➕ Add Connection'}
           </button>
-          ${customIp ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ''}
         </div>
       </div>
 

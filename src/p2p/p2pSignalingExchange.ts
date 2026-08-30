@@ -2,9 +2,16 @@ import type { P2PSignalMessage } from './types';
 import type { GistSyncConfig } from '../sync/types';
 import { buildGistHeaders } from '../sync/gistHttp';
 
-export async function postSignalToLan(baseUrl: string, signal: P2PSignalMessage): Promise<boolean> {
+function resolveLanSignalUrl(baseUrl?: string): string {
+  if (baseUrl) return baseUrl;
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return 'http://localhost:4200';
+}
+
+export async function postSignalToLan(baseUrl: string | undefined, signal: P2PSignalMessage): Promise<boolean> {
   try {
-    const url = new URL('/api/p2p/signal', baseUrl).toString();
+    const base = resolveLanSignalUrl(baseUrl);
+    const url = new URL('/api/p2p/signal', base).toString();
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -16,9 +23,10 @@ export async function postSignalToLan(baseUrl: string, signal: P2PSignalMessage)
   }
 }
 
-export async function fetchSignalsFromLan(baseUrl: string, recipientId?: string): Promise<P2PSignalMessage[]> {
+export async function fetchSignalsFromLan(baseUrl?: string, recipientId?: string): Promise<P2PSignalMessage[]> {
   try {
-    const url = new URL('/api/p2p/signal', baseUrl);
+    const base = resolveLanSignalUrl(baseUrl);
+    const url = new URL('/api/p2p/signal', base);
     if (recipientId) url.searchParams.set('recipientId', recipientId);
     const res = await fetch(url.toString(), { method: 'GET' });
     if (!res.ok) return [];
