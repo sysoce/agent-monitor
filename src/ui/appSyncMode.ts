@@ -56,10 +56,12 @@ export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: 
   const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
   let mode = saved;
   if (!mode) {
-    if (cfg?.gistId && !hasLiveServer()) {
+    if (hasLiveServer()) {
+      mode = 'live-sse';
+    } else if (cfg?.gistId) {
       mode = 'git-backup';
     } else {
-      mode = 'p2p';
+      mode = 'live-sse';
     }
   }
 

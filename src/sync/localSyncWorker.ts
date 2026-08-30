@@ -23,9 +23,7 @@ export class LocalSyncWorker {
 
   constructor(private readonly workspaceRoot: string, private readonly gistClient: GistClient) {}
 
-  private async computeFingerprint(sessions: Array<{ id: string; updatedAt: number; messageCount: number }>): Promise<string> {
-    return computeSessionsFingerprint(this.workspaceRoot, sessions);
-  }
+  private async computeFingerprint(sessions: Array<{ id: string; updatedAt: number; messageCount: number }>): Promise<string> { return computeSessionsFingerprint(this.workspaceRoot, sessions); }
 
   async pollInboxOnce(): Promise<void> {
     if (this.isProcessing || this.gistClient.isBlockedByRateLimit?.()) {
@@ -127,7 +125,7 @@ export class LocalSyncWorker {
       .then(([a, d]) => Boolean(a?.isFile() || d?.isFile())).catch(() => false);
   }
 
-  async scheduleOutboxSync(activeSessionId?: string, debounceMs = 1500): Promise<void> {
+  async scheduleOutboxSync(activeSessionId?: string, debounceMs = 2000): Promise<void> {
     if (activeSessionId) this.pendingActiveSessionId = activeSessionId;
     if (this.gistClient.isBlockedByRateLimit?.()) return;
     const targetId = this.pendingActiveSessionId;
@@ -141,16 +139,6 @@ export class LocalSyncWorker {
     this.syncThrottleTimer.unref?.();
   }
 
-  start(): void {
-    this.stop();
-    this.isPolling = true;
-    void this.pollInboxOnce();
-    void this.scheduleOutboxSync(undefined, 400);
-  }
-
-  stop(): void {
-    this.isPolling = false;
-    if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = undefined; }
-    if (this.syncThrottleTimer) { clearTimeout(this.syncThrottleTimer); this.syncThrottleTimer = undefined; }
-  }
+  start(): void { this.stop(); this.isPolling = true; void this.pollInboxOnce(); void this.scheduleOutboxSync(undefined, 800); }
+  stop(): void { this.isPolling = false; if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = undefined; } if (this.syncThrottleTimer) { clearTimeout(this.syncThrottleTimer); this.syncThrottleTimer = undefined; } }
 }

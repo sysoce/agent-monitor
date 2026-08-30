@@ -37,7 +37,7 @@ export function getDefaultServerUrl(): string {
       return __DEFAULT_SERVER_URL__;
     }
   } catch {}
-  return 'http://192.168.1.111:4200';
+  return '';
 }
 
 export function getServerBaseUrl(): string {
@@ -53,8 +53,10 @@ export function getServerBaseUrl(): string {
       return '';
     }
     if (stored) return stored.replace(/\/+$/, '');
-    const def = getDefaultServerUrl();
-    if (def) return def.replace(/\/+$/, '');
+    if (isStaticDeployment()) {
+      const def = getDefaultServerUrl();
+      if (def) return def.replace(/\/+$/, '');
+    }
   } catch {}
   return '';
 }

@@ -7520,7 +7520,7 @@ input:checked + .slider:before {
       }
     } catch {
     }
-    return "http://192.168.1.111:4200";
+    return "";
   }
   function getServerBaseUrl() {
     try {
@@ -7535,8 +7535,10 @@ input:checked + .slider:before {
         return "";
       }
       if (stored) return stored.replace(/\/+$/, "");
-      const def = getDefaultServerUrl();
-      if (def) return def.replace(/\/+$/, "");
+      if (isStaticDeployment()) {
+        const def = getDefaultServerUrl();
+        if (def) return def.replace(/\/+$/, "");
+      }
     } catch {
     }
     return "";
@@ -7886,7 +7888,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.28" : "1.0.27";
+  var CLIENT_VERSION = true ? "1.0.29" : "1.0.29";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -9573,10 +9575,12 @@ input:checked + .slider:before {
     const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
     let mode = saved;
     if (!mode) {
-      if (cfg?.gistId && !hasLiveServer()) {
+      if (hasLiveServer()) {
+        mode = "live-sse";
+      } else if (cfg?.gistId) {
         mode = "git-backup";
       } else {
-        mode = "p2p";
+        mode = "live-sse";
       }
     }
     if (mode === "p2p") {

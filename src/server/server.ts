@@ -70,6 +70,8 @@ export function startMonitorServer(customConfig?: Partial<MonitorServerConfig>):
 
   server.listen(port, host, async () => {
     const networks = getLocalNetworkAddresses(port);
+    const bestDirect = networks.find((n) => n.isTailscale) || networks.find((n) => !n.name.includes('localhost'));
+    const directUrl = bestDirect ? bestDirect.url : `http://localhost:${port}`;
     console.log('\n======================================================');
     console.log(' 🚀  Agent Mobile Monitor is Running!');
     console.log('======================================================');
@@ -85,19 +87,28 @@ export function startMonitorServer(customConfig?: Partial<MonitorServerConfig>):
       tunnelInstance = await startTunnel(port);
       if (tunnelInstance) console.log(` ▸ Public URL:   ${tunnelInstance.url}`);
     }
-    const payload = encodeSetupPayload({
+    const directPayload = encodeSetupPayload({
+      token: syncConfig?.token || '',
+      gistId: syncConfig?.gistId || '',
+      password: password || syncConfig?.password || '',
+      serverUrl: directUrl,
+    });
+    const directSetupUrl = `${directUrl}/#setup=${directPayload}`;
+    const ghPayload = encodeSetupPayload({
       token: syncConfig?.token || '',
       gistId: syncConfig?.gistId || '',
       password: password || syncConfig?.password || '',
     });
-    const ghUrl = `https://sysoce.github.io/agent-monitor/#setup=${payload}`;
+    const ghUrl = `https://sysoce.github.io/agent-monitor/#setup=${ghPayload}`;
+    console.log(` ▸ Direct Mobile:${directSetupUrl}`);
     console.log(` ▸ GitHub Pages: ${ghUrl}`);
     console.log(` ▸ Mobile Setup: http://localhost:${port}/setup`);
-    if (password) console.log(` 🔐 Access Password:  ${password}`);
+    if (password) console.log(` 🔐 Access PIN:   ${password}`);
     console.log('------------------------------------------------------');
-    console.log(' 📱 Mobile Pairing QR Code (Scan with phone camera):');
+    const netLabel = bestDirect?.isTailscale ? 'Tailscale Direct' : 'LAN Direct';
+    console.log(` 📱 Mobile Pairing QR Code (${netLabel} - Instant Live SSE):`);
     try {
-      const qrMatrix = generateQrMatrix(ghUrl);
+      const qrMatrix = generateQrMatrix(directSetupUrl);
       console.log(renderQrToTerminal(qrMatrix));
     } catch {}
     console.log('======================================================\n');
