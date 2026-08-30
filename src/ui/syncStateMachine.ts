@@ -81,38 +81,22 @@ export class SyncStateMachine {
     this.gistClient = config ? new GistClient(config) : undefined;
   }
 
-  forceP2PMode(): void {
-    const ctx = this.getModeCtx();
-    this.p2pCoord = switchP2PMode(ctx);
-    this.mode = ctx.mode;
+  setP2PTransport(coord: any): void {
+    this.p2pCoord = coord;
   }
 
-  forceLiveSseMode(): void {
-    const ctx = this.getModeCtx();
-    switchLiveSseMode(ctx);
-    this.mode = ctx.mode;
-    this.p2pCoord = null;
+  setMode(mode: TransportMode): void {
+    if (mode === 'p2p') this.forceP2PMode();
+    else if (mode === 'live-sse') this.forceLiveSseMode();
+    else if (mode === 'git-backup') this.forceGitBackupMode();
+    else { this.mode = mode; this.callbacks.onModeChange(mode); }
   }
 
-  forceGitBackupMode(): void {
-    const ctx = this.getModeCtx();
-    switchGitBackupMode(ctx);
-    this.mode = ctx.mode;
-    this.p2pCoord = null;
-  }
-
-  handlePrimarySseFailure(): void {
-    const ctx = this.getModeCtx();
-    handleSseFailure(ctx);
-    this.mode = ctx.mode;
-  }
-
-  restorePrimaryLive(): void {
-    const ctx = this.getModeCtx();
-    restoreLive(ctx);
-    this.mode = ctx.mode;
-    this.p2pCoord = null;
-  }
+  forceP2PMode(): void { const ctx = this.getModeCtx(); this.p2pCoord = switchP2PMode(ctx); this.mode = ctx.mode; }
+  forceLiveSseMode(): void { const ctx = this.getModeCtx(); switchLiveSseMode(ctx); this.mode = ctx.mode; this.p2pCoord = null; }
+  forceGitBackupMode(): void { const ctx = this.getModeCtx(); switchGitBackupMode(ctx); this.mode = ctx.mode; this.p2pCoord = null; }
+  handlePrimarySseFailure(): void { const ctx = this.getModeCtx(); handleSseFailure(ctx); this.mode = ctx.mode; }
+  restorePrimaryLive(): void { const ctx = this.getModeCtx(); restoreLive(ctx); this.mode = ctx.mode; this.p2pCoord = null; }
 
   triggerLiveServerReachable(): void {
     this.reachabilityProbe.stop();
@@ -122,24 +106,12 @@ export class SyncStateMachine {
 
   async pushInboxMessage(msg: SyncInboxMessage): Promise<void> {
     return dispatchInboxMessage(
-      {
-        p2pCoord: this.p2pCoord,
-        gistClient: this.gistClient,
-        mode: this.mode,
-        autoFallback: this.autoFallback,
-        pollOnce: () => this.pollController.pollOnce(),
-      },
+      { p2pCoord: this.p2pCoord, gistClient: this.gistClient, mode: this.mode, autoFallback: this.autoFallback, pollOnce: () => this.pollController.pollOnce() },
       msg
     );
   }
 
   async pollOnce(): Promise<void> { await this.pollController.pollOnce(); }
   stopGitPolling(): void { this.pollController.stop(); }
-
-  stop(): void {
-    this.reachabilityProbe.stop();
-    this.p2pCoord?.stop();
-    this.p2pCoord = null;
-    this.pollController.stop();
-  }
+  stop(): void { this.reachabilityProbe.stop(); this.p2pCoord?.stop(); this.p2pCoord = null; this.pollController.stop(); }
 }

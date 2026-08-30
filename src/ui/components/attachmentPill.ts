@@ -27,9 +27,13 @@ function resolveImageSrc(att: AttachmentItem): string {
     uri.startsWith('data:') ||
     uri.startsWith('http:') ||
     uri.startsWith('https:') ||
-    uri.startsWith('blob:')
+    uri.startsWith('blob:') ||
+    uri.startsWith('/api/')
   ) {
     return uri;
+  }
+  if (att.path) {
+    return `/api/files?path=${encodeURIComponent(att.path)}`;
   }
   return '';
 }

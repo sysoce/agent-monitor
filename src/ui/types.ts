@@ -1,7 +1,7 @@
 import type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup } from '../server/types';
 export type { SessionSummary, SessionDetail, PlanSummary, PlanDetail, ModelOption, ModelGroup };
-import type { AttachmentItem } from '../types';
-import type { MentionSuggestionItem } from '../types';
+import type { AttachmentItem, MentionSuggestionItem } from '../types';
+export type { AttachmentItem, MentionSuggestionItem };
 import type { ClientPresence } from '../sync/types';
 import type { NetworkAddressInfo } from '../server/networkAddress';
 

@@ -41,25 +41,7 @@ export function selectMentionItem(state: AppState, item: MentionSuggestionItem, 
   onRender();
 }
 
-async function processFilesToAttachments(state: AppState, files: File[]): Promise<void> {
-  for (const file of files) {
-    const reader = new FileReader();
-    await new Promise<void>((resolve) => {
-      reader.onload = () => {
-        const isImg = file.type.startsWith('image/');
-        state.attachments = [...(state.attachments || []), {
-          id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          type: isImg ? 'image' : 'file',
-          label: file.name || (isImg ? 'pasted-image.png' : 'pasted-file'),
-          content: typeof reader.result === 'string' ? reader.result : '',
-        }];
-        resolve();
-      };
-      if (file.type.startsWith('image/')) reader.readAsDataURL(file);
-      else reader.readAsText(file);
-    });
-  }
-}
+import { handleFileDropOrPaste, extractFilesFromEvent } from './dropPasteHandler';
 
 export function setupMentionInput(state: AppState, onRender: () => void): void {
   const composer = document.getElementById('composer-input') as HTMLTextAreaElement | null;
@@ -82,9 +64,8 @@ export function setupMentionInput(state: AppState, onRender: () => void): void {
 
   composer.addEventListener('input', () => { state.composerDraft = composer.value; updateComposerButton(state); void checkMentionQuery(); });
   composer.addEventListener('paste', async (e: ClipboardEvent) => {
-    const items = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === 'file');
-    const files = items.map((it) => it.getAsFile()).filter((f): f is File => Boolean(f));
-    if (files.length > 0) { await processFilesToAttachments(state, files); onRender(); }
+    const files = extractFilesFromEvent(e);
+    if (files.length > 0) { await handleFileDropOrPaste(state, files, onRender); }
   });
   composer.addEventListener('keydown', (e) => {
     if (!state.isMentionOpen || !state.mentionSuggestions?.length) return;
@@ -114,8 +95,9 @@ export function bindMentionActions(state: AppState, onRender: () => void): void 
   if (fileInput && !fileInput.dataset.bound) {
     fileInput.dataset.bound = 'true';
     fileInput.addEventListener('change', async () => {
-      await processFilesToAttachments(state, Array.from(fileInput.files || []));
-      fileInput.value = ''; state.isMentionOpen = false; onRender();
+      const files = Array.from(fileInput.files || []);
+      if (files.length > 0) await handleFileDropOrPaste(state, files, onRender);
+      fileInput.value = ''; state.isMentionOpen = false;
     });
   }
 }

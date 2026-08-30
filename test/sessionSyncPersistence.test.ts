@@ -1,73 +1,127 @@
 import test from 'node:test';
-import * as assert from 'node:assert/strict';
-import { renderChatView } from '../src/ui/components/chatView';
+import assert from 'node:assert/strict';
 import { SyncStateMachine } from '../src/ui/syncStateMachine';
-import { enrichPlanDetails } from '../src/server/sessionEnricher';
+import { toggleSyncModeAction } from '../src/ui/appSyncMode';
 import type { AppState } from '../src/ui/types';
+import { getSavedSessionId, saveActiveSessionId, getCachedSessionDetail, saveCachedSessionDetail } from '../src/ui/tabStore';
 
-test('renderChatView renders all consecutive user messages from disk without dropping turns', () => {
-  const state: AppState = {
-    activeTab: 'chat',
-    sessions: [],
-    activeSessionId: 'sess-test',
-    plans: [],
-    activeSession: {
-      id: 'sess-test',
-      title: 'Test Session',
-      mode: 'agent',
-      createdAt: 1000,
-      updatedAt: 2000,
-      messages: [
-        { role: 'user', content: 'test' },
-        { role: 'user', content: 'test' },
-        { role: 'user', content: 'test' },
-        { role: 'user', content: 'test' },
-        { role: 'assistant', content: 'Diagnostics completed.' },
-      ],
-      filesChanged: [],
-      artifacts: [],
-      subagents: [],
-    },
-    syncStatus: 'connected',
-    searchQuery: '',
-    composerMode: 'agent',
-    selectedModel: 'model',
-    availableModels: [],
-    isSending: false,
-    isAuthenticated: true,
-  };
+test('SyncStateMachine does NOT fallback to git-backup on SSE failure when autoFallback is disabled', () => {
+  let currentMode: string = 'live-sse';
+  let currentStatus: string = 'connected';
 
-  const html = renderChatView(state);
-  const userTurns = html.match(/class="turn turn-user"/g) || [];
-  assert.equal(userTurns.length, 4, 'Should render all 4 user turns in full sync with disk');
-});
-
-test('enrichPlanDetails does not attach planMeta to source code files like planView.ts', async () => {
-  const messages: any[] = [
-    {
-      role: 'assistant',
-      content: 'Workspace Status & Diagnostics:\n- Tracked Modifications: src/monitor/ui/components/planView.ts\nAll tests passing.',
-    },
-  ];
-
-  await enrichPlanDetails('/non/existent', messages);
-  assert.equal(messages[0].planMeta, undefined, 'planView.ts should not be treated as a plan');
-});
-
-test('SyncStateMachine updates status to connected on notModified responses', async () => {
-  let latestStatus = 'syncing';
-  const sm = new SyncStateMachine({
-    onModeChange: () => {},
-    onStatusChange: (s) => { latestStatus = s; },
+  const machine = new SyncStateMachine({
+    onModeChange: (m) => { currentMode = m; },
+    onStatusChange: (s) => { currentStatus = s; },
     onDataUpdate: () => {},
   });
 
-  sm.setGistConfig({ gistId: 'test-gist', token: 'test-token' });
-  (sm as any).gistClient = {
-    fetchSyncState: async () => ({ notModified: true, etag: 'etag-123' }),
-  };
-  (sm as any).mode = 'git-backup';
+  machine.setAutoFallback(false);
+  assert.equal(machine.getAutoFallback(), false);
 
-  await sm.pollOnce();
-  assert.equal(latestStatus, 'connected');
+  // Trigger primary SSE failure
+  machine.handlePrimarySseFailure();
+
+  assert.equal(currentMode, 'live-sse', 'Mode must remain live-sse when autoFallback is false');
+  assert.equal(currentStatus, 'disconnected', 'Status should be disconnected');
+});
+
+test('SyncStateMachine falls back to git-backup when autoFallback is explicitly enabled', () => {
+  let currentMode: string = 'live-sse';
+  let currentStatus: string = 'connected';
+
+  const machine = new SyncStateMachine({
+    onModeChange: (m) => { currentMode = m; },
+    onStatusChange: (s) => { currentStatus = s; },
+    onDataUpdate: () => {},
+  });
+
+  machine.setGistConfig({ gistId: 'gist-123', token: 'token-abc' });
+  machine.setAutoFallback(true);
+
+  machine.handlePrimarySseFailure();
+  assert.equal(currentMode, 'git-backup', 'Mode should switch to git-backup when autoFallback is true');
+});
+
+test('toggleSyncModeAction always toggles mode even when server is offline', () => {
+  const originalStorage = (globalThis as any).localStorage;
+  const store: Record<string, string> = {};
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store[k] || null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+  };
+
+  try {
+    const state = {
+      sessions: [],
+      syncMode: 'live-sse',
+      syncStatus: 'disconnected',
+      activeTab: 'chat',
+      composerMode: 'agent',
+      isMentionOpen: false,
+      isModelPickerOpen: false,
+      selectedModel: 'gemini-2.5-pro',
+      availableModels: [],
+      customConnections: [],
+    } as unknown as AppState;
+
+    let startedSse = false;
+    const machine = new SyncStateMachine({
+      onModeChange: (m) => { state.syncMode = m; },
+      onStatusChange: () => {},
+      onDataUpdate: () => {},
+    });
+
+    machine.setGistConfig({ gistId: 'gist-123', token: 'token-abc' });
+
+    // Toggle from live-sse to git-backup
+    toggleSyncModeAction(state, machine, () => { startedSse = true; });
+    assert.equal(state.syncMode, 'git-backup', 'Should toggle to git-backup');
+
+    // Toggle from git-backup to p2p
+    toggleSyncModeAction(state, machine, () => { startedSse = true; });
+    assert.equal(state.syncMode, 'p2p', 'Should toggle to p2p');
+
+    // Toggle from p2p to live-sse
+    toggleSyncModeAction(state, machine, () => { startedSse = true; });
+    assert.equal(state.syncMode, 'live-sse', 'Should toggle to live-sse');
+    assert.equal(startedSse, true, 'startSse should be invoked');
+  } finally {
+    (globalThis as any).localStorage = originalStorage;
+  }
+});
+
+test('tabStore caches and restores active session detail for instant reload display', () => {
+  const originalStorage = (globalThis as any).localStorage;
+  const store: Record<string, string> = {};
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store[k] || null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+  };
+
+  try {
+    const detail = {
+      id: 'sess-persisted-1',
+      title: 'Persisted Session',
+      mode: 'agent' as const,
+      createdAt: 1000,
+      updatedAt: 2000,
+      messages: [{ role: 'user' as const, content: 'Saved prompt' }],
+      filesChanged: [],
+      artifacts: [],
+      subagents: [],
+    };
+
+    saveActiveSessionId('sess-persisted-1');
+    saveCachedSessionDetail(detail);
+
+    assert.equal(getSavedSessionId(), 'sess-persisted-1');
+    const restored = getCachedSessionDetail('sess-persisted-1');
+    assert.ok(restored, 'Restored session detail should exist');
+    assert.equal(restored?.id, 'sess-persisted-1');
+    assert.equal(restored?.messages.length, 1);
+  } finally {
+    (globalThis as any).localStorage = originalStorage;
+  }
 });

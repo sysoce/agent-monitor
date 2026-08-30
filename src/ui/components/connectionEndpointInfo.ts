@@ -11,9 +11,9 @@ export interface ConnectionEndpointInfo {
 
 export function detectIsTailscale(hostOrIp: string): boolean {
   if (!hostOrIp) return false;
-  const clean = hostOrIp.toLowerCase().trim();
+  const clean = hostOrIp.toLowerCase().trim().replace(/^https?:\/\//, '');
   if (clean.startsWith('100.')) return true;
-  if (clean.includes('tailscale') || clean.endsWith('.ts.net')) return true;
+  if (clean.includes('tailscale') || clean.endsWith('.ts.net') || clean.includes('.ts.net:') || clean.includes('.ts.net/')) return true;
   return false;
 }
 
@@ -74,4 +74,9 @@ export function getConnectionEndpointInfo(state: AppState): ConnectionEndpointIn
     fullUrl,
     displayText,
   };
+}
+
+export function formatConnectionEndpoint(hostOrIp: string): string {
+  const isTs = detectIsTailscale(hostOrIp);
+  return `${hostOrIp} (${isTs ? 'Tailscale' : 'LAN'})`;
 }

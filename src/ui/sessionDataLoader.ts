@@ -3,7 +3,7 @@ import { fetchSessions, fetchSessionDetail, fetchModels } from './apiClient';
 import { hasLiveServer } from './authStore';
 import { mergeSessionDetail } from './sessionMerge';
 import { syncSessionPlans } from './sessionPlanSync';
-import { getSavedTab, getSavedSessionId } from './tabStore';
+import { getSavedTab, getSavedSessionId, saveActiveSessionId, getCachedSessionDetail, saveCachedSessionDetail } from './tabStore';
 import { sortSessions } from './sessionSorting';
 
 export async function reloadSessionData(state: AppState, isInitial: boolean, onDone: () => void): Promise<void> {
@@ -11,7 +11,14 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
     if (isInitial) {
       const tab = getSavedTab(), sid = getSavedSessionId();
       if (tab) state.activeTab = tab;
-      if (sid) state.activeSessionId = sid;
+      if (sid) {
+        state.activeSessionId = sid;
+        const cached = getCachedSessionDetail(sid);
+        if (cached) {
+          state.activeSession = cached;
+          state.isLoadingSession = false;
+        }
+      }
     }
 
     if (state.syncMode === 'git-backup' || !hasLiveServer()) {
@@ -79,7 +86,11 @@ export async function reloadSessionData(state: AppState, isInitial: boolean, onD
       if (!state.activeSession || (state.activeSession.messages && state.activeSession.messages.length === 0)) state.isLoadingSession = true;
       const d = await fetchSessionDetail(state.activeSessionId).catch(() => undefined);
       state.isLoadingSession = false;
-      if (d) state.activeSession = mergeSessionDetail(state.activeSession, d, undefined, state.lastAbortedAt);
+      if (d) {
+        state.activeSession = mergeSessionDetail(state.activeSession, d, undefined, state.lastAbortedAt);
+        saveCachedSessionDetail(state.activeSession);
+        saveActiveSessionId(state.activeSession.id);
+      }
       if (state.activeSession && !state.activeSession.isGenerating && !state.isSending) {
         Object.assign(state, { isAwaitingResponse: false, awaitingSessionId: undefined });
       }

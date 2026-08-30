@@ -2,34 +2,47 @@ import type { AppState } from './types';
 import type { SessionDetail } from '../server/types';
 import type { ChatMessage } from '../types';
 import type { SyncInboxMessage } from '../sync/types';
+import { applyAbortSuppression } from './sessionAbortSuppression';
 
-export function appendOptimisticUserMessage(state: AppState, text: string): void {
+export function appendOptimisticUserMessage(state: AppState, text: string, attachments?: any[]): void {
   const sid = state.activeSessionId || `sess-${Date.now()}`;
   state.activeSessionId = sid;
+  const now = Date.now();
+  const atts = attachments || (state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined);
   if (!state.activeSession) {
     state.activeSession = {
       id: sid,
-      title: text.slice(0, 30) || (state.attachments?.[0]?.label || 'Session'),
+      title: text.slice(0, 30) || (atts?.[0]?.label || 'Session'),
       mode: state.composerMode,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       messages: [],
       filesChanged: [],
       artifacts: [],
       subagents: [],
     };
+  } else {
+    state.activeSession.updatedAt = now;
   }
 
   const userMsg: ChatMessage = {
-    role: 'user',
-    content: text,
-    timestamp: Date.now(),
-    model: state.selectedModel,
-    mode: state.composerMode,
-    attachments: state.attachments && state.attachments.length > 0 ? [...state.attachments] : undefined,
+    role: 'user', content: text, timestamp: now,
+    model: state.selectedModel, mode: state.composerMode, attachments: atts,
   } as any;
-
   state.activeSession.messages.push(userMsg);
+
+  const sSummary = state.sessions.find((s) => s.id === sid);
+  if (sSummary) {
+    sSummary.updatedAt = now;
+    sSummary.messageCount = (sSummary.messageCount || 0) + 1;
+  } else {
+    state.sessions.unshift({
+      id: sid, title: state.activeSession.title, updatedAt: now,
+      createdAt: state.activeSession.createdAt || now,
+      messageCount: state.activeSession.messages.length,
+      isGenerating: state.activeSession.isGenerating,
+    });
+  }
 }
 
 export function mergeSessionDetail(
@@ -114,13 +127,10 @@ export function mergeSessionDetail(
     const lastMsg = mergedMessages[mergedMessages.length - 1];
     const isTrailingDraft = lastMsg?.role === 'assistant' && (
       Boolean((lastMsg as any).isLive) ||
-      (!lastMsg.content?.trim() && !(lastMsg as any).tool_calls?.length && !(lastMsg as any).thought?.trim() && !(lastMsg as any).thinking?.trim())
+      (!lastMsg.content?.trim() && !(lastMsg as any).tool_calls?.length && !(lastMsg as any).thought?.trim())
     );
-    if (isTrailingDraft) {
-      mergedMessages.splice(mergedMessages.length - 1, 0, ...allPending);
-    } else {
-      mergedMessages.push(...allPending);
-    }
+    if (isTrailingDraft) mergedMessages.splice(mergedMessages.length - 1, 0, ...allPending);
+    else mergedMessages.push(...allPending);
   }
 
   return applyAbortSuppression({
@@ -129,16 +139,3 @@ export function mergeSessionDetail(
     messages: mergedMessages,
   }, lastAbortedAt);
 }
-
-function applyAbortSuppression(detail: SessionDetail, lastAbortedAt?: number): SessionDetail {
-  if (!lastAbortedAt || lastAbortedAt <= 0) return detail;
-  const msgs = detail.messages || [];
-  const hasUserMsgAfterAbort = msgs.some((m) => m.role === 'user' && ((m as { timestamp?: number }).timestamp || 0) > lastAbortedAt);
-  if (hasUserMsgAfterAbort) return detail;
-  return {
-    ...detail,
-    isGenerating: false,
-    messages: msgs.map((m) => ((m as { isLive?: boolean }).isLive ? { ...m, isLive: false } : m)),
-  };
-}
-

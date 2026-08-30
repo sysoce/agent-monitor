@@ -21,7 +21,7 @@ export async function handleAttachmentRoute(
   url: URL,
   workspaceRoot: string
 ): Promise<boolean> {
-  if (url.pathname !== '/api/attachments' || req.method !== 'GET') {
+  if ((url.pathname !== '/api/attachments' && url.pathname !== '/api/files') || req.method !== 'GET') {
     return false;
   }
 

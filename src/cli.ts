@@ -81,7 +81,12 @@ async function main() {
     return;
   }
 
-  startMonitorServer({ port, host, workspaceRoot: dir, tunnel, password, requireAuth });
+  const inst = startMonitorServer({ port, host, workspaceRoot: dir, tunnel, password, requireAuth });
+  const cleanup = () => {
+    void inst.close().then(() => process.exit(0));
+  };
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 }
 
 void main();

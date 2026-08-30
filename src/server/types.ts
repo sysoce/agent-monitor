@@ -40,7 +40,7 @@ export interface SessionSummary {
   updatedAt: number;
   createdAt: number;
   messageCount: number;
-  preview: string;
+  preview?: string;
   model?: string;
   mode?: string;
   plans?: Array<{ name: string; title: string; path: string }>;

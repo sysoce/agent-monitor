@@ -64,52 +64,7 @@ export async function submitUserMessage(
   }
 }
 
-export async function stopCurrentSession(state: AppState, syncMachine?: SyncStateMachine): Promise<void> {
-  state.lastAbortedAt = Date.now();
-  const sid = state.activeSessionId || state.awaitingSessionId || state.activeSession?.id || state.sessions.find((s) => s.isGenerating)?.id || 'default';
-  if (state.activeSession) {
-    state.activeSession.isGenerating = false;
-    state.activeSession.messages?.forEach((m: any) => { if (m.isLive) m.isLive = false; });
-    state.activeSession.messages = state.activeSession.messages?.filter((m: any) =>
-      !(m?.role === 'assistant' && !m?.content?.trim() && !m?.tool_calls?.length && !m?.thinking && !m?.thought)
-    ) || [];
-    state.activeSession.subagents?.forEach((s) => { if (s.status === 'running') s.status = 'failed'; });
-    state.activeSession.backgroundTasks?.forEach((t) => { if (t.status === 'running') t.status = 'failed'; });
-  }
-  state.sessions.forEach((s) => { if (s.id === sid || s.isGenerating) s.isGenerating = false; });
-  state.isSending = false;
-  state.isAwaitingResponse = false;
-  state.awaitingSessionId = undefined;
-  syncMachine?.setAwaitingResponse?.(false);
-
-  if (state.syncMode === 'git-backup' && syncMachine) {
-    try {
-      await syncMachine.pushInboxMessage({
-        id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        sessionId: sid,
-        content: '',
-        role: 'user',
-        action: 'abort' as any,
-        timestamp: Date.now(),
-      });
-      state.errorMessage = undefined;
-    } catch {
-      state.errorMessage = 'Failed to stop agent: could not send abort message to git sync inbox.';
-    }
-  } else {
-    try {
-      const ok = await stopSession(sid);
-      if (ok) {
-        state.errorMessage = undefined;
-      } else {
-        state.errorMessage = 'Failed to stop agent: stop signal was not received by the server.';
-      }
-    } catch {
-      state.errorMessage = 'Failed to stop agent: could not reach server.';
-    }
-  }
-}
-
+export { stopCurrentSession } from './sessionStopper';
 export { buildPlanHandoffPrompt } from './planPrompt';
 
 export async function submitMessageFlow(
@@ -143,6 +98,26 @@ export async function submitMessageFlow(
   } finally {
     state.isSending = false;
     onRender();
+  }
+}
+
+export async function sendMonitorMessage(opts: {
+  content: string;
+  sessionId?: string;
+  role?: string;
+  mode?: 'agent' | 'plan' | 'ask';
+  syncMachine?: SyncStateMachine;
+}): Promise<void> {
+  const dummyState: any = {
+    activeSessionId: opts.sessionId,
+    awaitingSessionId: opts.sessionId,
+    selectedModel: 'gemini-3.7-flash',
+    composerMode: opts.mode || 'agent',
+    syncMode: opts.syncMachine?.getMode() || 'live-sse',
+    sessions: [],
+  };
+  if (opts.syncMachine) {
+    await submitUserMessage(dummyState, opts.syncMachine, opts.content);
   }
 }
 

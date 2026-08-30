@@ -57,8 +57,21 @@ export function renderAssistantTurn(msg: ChatMessage, isBuildMode = false): stri
 
 export function renderUserTurn(msg: ChatMessage): string {
   const text = extractText(msg);
-  const atts = (msg as { attachments?: AttachmentItem[] }).attachments || [];
-  const attsHtml = atts.length > 0 ? `<div class="msg-attachments">${atts.map((a) => renderAttachmentPill(a, false)).join('')}</div>` : '';
+  const rawAtts: AttachmentItem[] = [...((msg as { attachments?: AttachmentItem[] }).attachments || [])];
+  const rawImages = (msg as { images?: Array<{ path?: string; label?: string; uri?: string; content?: string }> }).images || [];
+  for (const img of rawImages) {
+    if (!rawAtts.some((a) => (img.path && a.path === img.path) || (img.label && a.label === img.label))) {
+      rawAtts.push({
+        id: `img-${Math.random().toString(36).slice(2, 7)}`,
+        type: 'image',
+        label: img.label || img.path?.split('/').pop() || 'image',
+        path: img.path,
+        uri: img.uri,
+        content: img.content,
+      });
+    }
+  }
+  const attsHtml = rawAtts.length > 0 ? `<div class="msg-attachments">${rawAtts.map((a) => renderAttachmentPill(a, false)).join('')}</div>` : '';
   const timestamp = (msg as { timestamp?: string | number | Date }).timestamp ?? (msg as { time?: string | number | Date }).time;
   const copyHtml = renderMessageCopyActionsHtml({ user: true, copyText: text, time: timestamp });
   return `<div class="turn turn-user"><div class="msg user">${attsHtml}<div class="msg-user-text">${escapeHtml(text)}</div></div>${copyHtml}</div>`;

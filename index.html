@@ -7989,32 +7989,65 @@ input:checked + .slider:before {
     return false;
   }
 
+  // src/ui/sessionAbortSuppression.ts
+  function applyAbortSuppression(detail, lastAbortedAt) {
+    if (!lastAbortedAt || lastAbortedAt <= 0) return detail;
+    const msgs = detail.messages || [];
+    const hasUserMsgAfterAbort = msgs.some(
+      (m) => m.role === "user" && (m.timestamp || 0) > lastAbortedAt
+    );
+    if (hasUserMsgAfterAbort) return detail;
+    return {
+      ...detail,
+      isGenerating: false,
+      messages: msgs.map((m) => m.isLive ? { ...m, isLive: false } : m)
+    };
+  }
+
   // src/ui/sessionMerge.ts
-  function appendOptimisticUserMessage(state2, text) {
+  function appendOptimisticUserMessage(state2, text, attachments) {
     const sid = state2.activeSessionId || `sess-${Date.now()}`;
     state2.activeSessionId = sid;
+    const now = Date.now();
+    const atts = attachments || (state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0);
     if (!state2.activeSession) {
       state2.activeSession = {
         id: sid,
-        title: text.slice(0, 30) || (state2.attachments?.[0]?.label || "Session"),
+        title: text.slice(0, 30) || (atts?.[0]?.label || "Session"),
         mode: state2.composerMode,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
         messages: [],
         filesChanged: [],
         artifacts: [],
         subagents: []
       };
+    } else {
+      state2.activeSession.updatedAt = now;
     }
     const userMsg = {
       role: "user",
       content: text,
-      timestamp: Date.now(),
+      timestamp: now,
       model: state2.selectedModel,
       mode: state2.composerMode,
-      attachments: state2.attachments && state2.attachments.length > 0 ? [...state2.attachments] : void 0
+      attachments: atts
     };
     state2.activeSession.messages.push(userMsg);
+    const sSummary = state2.sessions.find((s) => s.id === sid);
+    if (sSummary) {
+      sSummary.updatedAt = now;
+      sSummary.messageCount = (sSummary.messageCount || 0) + 1;
+    } else {
+      state2.sessions.unshift({
+        id: sid,
+        title: state2.activeSession.title,
+        updatedAt: now,
+        createdAt: state2.activeSession.createdAt || now,
+        messageCount: state2.activeSession.messages.length,
+        isGenerating: state2.activeSession.isGenerating
+      });
+    }
   }
   function mergeSessionDetail(existing, incoming, inbox, lastAbortedAt) {
     const incomingUserTexts = /* @__PURE__ */ new Set();
@@ -8070,12 +8103,9 @@ input:checked + .slider:before {
     }
     if (allPending.length > 0) {
       const lastMsg = mergedMessages[mergedMessages.length - 1];
-      const isTrailingDraft = lastMsg?.role === "assistant" && (Boolean(lastMsg.isLive) || !lastMsg.content?.trim() && !lastMsg.tool_calls?.length && !lastMsg.thought?.trim() && !lastMsg.thinking?.trim());
-      if (isTrailingDraft) {
-        mergedMessages.splice(mergedMessages.length - 1, 0, ...allPending);
-      } else {
-        mergedMessages.push(...allPending);
-      }
+      const isTrailingDraft = lastMsg?.role === "assistant" && (Boolean(lastMsg.isLive) || !lastMsg.content?.trim() && !lastMsg.tool_calls?.length && !lastMsg.thought?.trim());
+      if (isTrailingDraft) mergedMessages.splice(mergedMessages.length - 1, 0, ...allPending);
+      else mergedMessages.push(...allPending);
     }
     return applyAbortSuppression({
       ...incoming,
@@ -8083,20 +8113,9 @@ input:checked + .slider:before {
       messages: mergedMessages
     }, lastAbortedAt);
   }
-  function applyAbortSuppression(detail, lastAbortedAt) {
-    if (!lastAbortedAt || lastAbortedAt <= 0) return detail;
-    const msgs = detail.messages || [];
-    const hasUserMsgAfterAbort = msgs.some((m) => m.role === "user" && (m.timestamp || 0) > lastAbortedAt);
-    if (hasUserMsgAfterAbort) return detail;
-    return {
-      ...detail,
-      isGenerating: false,
-      messages: msgs.map((m) => m.isLive ? { ...m, isLive: false } : m)
-    };
-  }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.31" : "1.0.29";
+  var CLIENT_VERSION = true ? "1.0.32" : "1.0.32";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8416,6 +8435,60 @@ input:checked + .slider:before {
     };
   }
 
+  // src/ui/sessionStopper.ts
+  async function stopCurrentSession(state2, syncMachine) {
+    state2.lastAbortedAt = Date.now();
+    const sid = state2.activeSessionId || state2.awaitingSessionId || state2.activeSession?.id || state2.sessions.find((s) => s.isGenerating)?.id || "default";
+    if (state2.activeSession) {
+      state2.activeSession.isGenerating = false;
+      state2.activeSession.messages?.forEach((m) => {
+        if (m.isLive) m.isLive = false;
+      });
+      state2.activeSession.messages = state2.activeSession.messages?.filter(
+        (m) => !(m?.role === "assistant" && !m?.content?.trim() && !m?.tool_calls?.length && !m?.thinking && !m?.thought)
+      ) || [];
+      state2.activeSession.subagents?.forEach((s) => {
+        if (s.status === "running") s.status = "failed";
+      });
+      state2.activeSession.backgroundTasks?.forEach((t) => {
+        if (t.status === "running") t.status = "failed";
+      });
+    }
+    state2.sessions.forEach((s) => {
+      if (s.id === sid || s.isGenerating) s.isGenerating = false;
+    });
+    state2.isSending = false;
+    state2.isAwaitingResponse = false;
+    state2.awaitingSessionId = void 0;
+    syncMachine?.setAwaitingResponse?.(false);
+    if (state2.syncMode === "git-backup" && syncMachine) {
+      try {
+        await syncMachine.pushInboxMessage({
+          id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          sessionId: sid,
+          content: "",
+          role: "user",
+          action: "abort",
+          timestamp: Date.now()
+        });
+        state2.errorMessage = void 0;
+      } catch {
+        state2.errorMessage = "Failed to stop agent: could not send abort message to git sync inbox.";
+      }
+    } else {
+      try {
+        const ok = await stopSession(sid);
+        if (ok) {
+          state2.errorMessage = void 0;
+        } else {
+          state2.errorMessage = "Failed to stop agent: stop signal was not received by the server.";
+        }
+      } catch {
+        state2.errorMessage = "Failed to stop agent: could not reach server.";
+      }
+    }
+  }
+
   // src/ui/planPrompt.ts
   function buildPlanHandoffPrompt(planPath, planTitle) {
     const title = planTitle || planPath.split("/").pop() || "Plan";
@@ -8475,58 +8548,6 @@ input:checked + .slider:before {
         state2.composerMode,
         attachments
       );
-    }
-  }
-  async function stopCurrentSession(state2, syncMachine) {
-    state2.lastAbortedAt = Date.now();
-    const sid = state2.activeSessionId || state2.awaitingSessionId || state2.activeSession?.id || state2.sessions.find((s) => s.isGenerating)?.id || "default";
-    if (state2.activeSession) {
-      state2.activeSession.isGenerating = false;
-      state2.activeSession.messages?.forEach((m) => {
-        if (m.isLive) m.isLive = false;
-      });
-      state2.activeSession.messages = state2.activeSession.messages?.filter(
-        (m) => !(m?.role === "assistant" && !m?.content?.trim() && !m?.tool_calls?.length && !m?.thinking && !m?.thought)
-      ) || [];
-      state2.activeSession.subagents?.forEach((s) => {
-        if (s.status === "running") s.status = "failed";
-      });
-      state2.activeSession.backgroundTasks?.forEach((t) => {
-        if (t.status === "running") t.status = "failed";
-      });
-    }
-    state2.sessions.forEach((s) => {
-      if (s.id === sid || s.isGenerating) s.isGenerating = false;
-    });
-    state2.isSending = false;
-    state2.isAwaitingResponse = false;
-    state2.awaitingSessionId = void 0;
-    syncMachine?.setAwaitingResponse?.(false);
-    if (state2.syncMode === "git-backup" && syncMachine) {
-      try {
-        await syncMachine.pushInboxMessage({
-          id: `abort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          sessionId: sid,
-          content: "",
-          role: "user",
-          action: "abort",
-          timestamp: Date.now()
-        });
-        state2.errorMessage = void 0;
-      } catch {
-        state2.errorMessage = "Failed to stop agent: could not send abort message to git sync inbox.";
-      }
-    } else {
-      try {
-        const ok = await stopSession(sid);
-        if (ok) {
-          state2.errorMessage = void 0;
-        } else {
-          state2.errorMessage = "Failed to stop agent: stop signal was not received by the server.";
-        }
-      } catch {
-        state2.errorMessage = "Failed to stop agent: could not reach server.";
-      }
     }
   }
   async function submitMessageFlow(state2, syncMachine, text, onReload, onRender, options) {
@@ -9763,6 +9784,18 @@ input:checked + .slider:before {
       this.gistConfig = config;
       this.gistClient = config ? new GistClient(config) : void 0;
     }
+    setP2PTransport(coord) {
+      this.p2pCoord = coord;
+    }
+    setMode(mode) {
+      if (mode === "p2p") this.forceP2PMode();
+      else if (mode === "live-sse") this.forceLiveSseMode();
+      else if (mode === "git-backup") this.forceGitBackupMode();
+      else {
+        this.mode = mode;
+        this.callbacks.onModeChange(mode);
+      }
+    }
     forceP2PMode() {
       const ctx = this.getModeCtx();
       this.p2pCoord = switchP2PMode(ctx);
@@ -9798,13 +9831,7 @@ input:checked + .slider:before {
     }
     async pushInboxMessage(msg) {
       return dispatchInboxMessage(
-        {
-          p2pCoord: this.p2pCoord,
-          gistClient: this.gistClient,
-          mode: this.mode,
-          autoFallback: this.autoFallback,
-          pollOnce: () => this.pollController.pollOnce()
-        },
+        { p2pCoord: this.p2pCoord, gistClient: this.gistClient, mode: this.mode, autoFallback: this.autoFallback, pollOnce: () => this.pollController.pollOnce() },
         msg
       );
     }
@@ -9936,40 +9963,62 @@ input:checked + .slider:before {
   // src/ui/tabStore.ts
   var TAB_STORAGE_KEY = "agent_active_tab";
   var SESSION_STORAGE_KEY = "agent_active_session_id";
-  function getSavedTab() {
-    if (typeof localStorage === "undefined") return null;
-    try {
-      const val = localStorage.getItem(TAB_STORAGE_KEY);
-      if (val === "sidebar" || val === "chat" || val === "plans") {
-        return val;
+  var SESSION_CACHE_PREFIX = "agent_cached_session_";
+  var memoryStorage = {};
+  function getStorage() {
+    if (typeof localStorage !== "undefined") return localStorage;
+    return {
+      getItem: (k) => k in memoryStorage ? memoryStorage[k] : null,
+      setItem: (k, v) => {
+        memoryStorage[k] = v;
+      },
+      removeItem: (k) => {
+        delete memoryStorage[k];
       }
+    };
+  }
+  function getSavedTab() {
+    try {
+      const val = getStorage().getItem(TAB_STORAGE_KEY);
+      if (val === "sidebar" || val === "chat" || val === "plans") return val;
     } catch {
     }
     return null;
   }
   function saveActiveTab(tab) {
-    if (typeof localStorage === "undefined") return;
     try {
-      localStorage.setItem(TAB_STORAGE_KEY, tab);
+      getStorage().setItem(TAB_STORAGE_KEY, tab);
     } catch {
     }
   }
   function getSavedSessionId() {
-    if (typeof localStorage === "undefined") return null;
     try {
-      return localStorage.getItem(SESSION_STORAGE_KEY);
+      return getStorage().getItem(SESSION_STORAGE_KEY);
     } catch {
+      return null;
     }
-    return null;
   }
   function saveActiveSessionId(sessionId) {
-    if (typeof localStorage === "undefined") return;
     try {
-      if (sessionId) {
-        localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-      } else {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-      }
+      const s = getStorage();
+      if (sessionId) s.setItem(SESSION_STORAGE_KEY, sessionId);
+      else s.removeItem(SESSION_STORAGE_KEY);
+    } catch {
+    }
+  }
+  function getCachedSessionDetail(sessionId) {
+    if (!sessionId) return null;
+    try {
+      const raw = getStorage().getItem(`${SESSION_CACHE_PREFIX}${sessionId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+  function saveCachedSessionDetail(detail) {
+    if (!detail?.id) return;
+    try {
+      getStorage().setItem(`${SESSION_CACHE_PREFIX}${detail.id}`, JSON.stringify(detail));
     } catch {
     }
   }
@@ -10097,7 +10146,14 @@ input:checked + .slider:before {
       if (isInitial) {
         const tab = getSavedTab(), sid = getSavedSessionId();
         if (tab) state2.activeTab = tab;
-        if (sid) state2.activeSessionId = sid;
+        if (sid) {
+          state2.activeSessionId = sid;
+          const cached = getCachedSessionDetail(sid);
+          if (cached) {
+            state2.activeSession = cached;
+            state2.isLoadingSession = false;
+          }
+        }
       }
       if (state2.syncMode === "git-backup" || !hasLiveServer()) {
         if (!state2.activeSessionId && state2.sessions.length > 0) {
@@ -10163,7 +10219,11 @@ input:checked + .slider:before {
         if (!state2.activeSession || state2.activeSession.messages && state2.activeSession.messages.length === 0) state2.isLoadingSession = true;
         const d = await fetchSessionDetail(state2.activeSessionId).catch(() => void 0);
         state2.isLoadingSession = false;
-        if (d) state2.activeSession = mergeSessionDetail(state2.activeSession, d, void 0, state2.lastAbortedAt);
+        if (d) {
+          state2.activeSession = mergeSessionDetail(state2.activeSession, d, void 0, state2.lastAbortedAt);
+          saveCachedSessionDetail(state2.activeSession);
+          saveActiveSessionId(state2.activeSession.id);
+        }
         if (state2.activeSession && !state2.activeSession.isGenerating && !state2.isSending) {
           Object.assign(state2, { isAwaitingResponse: false, awaitingSessionId: void 0 });
         }
@@ -10274,11 +10334,11 @@ input:checked + .slider:before {
     }
     await submitMessageFlow(state2, syncMachine, text, () => reloadData(false), render2);
   }
-  async function handleSendNowQueuedMessage(state2, syncMachine, id, stopSession2, reloadData, render2) {
+  async function handleSendNowQueuedMessage(state2, syncMachine, id, stopSession3, reloadData, render2) {
     const msg = removeQueuedMessageById(state2, id);
     if (!msg) return;
     if (isAgentBusy(state2)) {
-      stopSession2();
+      stopSession3();
     }
     render2();
     await submitMessageFlow(state2, syncMachine, msg.text, () => reloadData(false), render2, {
@@ -12018,7 +12078,7 @@ ${items}
     const sorted = getSortedSessions(state2);
     const filtered = sorted.filter((s) => {
       if (!q) return true;
-      if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
+      if (s.title.toLowerCase().includes(q) || s.preview?.toLowerCase().includes(q)) return true;
       if (s.plans?.some((p) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
       if (s.artifacts?.some((a) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
       return false;
@@ -12036,7 +12096,7 @@ ${items}
     const sorted = getSortedSessions(state2);
     const filtered = sorted.filter((s) => {
       if (!q) return true;
-      if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
+      if (s.title.toLowerCase().includes(q) || s.preview?.toLowerCase().includes(q)) return true;
       if (s.plans?.some((p) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
       if (s.artifacts?.some((a) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
       return false;
@@ -12748,8 +12808,11 @@ ${thought.trim()}` : thought.trim();
       return formatImageDataUrl(att.content, att.label || att.path || att.uri || "");
     }
     const uri = att.uri || "";
-    if (uri.startsWith("data:") || uri.startsWith("http:") || uri.startsWith("https:") || uri.startsWith("blob:")) {
+    if (uri.startsWith("data:") || uri.startsWith("http:") || uri.startsWith("https:") || uri.startsWith("blob:") || uri.startsWith("/api/")) {
       return uri;
+    }
+    if (att.path) {
+      return `/api/files?path=${encodeURIComponent(att.path)}`;
     }
     return "";
   }
@@ -12901,8 +12964,21 @@ ${thought.trim()}` : thought.trim();
   }
   function renderUserTurn(msg) {
     const text = extractText(msg);
-    const atts = msg.attachments || [];
-    const attsHtml = atts.length > 0 ? `<div class="msg-attachments">${atts.map((a) => renderAttachmentPill(a, false)).join("")}</div>` : "";
+    const rawAtts = [...msg.attachments || []];
+    const rawImages = msg.images || [];
+    for (const img of rawImages) {
+      if (!rawAtts.some((a) => img.path && a.path === img.path || img.label && a.label === img.label)) {
+        rawAtts.push({
+          id: `img-${Math.random().toString(36).slice(2, 7)}`,
+          type: "image",
+          label: img.label || img.path?.split("/").pop() || "image",
+          path: img.path,
+          uri: img.uri,
+          content: img.content
+        });
+      }
+    }
+    const attsHtml = rawAtts.length > 0 ? `<div class="msg-attachments">${rawAtts.map((a) => renderAttachmentPill(a, false)).join("")}</div>` : "";
     const timestamp = msg.timestamp ?? msg.time;
     const copyHtml = renderMessageCopyActionsHtml({ user: true, copyText: text, time: timestamp });
     return `<div class="turn turn-user"><div class="msg user">${attsHtml}<div class="msg-user-text">${escapeHtml2(text)}</div></div>${copyHtml}</div>`;
@@ -13292,9 +13368,9 @@ ${thought.trim()}` : thought.trim();
   // src/ui/components/connectionEndpointInfo.ts
   function detectIsTailscale(hostOrIp) {
     if (!hostOrIp) return false;
-    const clean = hostOrIp.toLowerCase().trim();
+    const clean = hostOrIp.toLowerCase().trim().replace(/^https?:\/\//, "");
     if (clean.startsWith("100.")) return true;
-    if (clean.includes("tailscale") || clean.endsWith(".ts.net")) return true;
+    if (clean.includes("tailscale") || clean.endsWith(".ts.net") || clean.includes(".ts.net:") || clean.includes(".ts.net/")) return true;
     return false;
   }
   function extractHostFromUrl(rawUrl) {
@@ -13590,6 +13666,7 @@ ${thought.trim()}` : thought.trim();
   // src/ui/components/settingsModal/settingsAppSection.ts
   function renderSettingsAppSection(state2) {
     const autoUpdate = state2.autoUpdateEnabled ?? isAutoUpdateEnabled();
+    const downloadUrl = buildApiUrl("/download");
     return `
     <div class="settings-section settings-section--app" id="settings-section-app">
       <div class="settings-section-header">
@@ -13619,7 +13696,7 @@ ${thought.trim()}` : thought.trim();
             <span class="settings-row-title">Standalone Offline Bundle</span>
             <span class="settings-row-desc">Single-file HTML dashboard with full offline support</span>
           </div>
-          <a class="btn btn-secondary settings-btn-download" id="btn-download-app-bundle" href="/download" download="agent-monitor.html">
+          <a class="btn btn-secondary settings-btn-download" id="btn-download-app-bundle" href="${escapeHtml2(downloadUrl)}" download="agent-monitor.html">
             \u{1F4E5} Download HTML
           </a>
         </div>
@@ -15379,6 +15456,83 @@ ${thought.trim()}` : thought.trim();
     return false;
   }
 
+  // src/ui/dropPasteHandler.ts
+  async function defaultReadFileAsDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      if (typeof FileReader === "undefined") {
+        resolve("");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+  async function defaultReadFileAsText(blob) {
+    return new Promise((resolve, reject) => {
+      if (typeof FileReader === "undefined") {
+        resolve("");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(blob);
+    });
+  }
+  async function handleFileDropOrPaste(state2, files, onRender, readDataUrlFn = defaultReadFileAsDataUrl, readTextFn = defaultReadFileAsText) {
+    if (!files || files.length === 0) return;
+    const currentAtts = [...state2.attachments || []];
+    for (const file of files) {
+      const isImage = Boolean(file.type?.startsWith("image/"));
+      const label = file.name || (isImage ? `screenshot-${Date.now()}.png` : `file-${Date.now()}`);
+      let content = "";
+      try {
+        if (isImage) {
+          content = await readDataUrlFn(file);
+        } else {
+          content = await readTextFn(file);
+        }
+      } catch {
+        continue;
+      }
+      currentAtts.push({
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: isImage ? "image" : "file",
+        label,
+        content
+      });
+    }
+    state2.attachments = currentAtts;
+    onRender();
+  }
+  function extractFilesFromEvent(e) {
+    const files = [];
+    if ("dataTransfer" in e && e.dataTransfer?.files) {
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const f = e.dataTransfer.files.item(i);
+        if (f) files.push(f);
+      }
+    } else if ("clipboardData" in e && e.clipboardData) {
+      if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+        for (let i = 0; i < e.clipboardData.files.length; i++) {
+          const f = e.clipboardData.files.item(i);
+          if (f) files.push(f);
+        }
+      } else if (e.clipboardData.items) {
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+          const item = e.clipboardData.items[i];
+          if (item && item.kind === "file") {
+            const f = item.getAsFile();
+            if (f) files.push(f);
+          }
+        }
+      }
+    }
+    return files;
+  }
+
   // src/ui/mentionEvents.ts
   function updateMentionPopupDOM(state2, onRender) {
     const container = document.getElementById("mention-dropdown-container");
@@ -15420,25 +15574,6 @@ ${thought.trim()}` : thought.trim();
     state2.isMentionOpen = false;
     onRender();
   }
-  async function processFilesToAttachments(state2, files) {
-    for (const file of files) {
-      const reader = new FileReader();
-      await new Promise((resolve) => {
-        reader.onload = () => {
-          const isImg = file.type.startsWith("image/");
-          state2.attachments = [...state2.attachments || [], {
-            id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            type: isImg ? "image" : "file",
-            label: file.name || (isImg ? "pasted-image.png" : "pasted-file"),
-            content: typeof reader.result === "string" ? reader.result : ""
-          }];
-          resolve();
-        };
-        if (file.type.startsWith("image/")) reader.readAsDataURL(file);
-        else reader.readAsText(file);
-      });
-    }
-  }
   function setupMentionInput(state2, onRender) {
     const composer = document.getElementById("composer-input");
     if (!composer || composer.dataset.mentionBound) return;
@@ -15462,11 +15597,9 @@ ${thought.trim()}` : thought.trim();
       void checkMentionQuery();
     });
     composer.addEventListener("paste", async (e) => {
-      const items = Array.from(e.clipboardData?.items || []).filter((it) => it.kind === "file");
-      const files = items.map((it) => it.getAsFile()).filter((f) => Boolean(f));
+      const files = extractFilesFromEvent(e);
       if (files.length > 0) {
-        await processFilesToAttachments(state2, files);
-        onRender();
+        await handleFileDropOrPaste(state2, files, onRender);
       }
     });
     composer.addEventListener("keydown", (e) => {
@@ -15505,10 +15638,10 @@ ${thought.trim()}` : thought.trim();
     if (fileInput && !fileInput.dataset.bound) {
       fileInput.dataset.bound = "true";
       fileInput.addEventListener("change", async () => {
-        await processFilesToAttachments(state2, Array.from(fileInput.files || []));
+        const files = Array.from(fileInput.files || []);
+        if (files.length > 0) await handleFileDropOrPaste(state2, files, onRender);
         fileInput.value = "";
         state2.isMentionOpen = false;
-        onRender();
       });
     }
   }
@@ -15702,12 +15835,31 @@ ${thought.trim()}` : thought.trim();
       });
     }
   }
+  function bindGlobalDragAndDrop(state2, onRender) {
+    if (typeof document === "undefined" || document._dragDropBound) return;
+    document._dragDropBound = true;
+    document.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+    document.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      const files = extractFilesFromEvent(e);
+      if (files.length > 0) await handleFileDropOrPaste(state2, files, onRender);
+    });
+    document.addEventListener("paste", async (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl?.id === "composer-input" || activeEl?.tagName === "INPUT") return;
+      const files = extractFilesFromEvent(e);
+      if (files.length > 0) await handleFileDropOrPaste(state2, files, onRender);
+    });
+  }
   function bindAppEvents(state2, callbacks) {
     initRootDelegation(state2, callbacks);
     bindInputControls(state2, callbacks);
     bindModelPickerEvents(state2, callbacks);
     setupMentionInput(state2, callbacks.onRender);
     bindMentionActions(state2, callbacks.onRender);
+    bindGlobalDragAndDrop(state2, callbacks.onRender);
   }
 
   // src/ui/domFocusPreserver.ts

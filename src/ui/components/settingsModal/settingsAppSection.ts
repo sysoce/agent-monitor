@@ -3,8 +3,11 @@ import { CLIENT_VERSION } from '../../version';
 import { isAutoUpdateEnabled } from '../../updateManager';
 import { escapeHtml } from '../markdown';
 
+import { buildApiUrl } from '../../authStore';
+
 export function renderSettingsAppSection(state: AppState): string {
   const autoUpdate = state.autoUpdateEnabled ?? isAutoUpdateEnabled();
+  const downloadUrl = buildApiUrl('/download');
 
   return `
     <div class="settings-section settings-section--app" id="settings-section-app">
@@ -35,7 +38,7 @@ export function renderSettingsAppSection(state: AppState): string {
             <span class="settings-row-title">Standalone Offline Bundle</span>
             <span class="settings-row-desc">Single-file HTML dashboard with full offline support</span>
           </div>
-          <a class="btn btn-secondary settings-btn-download" id="btn-download-app-bundle" href="/download" download="agent-monitor.html">
+          <a class="btn btn-secondary settings-btn-download" id="btn-download-app-bundle" href="${escapeHtml(downloadUrl)}" download="agent-monitor.html">
             📥 Download HTML
           </a>
         </div>

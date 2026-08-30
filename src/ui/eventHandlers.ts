@@ -70,10 +70,31 @@ function bindInputControls(state: AppState, callbacks: EventHandlerCallbacks): v
   }
 }
 
+import { handleFileDropOrPaste, extractFilesFromEvent } from './dropPasteHandler';
+
+function bindGlobalDragAndDrop(state: AppState, onRender: () => void): void {
+  if (typeof document === 'undefined' || (document as any)._dragDropBound) return;
+  (document as any)._dragDropBound = true;
+
+  document.addEventListener('dragover', (e) => { e.preventDefault(); });
+  document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const files = extractFilesFromEvent(e);
+    if (files.length > 0) await handleFileDropOrPaste(state, files, onRender);
+  });
+  document.addEventListener('paste', async (e: ClipboardEvent) => {
+    const activeEl = document.activeElement;
+    if (activeEl?.id === 'composer-input' || activeEl?.tagName === 'INPUT') return;
+    const files = extractFilesFromEvent(e);
+    if (files.length > 0) await handleFileDropOrPaste(state, files, onRender);
+  });
+}
+
 export function bindAppEvents(state: AppState, callbacks: EventHandlerCallbacks): void {
   initRootDelegation(state, callbacks);
   bindInputControls(state, callbacks);
   bindModelPickerEvents(state, callbacks);
   setupMentionInput(state, callbacks.onRender);
   bindMentionActions(state, callbacks.onRender);
+  bindGlobalDragAndDrop(state, callbacks.onRender);
 }

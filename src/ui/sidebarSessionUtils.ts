@@ -77,7 +77,7 @@ export function renderSessionListHtml(state: AppState): string {
   const sorted = getSortedSessions(state);
   const filtered = sorted.filter((s) => {
     if (!q) return true;
-    if (s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)) return true;
+    if (s.title.toLowerCase().includes(q) || (s.preview?.toLowerCase().includes(q))) return true;
     if (s.plans?.some((p: { name?: string; title?: string }) => p.name?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q))) return true;
     if (s.artifacts?.some((a: { name?: string; path?: string }) => a.name?.toLowerCase().includes(q) || a.path?.toLowerCase().includes(q))) return true;
     return false;
