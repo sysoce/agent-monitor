@@ -8300,7 +8300,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.38" : "1.0.38";
+  var CLIENT_VERSION = true ? "1.0.39" : "1.0.39";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -8859,12 +8859,12 @@ input:checked + .slider:before {
     if (!plaintext) return plaintext;
     try {
       const zlib = getNodeZlib();
-      if (zlib && typeof zlib.deflateSync === "function") {
-        const buffer = zlib.deflateSync(Buffer.from(plaintext, "utf8"), { level: 6 });
+      if (zlib && typeof zlib.gzipSync === "function") {
+        const buffer = zlib.gzipSync(Buffer.from(plaintext, "utf8"), { level: 6 });
         return `${COMPRESSED_PREFIX}${buffer.toString("base64")}`;
       }
       if (typeof CompressionStream !== "undefined") {
-        const stream = new Blob([plaintext]).stream().pipeThrough(new CompressionStream("deflate"));
+        const stream = new Blob([plaintext]).stream().pipeThrough(new CompressionStream("gzip"));
         const buffer = await new Response(stream).arrayBuffer();
         const bytes = new Uint8Array(buffer);
         let binary = "";
@@ -8880,16 +8880,39 @@ input:checked + .slider:before {
     try {
       const base64Data = raw.slice(COMPRESSED_PREFIX.length);
       const zlib = getNodeZlib();
-      if (zlib && typeof zlib.inflateSync === "function") {
-        const buffer = zlib.inflateSync(Buffer.from(base64Data, "base64"));
-        return buffer.toString("utf8");
+      if (zlib) {
+        const buf = Buffer.from(base64Data, "base64");
+        if (typeof zlib.gunzipSync === "function") {
+          try {
+            return zlib.gunzipSync(buf).toString("utf8");
+          } catch {
+          }
+        }
+        if (typeof zlib.inflateSync === "function") {
+          try {
+            return zlib.inflateSync(buf).toString("utf8");
+          } catch {
+          }
+        }
+        if (typeof zlib.inflateRawSync === "function") {
+          try {
+            return zlib.inflateRawSync(buf).toString("utf8");
+          } catch {
+          }
+        }
       }
       if (typeof DecompressionStream !== "undefined") {
         const binary = atob(base64Data);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
-        return await new Response(stream).text();
+        const formats = ["gzip", "deflate", "deflate-raw"];
+        for (const fmt of formats) {
+          try {
+            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(fmt));
+            return await new Response(stream).text();
+          } catch {
+          }
+        }
       }
     } catch {
     }
@@ -10297,15 +10320,20 @@ input:checked + .slider:before {
       if (config.autoFallback !== void 0) {
         storage.setItem("agent_auto_fallback", String(config.autoFallback));
       }
+      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
       if (config.serverUrl) {
         storage.setItem("agent_server_url", config.serverUrl);
         setServerBaseUrl(config.serverUrl);
-        storage.setItem("agent_sync_mode", "live-sse");
+        if (!isHttps || !config.gistId) {
+          storage.setItem("agent_sync_mode", "live-sse");
+        }
       }
       if (config.gistId && config.token) {
         const gistSync = { gistId: config.gistId, token: config.token };
         storage.setItem("agent_gist_sync", JSON.stringify(gistSync));
-        if (!config.serverUrl) storage.setItem("agent_sync_mode", "git-backup");
+        if (isHttps || !config.serverUrl) {
+          storage.setItem("agent_sync_mode", "git-backup");
+        }
       }
       if (config.password) {
         storage.setItem("agent_monitor_token", config.password);

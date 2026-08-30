@@ -50,15 +50,20 @@ export function applyConfigToStorage(
     if (config.autoFallback !== undefined) {
       storage.setItem('agent_auto_fallback', String(config.autoFallback));
     }
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
     if (config.serverUrl) {
       storage.setItem('agent_server_url', config.serverUrl);
       setServerBaseUrl(config.serverUrl);
-      storage.setItem('agent_sync_mode', 'live-sse');
+      if (!isHttps || !config.gistId) {
+        storage.setItem('agent_sync_mode', 'live-sse');
+      }
     }
     if (config.gistId && config.token) {
       const gistSync = { gistId: config.gistId, token: config.token };
       storage.setItem('agent_gist_sync', JSON.stringify(gistSync));
-      if (!config.serverUrl) storage.setItem('agent_sync_mode', 'git-backup');
+      if (isHttps || !config.serverUrl) {
+        storage.setItem('agent_sync_mode', 'git-backup');
+      }
     }
     if (config.password) {
       storage.setItem('agent_monitor_token', config.password);
