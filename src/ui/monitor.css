@@ -3927,6 +3927,115 @@ input:checked + .slider:before {
   gap: 8px;
 }
 
+/* ---------------- Connection Switcher ---------------- */
+.network-connection-switcher {
+  background: #1c2333;
+  border: 1px solid #2e3c54;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.switcher-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.switcher-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.switcher-active-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.switcher-active-tag.tag-tailscale {
+  background: rgba(197, 134, 192, 0.2);
+  color: #c586c0;
+  border: 1px solid rgba(197, 134, 192, 0.4);
+}
+
+.switcher-active-tag.tag-lan {
+  background: rgba(78, 201, 176, 0.2);
+  color: #4ec9b0;
+  border: 1px solid rgba(78, 201, 176, 0.4);
+}
+
+.switcher-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.switcher-opt-btn {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: #252d3d;
+  border: 1px solid #3d4d68;
+  border-radius: 6px;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  justify-content: flex-start;
+}
+
+.switcher-opt-btn:hover {
+  background: #2f3a4e;
+  border-color: #58a6ff;
+  color: #ffffff;
+}
+
+.switcher-opt-btn.active {
+  background: rgba(56, 139, 253, 0.18);
+  border-color: #388bfd;
+  color: #ffffff;
+}
+
+.switcher-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.switcher-title {
+  font-weight: 600;
+}
+
+.switcher-badge {
+  font-size: 11px;
+  color: #8b949e;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.switcher-opt-btn.active .switcher-badge {
+  color: #c9d1d9;
+}
+
+.switcher-active-dot {
+  font-size: 10px;
+  font-weight: 700;
+  color: #4ec9b0;
+  margin-left: 4px;
+}
+
 .network-ip-item {
   background: #202024;
   border: 1px solid #303036;

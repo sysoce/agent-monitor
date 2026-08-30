@@ -7072,6 +7072,99 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 8px;
 }
+.network-connection-switcher {
+  background: #1c2333;
+  border: 1px solid #2e3c54;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.switcher-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.switcher-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.switcher-active-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.switcher-active-tag.tag-tailscale {
+  background: rgba(197, 134, 192, 0.2);
+  color: #c586c0;
+  border: 1px solid rgba(197, 134, 192, 0.4);
+}
+.switcher-active-tag.tag-lan {
+  background: rgba(78, 201, 176, 0.2);
+  color: #4ec9b0;
+  border: 1px solid rgba(78, 201, 176, 0.4);
+}
+.switcher-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.switcher-opt-btn {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: #252d3d;
+  border: 1px solid #3d4d68;
+  border-radius: 6px;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  justify-content: flex-start;
+}
+.switcher-opt-btn:hover {
+  background: #2f3a4e;
+  border-color: #58a6ff;
+  color: #ffffff;
+}
+.switcher-opt-btn.active {
+  background: rgba(56, 139, 253, 0.18);
+  border-color: #388bfd;
+  color: #ffffff;
+}
+.switcher-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.switcher-title {
+  font-weight: 600;
+}
+.switcher-badge {
+  font-size: 11px;
+  color: #8b949e;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+.switcher-opt-btn.active .switcher-badge {
+  color: #c9d1d9;
+}
+.switcher-active-dot {
+  font-size: 10px;
+  font-weight: 700;
+  color: #4ec9b0;
+  margin-left: 4px;
+}
 .network-ip-item {
   background: #202024;
   border: 1px solid #303036;
@@ -7486,30 +7579,38 @@ input:checked + .slider:before {
   // src/ui/authStore.ts
   var TOKEN_KEY = "agent_monitor_token";
   var SERVER_KEY = "agent_server_url";
+  var CUSTOM_IP_KEY = "agent_custom_server_ip";
+  var TAILSCALE_KEY = "agent_tailscale_url";
   function getStoredToken() {
     try {
-      const fromUrl = new URLSearchParams(window.location.search).get("token");
-      if (fromUrl) {
-        setStoredToken(fromUrl);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("token");
-        window.history.replaceState({}, "", url.toString());
-        return fromUrl;
+      if (typeof window !== "undefined" && window.location) {
+        const fromUrl = new URLSearchParams(window.location.search).get("token");
+        if (fromUrl) {
+          setStoredToken(fromUrl);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("token");
+          window.history.replaceState({}, "", url.toString());
+          return fromUrl;
+        }
       }
-      return localStorage.getItem(TOKEN_KEY);
+      return typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     } catch {
       return null;
     }
   }
   function setStoredToken(token) {
     try {
-      localStorage.setItem(TOKEN_KEY, token);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(TOKEN_KEY, token);
+      }
     } catch {
     }
   }
   function clearStoredToken() {
     try {
-      localStorage.removeItem(TOKEN_KEY);
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(TOKEN_KEY);
+      }
     } catch {
     }
   }
@@ -7524,13 +7625,15 @@ input:checked + .slider:before {
   }
   function getServerBaseUrl() {
     try {
-      const fromUrl = new URLSearchParams(window.location.search).get("server");
-      if (fromUrl) {
-        const clean = fromUrl.replace(/\/+$/, "");
-        setServerBaseUrl(clean);
-        return clean;
+      if (typeof window !== "undefined" && window.location) {
+        const fromUrl = new URLSearchParams(window.location.search).get("server");
+        if (fromUrl) {
+          const clean = fromUrl.replace(/\/+$/, "");
+          setServerBaseUrl(clean);
+          return clean;
+        }
       }
-      const stored = localStorage.getItem(SERVER_KEY);
+      const stored = typeof localStorage !== "undefined" ? localStorage.getItem(SERVER_KEY) : null;
       if (stored === "none") {
         return "";
       }
@@ -7554,18 +7657,46 @@ input:checked + .slider:before {
     }
     return true;
   }
-  function setServerBaseUrl(url) {
+  function getCleanStorage(key) {
     try {
-      const clean = url.trim().replace(/\/+$/, "");
-      localStorage.setItem(SERVER_KEY, clean || "none");
+      const val = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
+      if (val && val !== "none") return val.replace(/\/+$/, "");
+    } catch {
+    }
+    return "";
+  }
+  function setCleanStorage(key, val) {
+    try {
+      if (typeof localStorage !== "undefined") {
+        const clean = val.trim().replace(/\/+$/, "");
+        localStorage.setItem(key, clean || "none");
+      }
     } catch {
     }
   }
+  function setServerBaseUrl(url) {
+    setCleanStorage(SERVER_KEY, url);
+  }
   function clearServerBaseUrl() {
+    setCleanStorage(SERVER_KEY, "none");
+  }
+  function getCustomServerIp() {
+    return getCleanStorage(CUSTOM_IP_KEY);
+  }
+  function setCustomServerIp(url) {
+    setCleanStorage(CUSTOM_IP_KEY, url);
+  }
+  function clearCustomServerIp() {
     try {
-      localStorage.setItem(SERVER_KEY, "none");
+      if (typeof localStorage !== "undefined") localStorage.removeItem(CUSTOM_IP_KEY);
     } catch {
     }
+  }
+  function getTailscaleUrl() {
+    return getCleanStorage(TAILSCALE_KEY);
+  }
+  function setTailscaleUrl(url) {
+    setCleanStorage(TAILSCALE_KEY, url);
   }
   function buildApiUrl(pathname) {
     const base = getServerBaseUrl();
@@ -7888,7 +8019,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.29" : "1.0.29";
+  var CLIENT_VERSION = true ? "1.0.30" : "1.0.29";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -12976,6 +13107,66 @@ ${thought.trim()}` : thought.trim();
   `;
   }
 
+  // src/ui/components/connectionEndpointInfo.ts
+  function detectIsTailscale(hostOrIp) {
+    if (!hostOrIp) return false;
+    const clean = hostOrIp.toLowerCase().trim();
+    if (clean.startsWith("100.")) return true;
+    if (clean.includes("tailscale") || clean.endsWith(".ts.net")) return true;
+    return false;
+  }
+  function extractHostFromUrl(rawUrl) {
+    if (!rawUrl) return "";
+    try {
+      const parsed = new URL(rawUrl.startsWith("http") ? rawUrl : `http://${rawUrl}`);
+      return parsed.hostname;
+    } catch {
+      const match = rawUrl.match(/^(?:https?:\/\/)?([^:/#?]+)/i);
+      return match ? match[1] : rawUrl;
+    }
+  }
+  function getConnectionEndpointInfo(state2) {
+    let host = "";
+    let fullUrl = "";
+    if (state2.selectedLanIp) {
+      fullUrl = state2.selectedLanIp;
+      host = extractHostFromUrl(state2.selectedLanIp);
+    } else {
+      const serverBase = getServerBaseUrl();
+      if (serverBase) {
+        fullUrl = serverBase;
+        host = extractHostFromUrl(serverBase);
+      } else if (state2.serverSetupInfo?.lanUrl) {
+        fullUrl = state2.serverSetupInfo.lanUrl;
+        host = extractHostFromUrl(state2.serverSetupInfo.lanUrl);
+      } else if (typeof window !== "undefined" && !isStaticDeployment() && window.location.hostname) {
+        host = window.location.hostname;
+        fullUrl = window.location.origin;
+      }
+    }
+    if (!host && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) {
+      const firstNet = state2.serverSetupInfo.networks[0];
+      host = firstNet.address;
+      fullUrl = firstNet.url;
+    }
+    if (!host) {
+      return { ip: "", connectionType: "", isTailscale: false, displayText: "" };
+    }
+    const matchingNet = state2.serverSetupInfo?.networks?.find(
+      (n) => n.address === host || extractHostFromUrl(n.url) === host
+    );
+    const isTailscale = matchingNet?.isTailscale ?? detectIsTailscale(host);
+    const connectionType = isTailscale ? "Tailscale" : "LAN";
+    const displayText = `${host} (${connectionType})`;
+    return {
+      ip: host,
+      connectionType,
+      isTailscale,
+      fullUrl,
+      displayText
+    };
+  }
+
   // src/ui/components/settingsModal/settingsNetworkSection.ts
   function renderSettingsNetworkSection(state2) {
     const networks = state2.serverSetupInfo?.networks || [];
@@ -12983,6 +13174,11 @@ ${thought.trim()}` : thought.trim();
     const copyFeedback = state2.settingsCopyFeedback || "";
     const currentBaseUrl = getServerBaseUrl() || state2.selectedLanIp || "";
     const isServerSaved = copyFeedback === "server-saved";
+    const customIp = state2.customServerIp || getCustomServerIp() || (!detectIsTailscale(currentBaseUrl) ? currentBaseUrl : "");
+    const tailscaleUrl = state2.tailscaleUrl || getTailscaleUrl() || networks.find((n) => n.isTailscale)?.url || (detectIsTailscale(currentBaseUrl) ? currentBaseUrl : "");
+    const isTailscaleActive = Boolean(currentBaseUrl && (currentBaseUrl === tailscaleUrl || detectIsTailscale(currentBaseUrl)));
+    const isSetIpActive = Boolean(currentBaseUrl && customIp && currentBaseUrl === customIp && !isTailscaleActive);
+    const hasSwitcher = Boolean(customIp || tailscaleUrl);
     const renderedList = networks.length > 0 ? networks.map((net) => {
       const fullSetupUrl = `${net.url}/#setup=${payload}`;
       const isSelected = currentBaseUrl === net.url || !currentBaseUrl && net.url === state2.serverSetupInfo?.lanUrl?.split("/#")[0];
@@ -13028,6 +13224,42 @@ ${thought.trim()}` : thought.trim();
           <p class="network-ip-hint">Local connection URL: <code>${escapeHtml2(currentBaseUrl || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4200"))}</code></p>
         </div>
       `;
+    const switcherHtml = hasSwitcher ? `
+        <div class="network-connection-switcher">
+          <div class="switcher-header-row">
+            <span class="switcher-label">Quick Switch Connection:</span>
+            ${isTailscaleActive ? '<span class="switcher-active-tag tag-tailscale">\u{1F512} Tailscale Active</span>' : isSetIpActive ? '<span class="switcher-active-tag tag-lan">\u{1F3E0} Set IP Active</span>' : ""}
+          </div>
+          <div class="switcher-options">
+            ${customIp ? `
+              <button
+                type="button"
+                class="btn switcher-opt-btn ${isSetIpActive ? "active" : ""}"
+                id="btn-switch-set-ip"
+                title="Switch active connection to Set IP (${escapeHtml2(customIp)})"
+              >
+                <span class="switcher-icon">\u{1F3E0}</span>
+                <span class="switcher-title">Set IP</span>
+                <span class="switcher-badge font-mono">${escapeHtml2(extractHostFromUrl(customIp))}</span>
+                ${isSetIpActive ? '<span class="switcher-active-dot">\u25CF Active</span>' : ""}
+              </button>
+            ` : ""}
+            ${tailscaleUrl ? `
+              <button
+                type="button"
+                class="btn switcher-opt-btn ${isTailscaleActive ? "active" : ""}"
+                id="btn-switch-tailscale"
+                title="Switch active connection to Tailscale (${escapeHtml2(tailscaleUrl)})"
+              >
+                <span class="switcher-icon">\u{1F512}</span>
+                <span class="switcher-title">Tailscale</span>
+                <span class="switcher-badge font-mono">${escapeHtml2(extractHostFromUrl(tailscaleUrl))}</span>
+                ${isTailscaleActive ? '<span class="switcher-active-dot">\u25CF Active</span>' : ""}
+              </button>
+            ` : ""}
+          </div>
+        </div>
+      ` : "";
     return `
     <div class="settings-section settings-section--network" id="settings-section-network">
       <div class="settings-section-header">
@@ -13037,9 +13269,11 @@ ${thought.trim()}` : thought.trim();
         </p>
       </div>
 
+      ${switcherHtml}
+
       <div class="server-ip-config-box" style="margin-bottom: 12px;">
         <label for="input-custom-server-ip" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary, #9ca3af);">
-          Agent Server Address (LAN / Tailscale IP):
+          Agent Server Address (LAN / Set IP):
         </label>
         <div style="display: flex; gap: 8px; align-items: center;">
           <input
@@ -13047,13 +13281,13 @@ ${thought.trim()}` : thought.trim();
             class="search-input"
             type="text"
             placeholder="http://192.168.1.111:4200"
-            value="${escapeHtml2(currentBaseUrl)}"
+            value="${escapeHtml2(customIp)}"
             style="flex: 1;"
           />
           <button type="button" class="btn btn-primary" id="btn-save-custom-ip" style="white-space: nowrap;">
             ${isServerSaved ? "\u2705 Saved!" : "\u{1F4BE} Set IP"}
           </button>
-          ${currentBaseUrl ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ""}
+          ${customIp ? '<button type="button" class="btn btn-secondary" id="btn-clear-custom-ip" title="Clear server IP">Clear</button>' : ""}
         </div>
       </div>
 
@@ -13230,66 +13464,6 @@ ${thought.trim()}` : thought.trim();
       </div>
     </div>
   `;
-  }
-
-  // src/ui/components/connectionEndpointInfo.ts
-  function detectIsTailscale(hostOrIp) {
-    if (!hostOrIp) return false;
-    const clean = hostOrIp.toLowerCase().trim();
-    if (clean.startsWith("100.")) return true;
-    if (clean.includes("tailscale") || clean.endsWith(".ts.net")) return true;
-    return false;
-  }
-  function extractHostFromUrl(rawUrl) {
-    if (!rawUrl) return "";
-    try {
-      const parsed = new URL(rawUrl.startsWith("http") ? rawUrl : `http://${rawUrl}`);
-      return parsed.hostname;
-    } catch {
-      const match = rawUrl.match(/^(?:https?:\/\/)?([^:/#?]+)/i);
-      return match ? match[1] : rawUrl;
-    }
-  }
-  function getConnectionEndpointInfo(state2) {
-    let host = "";
-    let fullUrl = "";
-    if (state2.selectedLanIp) {
-      fullUrl = state2.selectedLanIp;
-      host = extractHostFromUrl(state2.selectedLanIp);
-    } else {
-      const serverBase = getServerBaseUrl();
-      if (serverBase) {
-        fullUrl = serverBase;
-        host = extractHostFromUrl(serverBase);
-      } else if (state2.serverSetupInfo?.lanUrl) {
-        fullUrl = state2.serverSetupInfo.lanUrl;
-        host = extractHostFromUrl(state2.serverSetupInfo.lanUrl);
-      } else if (typeof window !== "undefined" && !isStaticDeployment() && window.location.hostname) {
-        host = window.location.hostname;
-        fullUrl = window.location.origin;
-      }
-    }
-    if (!host && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) {
-      const firstNet = state2.serverSetupInfo.networks[0];
-      host = firstNet.address;
-      fullUrl = firstNet.url;
-    }
-    if (!host) {
-      return { ip: "", connectionType: "", isTailscale: false, displayText: "" };
-    }
-    const matchingNet = state2.serverSetupInfo?.networks?.find(
-      (n) => n.address === host || extractHostFromUrl(n.url) === host
-    );
-    const isTailscale = matchingNet?.isTailscale ?? detectIsTailscale(host);
-    const connectionType = isTailscale ? "Tailscale" : "LAN";
-    const displayText = `${host} (${connectionType})`;
-    return {
-      ip: host,
-      connectionType,
-      isTailscale,
-      fullUrl,
-      displayText
-    };
   }
 
   // src/ui/components/navHeader.ts
@@ -14464,6 +14638,88 @@ ${thought.trim()}` : thought.trim();
     setupModelSearchInput(state2, callbacks);
   }
 
+  // src/ui/settingsConnectionSwitcher.ts
+  async function fetchServerSetupInfo(state2, onRender, force = false) {
+    if (!state2.customServerIp) state2.customServerIp = getCustomServerIp() || void 0;
+    if (!state2.tailscaleUrl) state2.tailscaleUrl = getTailscaleUrl() || void 0;
+    if (!force && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
+    if (!hasLiveServer()) return;
+    try {
+      const res = await fetch(buildApiUrl("/api/setup-info"));
+      if (res.ok) {
+        const data = await res.json();
+        state2.serverSetupInfo = data;
+        const tsNet = data.networks?.find((n) => n.isTailscale);
+        if (tsNet) {
+          state2.tailscaleUrl = tsNet.url;
+          setTailscaleUrl(tsNet.url);
+        }
+        onRender();
+      }
+    } catch {
+    }
+  }
+  function selectLanIp(state2, ipUrl, onRender) {
+    state2.selectedLanIp = ipUrl;
+    state2.qrModalTarget = "lan";
+    setServerBaseUrl(ipUrl);
+    if (detectIsTailscale(extractHostFromUrl(ipUrl))) {
+      state2.tailscaleUrl = ipUrl;
+      setTailscaleUrl(ipUrl);
+    } else {
+      state2.customServerIp = ipUrl;
+      setCustomServerIp(ipUrl);
+    }
+    onRender();
+    void fetchServerSetupInfo(state2, onRender, true);
+  }
+  function switchToTailscale(state2, onRender) {
+    const tsUrl = state2.tailscaleUrl || getTailscaleUrl() || state2.serverSetupInfo?.networks?.find((n) => n.isTailscale)?.url;
+    if (!tsUrl) return;
+    state2.selectedLanIp = tsUrl;
+    state2.tailscaleUrl = tsUrl;
+    state2.qrModalTarget = "lan";
+    setServerBaseUrl(tsUrl);
+    setTailscaleUrl(tsUrl);
+    state2.settingsCopyFeedback = "switched-tailscale";
+    onRender();
+    void fetchServerSetupInfo(state2, onRender, true);
+  }
+  function switchToSetIp(state2, onRender) {
+    const customIp = state2.customServerIp || getCustomServerIp() || state2.serverSetupInfo?.lanUrl?.split("/#")[0];
+    if (!customIp) return;
+    state2.selectedLanIp = customIp;
+    state2.customServerIp = customIp;
+    state2.qrModalTarget = "lan";
+    setServerBaseUrl(customIp);
+    state2.settingsCopyFeedback = "switched-set-ip";
+    onRender();
+    void fetchServerSetupInfo(state2, onRender, true);
+  }
+  function saveCustomServerUrl(state2, url, onRender) {
+    const clean = url.trim().replace(/\/+$/, "");
+    if (clean) {
+      setCustomServerIp(clean);
+      setServerBaseUrl(clean);
+      state2.customServerIp = clean;
+      state2.selectedLanIp = clean;
+    } else {
+      clearCustomServerIp();
+      clearServerBaseUrl();
+      state2.customServerIp = void 0;
+      state2.selectedLanIp = void 0;
+    }
+    state2.settingsCopyFeedback = "server-saved";
+    onRender();
+    void fetchServerSetupInfo(state2, onRender, true);
+    setTimeout(() => {
+      if (state2.settingsCopyFeedback === "server-saved") {
+        state2.settingsCopyFeedback = void 0;
+        onRender();
+      }
+    }, 2500);
+  }
+
   // src/ui/settingsClipboardActions.ts
   async function copyQrLink(state2, onRender) {
     const url = buildSettingsQrUrl({
@@ -14528,24 +14784,14 @@ ${thought.trim()}` : thought.trim();
   }
 
   // src/ui/settingsModalEvents.ts
-  async function fetchServerSetupInfo(state2, onRender, force = false) {
-    if (!force && state2.serverSetupInfo?.networks && state2.serverSetupInfo.networks.length > 0) return;
-    if (!hasLiveServer()) return;
-    try {
-      const res = await fetch(buildApiUrl("/api/setup-info"));
-      if (res.ok) {
-        state2.serverSetupInfo = await res.json();
-        onRender();
-      }
-    } catch {
-    }
-  }
   function openSettingsModal(state2, onRender) {
     state2.isSettingsModalOpen = true;
     state2.isQrModalOpen = true;
     state2.qrModalTarget = state2.qrModalTarget || "gh_pages";
     state2.settingsCopyFeedback = void 0;
     state2.qrCopyFeedback = void 0;
+    if (!state2.customServerIp) state2.customServerIp = getCustomServerIp() || void 0;
+    if (!state2.tailscaleUrl) state2.tailscaleUrl = getTailscaleUrl() || void 0;
     onRender();
     void fetchServerSetupInfo(state2, onRender);
   }
@@ -14561,32 +14807,6 @@ ${thought.trim()}` : thought.trim();
     state2.settingsCopyFeedback = void 0;
     state2.qrCopyFeedback = void 0;
     onRender();
-  }
-  function selectLanIp(state2, ipUrl, onRender) {
-    state2.selectedLanIp = ipUrl;
-    state2.qrModalTarget = "lan";
-    setServerBaseUrl(ipUrl);
-    onRender();
-    void fetchServerSetupInfo(state2, onRender, true);
-  }
-  function saveCustomServerUrl(state2, url, onRender) {
-    const clean = url.trim().replace(/\/+$/, "");
-    if (clean) {
-      setServerBaseUrl(clean);
-      state2.selectedLanIp = clean;
-    } else {
-      clearServerBaseUrl();
-      state2.selectedLanIp = void 0;
-    }
-    state2.settingsCopyFeedback = "server-saved";
-    onRender();
-    void fetchServerSetupInfo(state2, onRender, true);
-    setTimeout(() => {
-      if (state2.settingsCopyFeedback === "server-saved") {
-        state2.settingsCopyFeedback = void 0;
-        onRender();
-      }
-    }, 2500);
   }
   function handleSettingsModalClick(state2, target, callbacks) {
     if (target.closest("#btn-open-settings, #btn-show-qr, #btn-sidebar-qr")) {
@@ -14607,6 +14827,14 @@ ${thought.trim()}` : thought.trim();
     }
     if (target.closest("#qr-tab-dl")) {
       selectQrTab(state2, "download", callbacks.onRender);
+      return true;
+    }
+    if (target.closest("#btn-switch-tailscale")) {
+      switchToTailscale(state2, callbacks.onRender);
+      return true;
+    }
+    if (target.closest("#btn-switch-set-ip")) {
+      switchToSetIp(state2, callbacks.onRender);
       return true;
     }
     const useIpBtn = target.closest("[data-use-ip]");

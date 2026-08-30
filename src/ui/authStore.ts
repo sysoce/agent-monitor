@@ -1,17 +1,21 @@
 const TOKEN_KEY = 'agent_monitor_token';
 const SERVER_KEY = 'agent_server_url';
+const CUSTOM_IP_KEY = 'agent_custom_server_ip';
+const TAILSCALE_KEY = 'agent_tailscale_url';
 
 export function getStoredToken(): string | null {
   try {
-    const fromUrl = new URLSearchParams(window.location.search).get('token');
-    if (fromUrl) {
-      setStoredToken(fromUrl);
-      const url = new URL(window.location.href);
-      url.searchParams.delete('token');
-      window.history.replaceState({}, '', url.toString());
-      return fromUrl;
+    if (typeof window !== 'undefined' && window.location) {
+      const fromUrl = new URLSearchParams(window.location.search).get('token');
+      if (fromUrl) {
+        setStoredToken(fromUrl);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('token');
+        window.history.replaceState({}, '', url.toString());
+        return fromUrl;
+      }
     }
-    return localStorage.getItem(TOKEN_KEY);
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
   } catch {
     return null;
   }
@@ -19,13 +23,17 @@ export function getStoredToken(): string | null {
 
 export function setStoredToken(token: string): void {
   try {
-    localStorage.setItem(TOKEN_KEY, token);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(TOKEN_KEY, token);
+    }
   } catch {}
 }
 
 export function clearStoredToken(): void {
   try {
-    localStorage.removeItem(TOKEN_KEY);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(TOKEN_KEY);
+    }
   } catch {}
 }
 
@@ -42,13 +50,15 @@ export function getDefaultServerUrl(): string {
 
 export function getServerBaseUrl(): string {
   try {
-    const fromUrl = new URLSearchParams(window.location.search).get('server');
-    if (fromUrl) {
-      const clean = fromUrl.replace(/\/+$/, '');
-      setServerBaseUrl(clean);
-      return clean;
+    if (typeof window !== 'undefined' && window.location) {
+      const fromUrl = new URLSearchParams(window.location.search).get('server');
+      if (fromUrl) {
+        const clean = fromUrl.replace(/\/+$/, '');
+        setServerBaseUrl(clean);
+        return clean;
+      }
     }
-    const stored = localStorage.getItem(SERVER_KEY);
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(SERVER_KEY) : null;
     if (stored === 'none') {
       return '';
     }
@@ -85,17 +95,34 @@ export function hasLiveServer(): boolean {
   return true;
 }
 
-export function setServerBaseUrl(url: string): void {
+function getCleanStorage(key: string): string {
   try {
-    const clean = url.trim().replace(/\/+$/, '');
-    localStorage.setItem(SERVER_KEY, clean || 'none');
+    const val = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    if (val && val !== 'none') return val.replace(/\/+$/, '');
+  } catch {}
+  return '';
+}
+
+function setCleanStorage(key: string, val: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const clean = val.trim().replace(/\/+$/, '');
+      localStorage.setItem(key, clean || 'none');
+    }
   } catch {}
 }
 
-export function clearServerBaseUrl(): void {
-  try {
-    localStorage.setItem(SERVER_KEY, 'none');
-  } catch {}
+export function setServerBaseUrl(url: string): void { setCleanStorage(SERVER_KEY, url); }
+export function clearServerBaseUrl(): void { setCleanStorage(SERVER_KEY, 'none'); }
+export function getCustomServerIp(): string { return getCleanStorage(CUSTOM_IP_KEY); }
+export function setCustomServerIp(url: string): void { setCleanStorage(CUSTOM_IP_KEY, url); }
+export function clearCustomServerIp(): void {
+  try { if (typeof localStorage !== 'undefined') localStorage.removeItem(CUSTOM_IP_KEY); } catch {}
+}
+export function getTailscaleUrl(): string { return getCleanStorage(TAILSCALE_KEY); }
+export function setTailscaleUrl(url: string): void { setCleanStorage(TAILSCALE_KEY, url); }
+export function clearTailscaleUrl(): void {
+  try { if (typeof localStorage !== 'undefined') localStorage.removeItem(TAILSCALE_KEY); } catch {}
 }
 
 export function buildApiUrl(pathname: string): string {

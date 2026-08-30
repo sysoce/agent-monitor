@@ -2,22 +2,24 @@ import type { AppState } from './types';
 import type { TransportMode } from '../sync/types';
 import type { QrTarget } from './components/settingsModal/types';
 import type { EventHandlerCallbacks } from './eventHandlers';
-import { buildApiUrl, setServerBaseUrl, clearServerBaseUrl, hasLiveServer } from './authStore';
+import {
+  fetchServerSetupInfo,
+  selectLanIp,
+  switchToTailscale,
+  switchToSetIp,
+  saveCustomServerUrl,
+} from './settingsConnectionSwitcher';
+import { getCustomServerIp, getTailscaleUrl } from './authStore';
 import { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
 
+export {
+  fetchServerSetupInfo,
+  selectLanIp,
+  switchToTailscale,
+  switchToSetIp,
+  saveCustomServerUrl,
+} from './settingsConnectionSwitcher';
 export { copyQrLink, copySetupHash, copyIpUrl } from './settingsClipboardActions';
-
-export async function fetchServerSetupInfo(state: AppState, onRender: () => void, force = false): Promise<void> {
-  if (!force && state.serverSetupInfo?.networks && state.serverSetupInfo.networks.length > 0) return;
-  if (!hasLiveServer()) return;
-  try {
-    const res = await fetch(buildApiUrl('/api/setup-info'));
-    if (res.ok) {
-      state.serverSetupInfo = await res.json();
-      onRender();
-    }
-  } catch {}
-}
 
 export function openSettingsModal(state: AppState, onRender: () => void): void {
   state.isSettingsModalOpen = true;
@@ -25,6 +27,8 @@ export function openSettingsModal(state: AppState, onRender: () => void): void {
   state.qrModalTarget = state.qrModalTarget || 'gh_pages';
   state.settingsCopyFeedback = undefined;
   state.qrCopyFeedback = undefined;
+  if (!state.customServerIp) state.customServerIp = getCustomServerIp() || undefined;
+  if (!state.tailscaleUrl) state.tailscaleUrl = getTailscaleUrl() || undefined;
   onRender();
   void fetchServerSetupInfo(state, onRender);
 }
@@ -44,33 +48,6 @@ export function selectQrTab(state: AppState, target: QrTarget, onRender: () => v
   onRender();
 }
 
-export function selectLanIp(state: AppState, ipUrl: string, onRender: () => void): void {
-  state.selectedLanIp = ipUrl;
-  state.qrModalTarget = 'lan';
-  setServerBaseUrl(ipUrl);
-  onRender();
-  void fetchServerSetupInfo(state, onRender, true);
-}
-
-export function saveCustomServerUrl(state: AppState, url: string, onRender: () => void): void {
-  const clean = url.trim().replace(/\/+$/, '');
-  if (clean) {
-    setServerBaseUrl(clean);
-    state.selectedLanIp = clean;
-  } else {
-    clearServerBaseUrl();
-    state.selectedLanIp = undefined;
-  }
-  state.settingsCopyFeedback = 'server-saved';
-  onRender();
-  void fetchServerSetupInfo(state, onRender, true);
-  setTimeout(() => {
-    if (state.settingsCopyFeedback === 'server-saved') {
-      state.settingsCopyFeedback = undefined;
-      onRender();
-    }
-  }, 2500);
-}
 
 export function handleSettingsModalClick(state: AppState, target: HTMLElement, callbacks: EventHandlerCallbacks): boolean {
   if (target.closest('#btn-open-settings, #btn-show-qr, #btn-sidebar-qr')) {
@@ -84,6 +61,8 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   if (target.closest('#qr-tab-gh')) { selectQrTab(state, 'gh_pages', callbacks.onRender); return true; }
   if (target.closest('#qr-tab-lan')) { selectQrTab(state, 'lan', callbacks.onRender); return true; }
   if (target.closest('#qr-tab-dl')) { selectQrTab(state, 'download', callbacks.onRender); return true; }
+  if (target.closest('#btn-switch-tailscale')) { switchToTailscale(state, callbacks.onRender); return true; }
+  if (target.closest('#btn-switch-set-ip')) { switchToSetIp(state, callbacks.onRender); return true; }
 
   const useIpBtn = target.closest<HTMLElement>('[data-use-ip]');
   if (useIpBtn) {
@@ -119,3 +98,4 @@ export function handleSettingsModalClick(state: AppState, target: HTMLElement, c
   if (target.closest('#btn-settings-logout')) { callbacks.onLogout?.(); closeSettingsModal(state, callbacks.onRender); return true; }
   return false;
 }
+

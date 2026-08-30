@@ -69,6 +69,8 @@ export interface AppState {
   qrCopyFeedback?: 'link' | 'hash';
   settingsCopyFeedback?: string;
   selectedLanIp?: string;
+  customServerIp?: string;
+  tailscaleUrl?: string;
   serverSetupInfo?: {
     githubPagesUrl?: string;
     lanUrl?: string;
