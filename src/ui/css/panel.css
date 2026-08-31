@@ -52,6 +52,8 @@ html, body {
   font-size: var(--vscode-font-size, 13px);
   color: var(--cursor-foreground);
   background: var(--cursor-bg);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .agent-app {

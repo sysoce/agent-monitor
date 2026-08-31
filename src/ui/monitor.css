@@ -15,6 +15,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   touch-action: pan-x pan-y;
   -webkit-text-size-adjust: 100%;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 #app {
@@ -370,6 +372,8 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg.assistant {
@@ -381,15 +385,21 @@ body {
   font-size: 13.5px;
   line-height: 1.55;
   padding: 0 4px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg-text {
   word-break: break-word;
   line-height: 1.6;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg-user-text {
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg-attachments {
@@ -3220,6 +3230,9 @@ body {
   align-items: flex-start;
   gap: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .connection-notice--error {
@@ -3250,12 +3263,17 @@ body {
   font-size: 16px;
   line-height: 1.2;
   flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
 .connection-notice-content {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .connection-notice-title {
@@ -3263,12 +3281,16 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .connection-notice-text {
   font-size: 12.5px;
   line-height: 1.4;
   opacity: 0.95;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .btn-settings {
@@ -3873,6 +3895,8 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-section {
@@ -3882,6 +3906,8 @@ input:checked + .slider:before {
   padding-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-section:last-child {
@@ -3891,6 +3917,8 @@ input:checked + .slider:before {
 
 .settings-section-header {
   margin-bottom: 2px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-section-title {
@@ -3901,6 +3929,8 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 6px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-section-subtitle {
@@ -3908,6 +3938,8 @@ input:checked + .slider:before {
   color: #999999;
   margin: 0;
   line-height: 1.45;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .qr-tabs-container {
@@ -4000,6 +4032,15 @@ input:checked + .slider:before {
   margin-top: 8px;
   border-left: 3px solid #0e639c;
   color: #cccccc;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.qr-install-tips ol,
+.qr-install-tips li,
+.qr-install-tips strong {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .qr-install-tips ol {
@@ -4172,6 +4213,8 @@ input:checked + .slider:before {
   padding: 10px 12px;
   cursor: pointer;
   transition: all 0.15s ease;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .network-ip-item:hover {
@@ -4191,6 +4234,8 @@ input:checked + .slider:before {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .network-ip-title-group {
@@ -4198,12 +4243,16 @@ input:checked + .slider:before {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .network-ip-name {
   font-size: 12.5px;
   font-weight: 600;
   color: #ffffff;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .network-ip-badge {
@@ -4211,6 +4260,8 @@ input:checked + .slider:before {
   padding: 1px 6px;
   border-radius: 4px;
   font-weight: 600;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .badge-lan {
@@ -4238,6 +4289,8 @@ input:checked + .slider:before {
   font-weight: 600;
   display: inline-flex;
   align-items: center;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .network-status--active {
@@ -4274,7 +4327,6 @@ input:checked + .slider:before {
 }
 
 .network-ip-actions {
-
   display: flex;
   gap: 6px;
 }
@@ -4299,6 +4351,8 @@ input:checked + .slider:before {
 .network-ip-address-text {
   font-size: 11.5px;
   color: #a0a0a0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .network-ip-address-text code {
@@ -4307,6 +4361,9 @@ input:checked + .slider:before {
   padding: 2px 6px;
   border-radius: 4px;
   color: #e6e6e6;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .network-ip-empty {
@@ -4316,6 +4373,8 @@ input:checked + .slider:before {
   background: #1c1c1f;
   border-radius: 6px;
   border: 1px dashed #333338;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ---------------- Settings Sync & App Cards ---------------- */
@@ -4328,12 +4387,16 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-sync-info {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-sync-row {
@@ -4341,14 +4404,20 @@ input:checked + .slider:before {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-sync-label {
   color: #888888;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-sync-val {
   color: #ffffff;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-sync-status {
@@ -4357,6 +4426,8 @@ input:checked + .slider:before {
   gap: 5px;
   font-size: 11px;
   font-weight: 500;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-sync-status.status-online { color: #4ec9b0; }
@@ -4446,17 +4517,23 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-row-title {
   font-size: 12.5px;
   font-weight: 600;
   color: #ffffff;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-row-desc {
   font-size: 11.5px;
   color: #888888;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-version-row {
@@ -4465,15 +4542,21 @@ input:checked + .slider:before {
   font-size: 12px;
   padding-top: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-version-label {
   color: #888888;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-version-val {
   color: #ffffff;
   font-weight: 600;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .settings-btn-download {

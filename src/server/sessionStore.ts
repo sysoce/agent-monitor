@@ -30,9 +30,28 @@ export async function getSessionDetail(workspaceRoot: string, sessionId: string)
   const filesChanged: Array<{ path: string; status?: string }> = [];
   for (const m of messages) {
     for (const tc of m.tool_calls ?? []) {
-      const target = String(tc.args?.target_file || tc.args?.targetFile || tc.args?.path || '');
-      if (target && !filesChanged.some((f) => f.path === target)) filesChanged.push({ path: target, status: tc.name?.includes('delete') ? 'deleted' : 'modified' });
-      if (target && isPlanFilePath(target) && !artifacts.some((a) => a.path === target)) artifacts.push({ name: path.basename(target), path: target, type: 'plan' });
+      const tcArgs = (tc.args ?? {}) as Record<string, unknown>;
+      const targets: string[] = [];
+      if (Array.isArray(tcArgs.files)) {
+        for (const f of tcArgs.files) {
+          if (typeof f === 'object' && f !== null) {
+            const item = f as Record<string, unknown>;
+            const p = String(item.path ?? item.targetFile ?? item.TargetFile ?? item.file ?? item.filePath ?? '');
+            if (p) targets.push(p);
+          }
+        }
+      }
+      const direct = String(tcArgs.target_file || tcArgs.targetFile || tcArgs.TargetFile || tcArgs.path || tcArgs.filePath || tcArgs.file || '');
+      if (direct && !targets.includes(direct)) targets.push(direct);
+
+      for (const target of targets) {
+        if (target && !filesChanged.some((f) => f.path === target)) {
+          filesChanged.push({ path: target, status: tc.name?.toLowerCase().includes('delete') ? 'deleted' : 'modified' });
+        }
+        if (target && isPlanFilePath(target) && !artifacts.some((a) => a.path === target)) {
+          artifacts.push({ name: path.basename(target), path: target, type: 'plan' });
+        }
+      }
     }
   }
 
