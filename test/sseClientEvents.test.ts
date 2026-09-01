@@ -34,7 +34,7 @@ class MockEventSourceExtended {
   }
 }
 
-test('initSseClient triggers onChange for message, change, update, and session events', async () => {
+test('initSseClient triggers onChange for change events', async () => {
   const originalWindow = (global as any).window;
   const originalEventSource = (global as any).EventSource;
 
@@ -53,24 +53,15 @@ test('initSseClient triggers onChange for message, change, update, and session e
   assert.equal(MockEventSourceExtended.instances.length, 1);
   const es = MockEventSourceExtended.instances[0]!;
 
-  es.emit('message', { data: JSON.stringify({ type: 'sync' }) });
-  assert.equal(changeCount, 1, 'Standard message event should trigger onChange');
-
   es.emit('change', { data: JSON.stringify({ type: 'change' }) });
-  assert.equal(changeCount, 2, 'Change event should trigger onChange');
-
-  es.emit('update', { data: JSON.stringify({ type: 'update' }) });
-  assert.equal(changeCount, 3, 'Update event should trigger onChange');
-
-  es.emit('session', { data: JSON.stringify({ type: 'session' }) });
-  assert.equal(changeCount, 4, 'Session event should trigger onChange');
+  assert.equal(changeCount, 1, 'Change event should trigger onChange');
 
   cleanup();
   (global as any).window = originalWindow;
   (global as any).EventSource = originalEventSource;
 });
 
-test('initSseClient immediately sets disconnected when url is mixed content blocked on HTTPS', async () => {
+test('initSseClient attempts SSE on HTTPS with stored HTTP server URL', async () => {
   const originalWindow = (global as any).window;
   const originalEventSource = (global as any).EventSource;
   const originalLocalStorage = (global as any).localStorage;
@@ -93,8 +84,8 @@ test('initSseClient immediately sets disconnected when url is mixed content bloc
   await new Promise((r) => setTimeout(r, 20));
   cleanup();
 
-  assert.equal(MockEventSourceExtended.instances.length, 0, 'No EventSource should be created for mixed content');
-  assert.deepEqual(statuses, ['disconnected']);
+  assert.equal(MockEventSourceExtended.instances.length, 1, 'EventSource should be created');
+  assert.equal(statuses[0], 'syncing');
 
   (global as any).window = originalWindow;
   (global as any).EventSource = originalEventSource;

@@ -7923,8 +7923,8 @@ input:checked + .slider:before {
   }
   function getDefaultServerUrl() {
     try {
-      if ("http://192.168.1.111:4200") {
-        return "http://192.168.1.111:4200";
+      if ("http://192.168.1.229:4200") {
+        return "http://192.168.1.229:4200";
       }
     } catch {
     }
@@ -7966,8 +7966,8 @@ input:checked + .slider:before {
     const stored = getCleanStorage(DEFAULT_LAN_KEY);
     if (stored) return stored;
     try {
-      if ("http://192.168.1.111:4200") {
-        return "http://192.168.1.111:4200";
+      if ("http://192.168.1.229:4200") {
+        return "http://192.168.1.229:4200";
       }
     } catch {
     }
@@ -8083,12 +8083,6 @@ input:checked + .slider:before {
   function isStaticDeployment() {
     if (typeof window === "undefined") return false;
     return window.location.protocol === "file:" || window.location.hostname.endsWith("github.io") || window.location.hostname.endsWith(".pages.dev") || window.location.hostname.endsWith(".vercel.app") || window.location.hostname.endsWith(".netlify.app");
-  }
-  function isMixedContentBlocked(url) {
-    if (typeof window === "undefined") return false;
-    if (window.location.protocol !== "https:") return false;
-    if (!url) return false;
-    return url.startsWith("http://") || url.startsWith("ws://");
   }
   function hasLiveServer() {
     const base = getServerBaseUrl();
@@ -8235,14 +8229,15 @@ input:checked + .slider:before {
 
   // src/ui/sseClient.ts
   function isStaticHostEnvironment() {
-    const base = getServerBaseUrl();
-    return isStaticDeployment() && !base;
+    if (typeof window === "undefined") return false;
+    const { hostname, protocol } = window.location;
+    const isStatic = protocol === "file:" || hostname.endsWith("github.io") || hostname.endsWith(".pages.dev");
+    return isStatic && !getServerBaseUrl();
   }
   function initSseClient(opts) {
     let es = null;
     let retryTimeout = null;
     let closed = false;
-    let retryCount = 0;
     if (isStaticHostEnvironment()) {
       setTimeout(() => {
         if (!closed) opts.onStatusChange("disconnected");
@@ -8253,21 +8248,10 @@ input:checked + .slider:before {
     }
     function connect() {
       if (closed) return;
-      if (es) {
-        try {
-          es.close();
-        } catch {
-        }
-        es = null;
-      }
+      opts.onStatusChange("syncing");
       const token = getStoredToken();
       const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : "/api/events";
       const url = buildApiUrl(relative);
-      if (isMixedContentBlocked(url)) {
-        opts.onStatusChange("disconnected");
-        return;
-      }
-      opts.onStatusChange(retryCount > 0 ? "connecting" : "syncing");
       try {
         es = new EventSource(url);
       } catch {
@@ -8276,26 +8260,15 @@ input:checked + .slider:before {
       }
       es.onopen = () => {
         if (closed) return;
-        retryCount = 0;
         opts.onStatusChange("connected");
       };
-      const handleChange = () => {
+      es.addEventListener("change", () => {
         if (closed) return;
         opts.onChange();
-      };
-      es.onmessage = handleChange;
-      es.addEventListener("change", handleChange);
-      es.addEventListener("update", handleChange);
-      es.addEventListener("session", handleChange);
-      es.addEventListener("sync", handleChange);
+      });
       es.onerror = () => {
         if (closed) return;
-        retryCount++;
-        if (retryCount >= 3) {
-          opts.onStatusChange("disconnected");
-        } else {
-          opts.onStatusChange("connecting");
-        }
+        opts.onStatusChange("disconnected");
         es?.close();
         if (!closed) {
           retryTimeout = setTimeout(connect, 3e3);
@@ -8465,7 +8438,7 @@ input:checked + .slider:before {
   }
 
   // src/ui/version.ts
-  var CLIENT_VERSION = true ? "1.0.44" : "1.0.42";
+  var CLIENT_VERSION = true ? "1.0.46" : "1.0.42";
   function parseSemver(ver) {
     if (!ver || typeof ver !== "string") return [0, 0, 0];
     const clean = ver.trim().replace(/^v/, "").split("-")[0] || "";
@@ -10093,7 +10066,7 @@ input:checked + .slider:before {
     ctx.callbacks.onModeChange("p2p");
     ctx.callbacks.onError?.("");
     ctx.p2pCoord?.stop();
-    const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig, getServerBaseUrl());
+    const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig);
     if (!coord) ctx.callbacks.onStatusChange("connected");
     return coord;
   }
@@ -10122,8 +10095,9 @@ input:checked + .slider:before {
     }
   }
   function handleSseFailure(ctx) {
-    if (!ctx.autoFallback) {
-      ctx.callbacks.onStatusChange("disconnected");
+    const onLiveHost = typeof window !== "undefined" && !isStaticDeployment();
+    if (!ctx.autoFallback || onLiveHost) {
+      ctx.callbacks.onStatusChange(onLiveHost ? "connecting" : "disconnected");
       return;
     }
     if (ctx.gistConfig) {
@@ -10346,13 +10320,22 @@ input:checked + .slider:before {
     if (cfg) syncMachine.setGistConfig(cfg);
     syncMachine.setAutoFallback(isAutoFallbackEnabled());
     const saved = typeof localStorage !== "undefined" && localStorage.getItem("agent_sync_mode") || void 0;
+    const onLiveHost = typeof window !== "undefined" && !isStaticDeployment();
     let mode;
-    if (saved) {
-      mode = saved;
-    } else if (!isStaticDeployment()) {
-      mode = "live-sse";
+    if (onLiveHost) {
+      mode = saved === "p2p" ? "p2p" : "live-sse";
+      if (typeof localStorage !== "undefined") localStorage.setItem("agent_sync_mode", mode);
     } else {
-      mode = hasLiveServer() ? "live-sse" : cfg?.gistId ? "git-backup" : "p2p";
+      mode = saved;
+      if (!mode) {
+        if (hasLiveServer()) {
+          mode = "live-sse";
+        } else if (cfg?.gistId) {
+          mode = "git-backup";
+        } else {
+          mode = "live-sse";
+        }
+      }
     }
     if (mode === "p2p") {
       syncMachine.forceP2PMode();
@@ -10381,7 +10364,14 @@ input:checked + .slider:before {
   }
   function toggleSyncModeAction(state2, syncMachine, startSse, sseCleanup) {
     const current = state2.syncMode || "p2p";
-    const next = current === "p2p" ? "live-sse" : current === "live-sse" ? "git-backup" : "p2p";
+    let next = "p2p";
+    if (current === "p2p") {
+      next = "live-sse";
+    } else if (current === "live-sse") {
+      next = "git-backup";
+    } else {
+      next = "p2p";
+    }
     setSyncModeAction(next, state2, syncMachine, startSse, sseCleanup);
   }
 
@@ -10495,12 +10485,12 @@ input:checked + .slider:before {
     if (hash.startsWith("setup=")) {
       const payload = hash.slice(6).split("&")[0];
       const decoded = decodeSetupPayload(payload);
-      if (decoded?.gistId || decoded?.token || decoded?.serverUrl || decoded?.password) {
+      if (decoded?.gistId || decoded?.token || decoded?.serverUrl) {
         return { gistId: decoded.gistId, token: decoded.token, password: decoded.password, serverUrl: decoded.serverUrl };
       }
     }
     const directDecoded = decodeSetupPayload(hash);
-    if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl || directDecoded?.password) {
+    if (directDecoded?.gistId || directDecoded?.token || directDecoded?.serverUrl) {
       return { gistId: directDecoded.gistId, token: directDecoded.token, password: directDecoded.password, serverUrl: directDecoded.serverUrl };
     }
     const params = new URLSearchParams(hash);
@@ -10510,31 +10500,29 @@ input:checked + .slider:before {
     const serverUrl = params.get("server") || params.get("serverUrl") || params.get("s") || void 0;
     const fbParam = params.get("fallback") ?? params.get("autoFallback");
     const autoFallback = fbParam !== null ? fbParam !== "0" && fbParam !== "false" : void 0;
-    if (gistId || token || serverUrl || password || autoFallback !== void 0) {
+    if (gistId || token || serverUrl || autoFallback !== void 0) {
       return { gistId, token, password, serverUrl, autoFallback };
     }
     return null;
   }
   function applyConfigToStorage(config, storage = typeof localStorage !== "undefined" ? localStorage : {}) {
-    if (!config.gistId && !config.token && !config.serverUrl && !config.password && config.autoFallback === void 0) return false;
+    if (!config.gistId && !config.token && !config.serverUrl && config.autoFallback === void 0) return false;
     try {
       if (config.autoFallback !== void 0) {
         storage.setItem("agent_auto_fallback", String(config.autoFallback));
       }
-      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
       if (config.serverUrl) {
         storage.setItem("agent_server_url", config.serverUrl);
         setServerBaseUrl(config.serverUrl);
-        if (!isHttps || !config.gistId) {
-          storage.setItem("agent_sync_mode", "live-sse");
-        }
       }
       if (config.gistId && config.token) {
         const gistSync = { gistId: config.gistId, token: config.token };
         storage.setItem("agent_gist_sync", JSON.stringify(gistSync));
-        if (isHttps || !config.serverUrl) {
-          storage.setItem("agent_sync_mode", "git-backup");
-        }
+        const preferLive = Boolean(config.serverUrl) || typeof window !== "undefined" && !isStaticDeployment();
+        storage.setItem("agent_sync_mode", preferLive ? "live-sse" : "git-backup");
+      }
+      if (config.serverUrl && !config.gistId) {
+        storage.setItem("agent_sync_mode", "live-sse");
       }
       if (config.password) {
         storage.setItem("agent_monitor_token", config.password);
@@ -10549,7 +10537,7 @@ input:checked + .slider:before {
     if (typeof window === "undefined") return { imported: false };
     const raw = window.location.hash || window.location.search;
     const parsed = parseUrlConfig(raw);
-    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl && !parsed.password && parsed.autoFallback === void 0) return { imported: false };
+    if (!parsed || !parsed.gistId && !parsed.token && !parsed.serverUrl && parsed.autoFallback === void 0) return { imported: false };
     const ok = applyConfigToStorage(parsed);
     if (ok) {
       try {
@@ -11026,7 +11014,7 @@ input:checked + .slider:before {
           const changed = this.state.syncStatus !== s;
           this.state.syncStatus = s;
           if (s === "disconnected") {
-            if (this.state.syncMode === "live-sse") this.syncMachine.handlePrimarySseFailure();
+            this.syncMachine.handlePrimarySseFailure();
           } else if (s === "connected") {
             this.syncMachine.restorePrimaryLive();
             void this.reloadData(false);

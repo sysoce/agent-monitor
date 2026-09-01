@@ -1,7 +1,7 @@
 import type { GistSyncConfig, TransportMode } from '../sync/types';
 import type { SyncStateMachineCallbacks } from './syncStateMachineTypes';
 import { startP2PCoordination } from './syncStateMachineP2P';
-import { getServerBaseUrl } from './authStore';
+import { isStaticDeployment } from './authStore';
 import type { P2PClientCoordinator } from '../p2p/p2pClientCoordinator';
 import type { LiveReachabilityProbe } from './liveReachabilityProbe';
 import type { GitPollController } from './syncStateMachinePoll';
@@ -23,7 +23,7 @@ export function switchP2PMode(ctx: ModeContext): P2PClientCoordinator | null {
   ctx.callbacks.onModeChange('p2p');
   ctx.callbacks.onError?.('');
   ctx.p2pCoord?.stop();
-  const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig, getServerBaseUrl());
+  const coord = startP2PCoordination(ctx.callbacks, ctx.gistConfig);
   if (!coord) ctx.callbacks.onStatusChange('connected');
   return coord;
 }
@@ -55,8 +55,9 @@ export function switchGitBackupMode(ctx: ModeContext): void {
 }
 
 export function handleSseFailure(ctx: ModeContext): void {
-  if (!ctx.autoFallback) {
-    ctx.callbacks.onStatusChange('disconnected');
+  const onLiveHost = typeof window !== 'undefined' && !isStaticDeployment();
+  if (!ctx.autoFallback || onLiveHost) {
+    ctx.callbacks.onStatusChange(onLiveHost ? 'connecting' : 'disconnected');
     return;
   }
   if (ctx.gistConfig) {

@@ -1,5 +1,5 @@
 import type { SyncStatus } from './types';
-import { getStoredToken, buildApiUrl, getServerBaseUrl, isStaticDeployment, isMixedContentBlocked } from './authStore';
+import { getStoredToken, buildApiUrl, getServerBaseUrl } from './authStore';
 
 export interface SseClientOptions {
   onStatusChange: (status: SyncStatus) => void;
@@ -7,15 +7,16 @@ export interface SseClientOptions {
 }
 
 export function isStaticHostEnvironment(): boolean {
-  const base = getServerBaseUrl();
-  return isStaticDeployment() && !base;
+  if (typeof window === 'undefined') return false;
+  const { hostname, protocol } = window.location;
+  const isStatic = protocol === 'file:' || hostname.endsWith('github.io') || hostname.endsWith('.pages.dev');
+  return isStatic && !getServerBaseUrl();
 }
 
 export function initSseClient(opts: SseClientOptions): () => void {
   let es: EventSource | null = null;
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
-  let retryCount = 0;
 
   if (isStaticHostEnvironment()) {
     setTimeout(() => {
@@ -28,18 +29,10 @@ export function initSseClient(opts: SseClientOptions): () => void {
 
   function connect() {
     if (closed) return;
-    if (es) {
-      try { es.close(); } catch {}
-      es = null;
-    }
+    opts.onStatusChange('syncing');
     const token = getStoredToken();
     const relative = token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events';
     const url = buildApiUrl(relative);
-    if (isMixedContentBlocked(url)) {
-      opts.onStatusChange('disconnected');
-      return;
-    }
-    opts.onStatusChange(retryCount > 0 ? 'connecting' : 'syncing');
     try {
       es = new EventSource(url);
     } catch {
@@ -49,29 +42,17 @@ export function initSseClient(opts: SseClientOptions): () => void {
 
     es.onopen = () => {
       if (closed) return;
-      retryCount = 0;
       opts.onStatusChange('connected');
     };
 
-    const handleChange = () => {
+    es.addEventListener('change', () => {
       if (closed) return;
       opts.onChange();
-    };
-
-    es.onmessage = handleChange;
-    es.addEventListener('change', handleChange);
-    es.addEventListener('update', handleChange);
-    es.addEventListener('session', handleChange);
-    es.addEventListener('sync', handleChange);
+    });
 
     es.onerror = () => {
       if (closed) return;
-      retryCount++;
-      if (retryCount >= 3) {
-        opts.onStatusChange('disconnected');
-      } else {
-        opts.onStatusChange('connecting');
-      }
+      opts.onStatusChange('disconnected');
       es?.close();
       if (!closed) {
         retryTimeout = setTimeout(connect, 3000);

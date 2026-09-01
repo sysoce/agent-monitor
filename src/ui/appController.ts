@@ -124,7 +124,7 @@ export class AppController {
         const changed = this.state.syncStatus !== s;
         this.state.syncStatus = s;
         if (s === 'disconnected') {
-          if (this.state.syncMode === 'live-sse') this.syncMachine.handlePrimarySseFailure();
+          this.syncMachine.handlePrimarySseFailure();
         } else if (s === 'connected') {
           this.syncMachine.restorePrimaryLive();
           void this.reloadData(false);

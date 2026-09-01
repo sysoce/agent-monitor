@@ -71,6 +71,29 @@ test('getServerBaseUrl returns empty string for direct non-static host without h
   });
 });
 
+test('applyPersistedSyncMode overrides stale git-backup on direct LAN host', () => {
+  withMockEnv({
+    window: { location: { protocol: 'http:', hostname: '192.168.1.111', port: '4200', origin: 'http://192.168.1.111:4200', search: '', pathname: '/' } },
+    store: {
+      agent_gist_sync: JSON.stringify({ gistId: 'gist-123', token: 'token-abc' }),
+      agent_sync_mode: 'git-backup',
+    },
+  }, (store) => {
+    let activeMode = '';
+    let sseStarted = false;
+    const sm = new SyncStateMachine({
+      onModeChange: (m) => { activeMode = m; },
+      onStatusChange: () => {},
+      onDataUpdate: () => {},
+    });
+
+    applyPersistedSyncMode(sm, () => { sseStarted = true; });
+    assert.equal(activeMode, 'live-sse', 'Direct LAN access must not stay on stale git-backup mode');
+    assert.equal(store.agent_sync_mode, 'live-sse');
+    assert.equal(sseStarted, true);
+  });
+});
+
 test('applyPersistedSyncMode honors saved live-sse mode on HTTPS even with HTTP server and gist configured', () => {
   withMockEnv({
     window: { location: { protocol: 'https:', hostname: 'sysoce.github.io', origin: 'https://sysoce.github.io', search: '', pathname: '/agent-monitor/' } },

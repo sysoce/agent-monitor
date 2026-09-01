@@ -54,13 +54,23 @@ export function applyPersistedSyncMode(syncMachine: SyncStateMachine, startSse: 
   if (cfg) syncMachine.setGistConfig(cfg);
   syncMachine.setAutoFallback(isAutoFallbackEnabled());
   const saved = (typeof localStorage !== 'undefined' && localStorage.getItem('agent_sync_mode')) as TransportMode || undefined;
+  const onLiveHost = typeof window !== 'undefined' && !isStaticDeployment();
   let mode: TransportMode;
-  if (saved) {
-    mode = saved;
-  } else if (!isStaticDeployment()) {
-    mode = 'live-sse';
+  if (onLiveHost) {
+    // v1.0.32 LAN/Tailscale direct access: always prefer live SSE (or explicit P2P)
+    mode = saved === 'p2p' ? 'p2p' : 'live-sse';
+    if (typeof localStorage !== 'undefined') localStorage.setItem('agent_sync_mode', mode);
   } else {
-    mode = hasLiveServer() ? 'live-sse' : (cfg?.gistId ? 'git-backup' : 'p2p');
+    mode = saved;
+    if (!mode) {
+      if (hasLiveServer()) {
+        mode = 'live-sse';
+      } else if (cfg?.gistId) {
+        mode = 'git-backup';
+      } else {
+        mode = 'live-sse';
+      }
+    }
   }
 
   if (mode === 'p2p') {
@@ -103,7 +113,13 @@ export function toggleSyncModeAction(
   sseCleanup?: () => void
 ): void {
   const current = state.syncMode || 'p2p';
-  const next: TransportMode = current === 'p2p' ? 'live-sse' : current === 'live-sse' ? 'git-backup' : 'p2p';
+  let next: TransportMode = 'p2p';
+  if (current === 'p2p') {
+    next = 'live-sse';
+  } else if (current === 'live-sse') {
+    next = 'git-backup';
+  } else {
+    next = 'p2p';
+  }
   setSyncModeAction(next, state, syncMachine, startSse, sseCleanup);
 }
-
