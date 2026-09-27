@@ -13,6 +13,7 @@ import { serveStaticFile } from './staticHandler';
 import { handleSetupRoute } from './setupHandler';
 import { handleAttachmentRoute } from './attachmentHandler';
 import { handleP2PSignalRoute } from './p2pSignalRouter';
+import { readAgentCoreMeta, proxyToAgentCore } from './coreProxy';
 import type { AttachmentItem } from '../types';
 
 export { readJsonBody };
@@ -53,6 +54,13 @@ export async function handleRequest(
 
   if (await handleAttachmentRoute(req, res, url, workspaceRoot)) return;
   if (pathname === '/api/events') { sse.addClient(res); return; }
+
+  const coreMeta = readAgentCoreMeta(workspaceRoot);
+  if (coreMeta && pathname.startsWith('/api/')) {
+    const proxied = await proxyToAgentCore(req, res, coreMeta);
+    if (proxied) return;
+  }
+
   if (pathname === '/api/models' && req.method === 'GET') {
     const catalog = getMonitorModelCatalog();
     sendJson(res, 200, { models: catalog.models, groups: catalog.groups, currentProvider: catalog.currentProvider }, req);
